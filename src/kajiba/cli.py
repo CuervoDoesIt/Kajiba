@@ -16,7 +16,21 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
+from kajiba import __version__
 from kajiba.privacy import anonymize_hardware, apply_consent_level, jitter_timestamp
+from kajiba.publisher import (
+    CLONE_DIR,
+    DEFAULT_DATASET_REPO,
+    GitHubOps,
+    build_deletion_pr_body,
+    build_deletion_pr_title,
+    build_publish_pr_body,
+    build_publish_pr_title,
+    create_deletion_entry,
+    generate_catalog,
+    generate_readme,
+    write_records_to_shards,
+)
 from kajiba.schema import (
     OUTCOME_TAGS, PAIN_POINT_CATEGORIES, SCHEMA_VERSION,
     KajibaRecord, OutcomeSignals, PainPoint, QualityMetadata,
@@ -789,3 +803,222 @@ def report(category: Optional[str], description: Optional[str], severity: Option
     _save_staged_record(filepath, record)
     console.print(f"[green]Pain point reported: {category} ({severity})[/green]")
     console.print(f"  {description}")
+
+
+# ---------------------------------------------------------------------------
+# Publishing commands
+# ---------------------------------------------------------------------------
+
+
+def _load_config_value(key: str, default: str) -> str:
+    """Read a single value from ~/.hermes/config.yaml under the kajiba section.
+
+    Args:
+        key: The config key to look up (e.g. "dataset_repo").
+        default: Fallback value if key is absent or yaml unavailable.
+
+    Returns:
+        The config value as a string, or the default.
+    """
+    config_path = Path.home() / ".hermes" / "config.yaml"
+    if not config_path.exists():
+        return default
+    try:
+        import yaml  # type: ignore[import-untyped]
+        with config_path.open() as f:
+            full_config = yaml.safe_load(f) or {}
+        kajiba_section = full_config.get("kajiba", {})
+        return str(kajiba_section.get(key, default))
+    except ImportError:
+        return default
+    except Exception:
+        return default
+
+
+@cli.command()
+@click.option("--repo", default=None, help="Dataset repository (owner/repo). Default: config or CuervoDoesIt/kajiba-dataset")
+@click.option("--dry-run", is_flag=True, help="Show what would be published without actually pushing")
+def publish(repo: Optional[str], dry_run: bool) -> None:
+    """Publish outbox records to the dataset repository via PR.
+
+    Implements the full D-04 workflow: auth check, outbox load, consent
+    re-verification, fork/clone, branch, write shards, catalog, readme,
+    commit, push, PR creation.
+    """
+    # Step 1: Resolve dataset repo
+    if repo is None:
+        dataset_repo = _load_config_value("dataset_repo", DEFAULT_DATASET_REPO)
+    else:
+        dataset_repo = repo
+    repo_name = dataset_repo.split("/")[-1]
+
+    console.print(f"[bold]Publishing to:[/bold] {dataset_repo}")
+
+    # Step 2: Check gh auth
+    gh_ops = GitHubOps(upstream_repo=dataset_repo)
+    auth_result = gh_ops.check_auth()
+    if auth_result.returncode == -1:
+        console.print(
+            "[red]Error:[/red] gh CLI not found. "
+            "Install from https://cli.github.com/"
+        )
+        raise SystemExit(1)
+    if not auth_result.success:
+        console.print(
+            "[red]Error:[/red] Not authenticated. "
+            "Run `gh auth login` first."
+        )
+        raise SystemExit(1)
+    console.print("[green]  Auth check passed[/green]")
+
+    # Step 3: Load outbox records
+    outbox_records = _load_outbox_records()
+    if not outbox_records:
+        console.print(
+            "[yellow]No records to publish.[/yellow] "
+            "Submit records first with `kajiba submit`."
+        )
+        raise SystemExit(1)
+    console.print(f"[green]  Loaded {len(outbox_records)} outbox record(s)[/green]")
+
+    # Step 4: Re-verify consent (D-03)
+    verified_records: list[dict] = []
+    model_names: list[str] = []
+    tier_names: list[str] = []
+    for path, data in outbox_records:
+        try:
+            record = validate_record(data)
+            consent_level = "full"
+            if record.submission and record.submission.consent_level:
+                consent_level = record.submission.consent_level
+            stripped = apply_consent_level(record, consent_level)
+            rec_dict = stripped.model_dump(mode="json", by_alias=True)
+            verified_records.append(rec_dict)
+
+            # Collect model and tier info for PR metadata
+            if record.model and record.model.model_name:
+                model_names.append(record.model.model_name)
+            else:
+                model_names.append("unknown")
+            if record.quality and record.quality.quality_tier:
+                tier_names.append(record.quality.quality_tier)
+            else:
+                tier_names.append("review_needed")
+        except Exception as exc:
+            logger.warning("Skipping invalid record from %s: %s", path, exc)
+            console.print(f"[yellow]  Skipping invalid record: {path.name}[/yellow]")
+
+    if not verified_records:
+        console.print("[red]Error:[/red] No valid records after consent verification.")
+        raise SystemExit(1)
+    console.print(f"[green]  Consent verified: {len(verified_records)} record(s)[/green]")
+
+    # Step 5: Get username and fork
+    username_result = gh_ops.get_username()
+    if not username_result.success:
+        console.print(f"[red]Error:[/red] Could not get GitHub username: {username_result.stderr}")
+        raise SystemExit(1)
+    username = username_result.stdout.strip()
+    console.print(f"[green]  GitHub user: {username}[/green]")
+
+    fork_result = gh_ops.fork_repo()
+    if not fork_result.success:
+        console.print(f"[red]Error:[/red] Failed to fork repository: {fork_result.stderr}")
+        raise SystemExit(1)
+    console.print("[green]  Fork ready[/green]")
+
+    # Step 6: Clone or update fork
+    clone_dir = CLONE_DIR
+    if clone_dir.exists() and (clone_dir / ".git").is_dir():
+        pull_result = gh_ops.pull_latest(str(clone_dir))
+        if not pull_result.success:
+            console.print(f"[red]Error:[/red] Failed to update clone: {pull_result.stderr}")
+            raise SystemExit(1)
+        console.print("[green]  Clone updated[/green]")
+    else:
+        fork_url = f"https://github.com/{username}/{repo_name}.git"
+        clone_result = gh_ops.clone_fork(str(clone_dir), fork_url)
+        if not clone_result.success:
+            console.print(f"[red]Error:[/red] Failed to clone fork: {clone_result.stderr}")
+            raise SystemExit(1)
+        console.print("[green]  Fork cloned[/green]")
+
+    # Step 7: Create branch
+    branch_name = f"kajiba/publish-{datetime.now(UTC).strftime('%Y%m%d-%H%M%S')}"
+    branch_result = gh_ops.create_branch(str(clone_dir), branch_name)
+    if not branch_result.success:
+        console.print(f"[red]Error:[/red] Failed to create branch: {branch_result.stderr}")
+        raise SystemExit(1)
+    console.print(f"[green]  Branch created: {branch_name}[/green]")
+
+    # Step 8: Write records
+    written_count = write_records_to_shards(clone_dir, verified_records)
+    console.print(f"[green]  Wrote {written_count} record(s) to shards[/green]")
+
+    # Step 9: Generate catalog and README
+    catalog = generate_catalog(clone_dir)
+    catalog_path = clone_dir / "catalog.json"
+    catalog_path.write_text(
+        json.dumps(catalog, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    readme_content = generate_readme(catalog)
+    readme_path = clone_dir / "README.md"
+    readme_path.write_text(readme_content, encoding="utf-8")
+    console.print("[green]  Catalog and README regenerated[/green]")
+
+    # Step 10: Dry run check
+    if dry_run:
+        console.print()
+        console.print(Panel(
+            f"[bold]Dry run summary[/bold]\n"
+            f"Records: {written_count}\n"
+            f"Models: {', '.join(sorted(set(model_names)))}\n"
+            f"Tiers: {', '.join(sorted(set(tier_names)))}\n"
+            f"Branch: {branch_name}\n"
+            f"No changes pushed.",
+            title="Publish Dry Run",
+        ))
+        return
+
+    # Step 11: Commit, push, PR
+    commit_result = gh_ops.commit_all(
+        str(clone_dir),
+        f"kajiba: add {written_count} record(s)",
+    )
+    if not commit_result.success:
+        console.print(f"[red]Error:[/red] Failed to commit: {commit_result.stderr}")
+        raise SystemExit(1)
+    console.print("[green]  Changes committed[/green]")
+
+    push_result = gh_ops.push_branch(str(clone_dir), branch_name)
+    if not push_result.success:
+        console.print(f"[red]Error:[/red] Failed to push: {push_result.stderr}")
+        raise SystemExit(1)
+    console.print("[green]  Branch pushed[/green]")
+
+    pr_title = build_publish_pr_title(written_count, model_names)
+    pr_body = build_publish_pr_body(
+        written_count, model_names, tier_names, __version__,
+    )
+    head = f"{username}:{branch_name}"
+    pr_result = gh_ops.create_pr(pr_title, pr_body, head)
+
+    if not pr_result.success:
+        console.print(
+            f"[yellow]Warning:[/yellow] Records pushed to fork but PR creation failed.\n"
+            f"  {pr_result.stderr}\n"
+            f"  Create PR manually at https://github.com/{username}/{repo_name}"
+        )
+        return
+
+    pr_url = pr_result.stdout.strip()
+    console.print()
+    console.print(Panel(
+        f"[bold green]Published successfully![/bold green]\n"
+        f"Records: {written_count}\n"
+        f"Models: {', '.join(sorted(set(model_names)))}\n"
+        f"Tiers: {', '.join(sorted(set(tier_names)))}\n"
+        f"PR: {pr_url}",
+        title="Publish Complete",
+    ))
