@@ -18,8 +18,9 @@ from rich.text import Text
 
 from kajiba.privacy import anonymize_hardware, apply_consent_level, jitter_timestamp
 from kajiba.schema import (
-    OUTCOME_TAGS, SCHEMA_VERSION, KajibaRecord, OutcomeSignals,
-    QualityMetadata, SubmissionMetadata, validate_record,
+    OUTCOME_TAGS, PAIN_POINT_CATEGORIES, SCHEMA_VERSION,
+    KajibaRecord, OutcomeSignals, PainPoint, QualityMetadata,
+    SubmissionMetadata, validate_record,
 )
 from kajiba.scorer import compute_quality_score
 from kajiba.scrubber import flag_org_domains, scrub_record
@@ -231,24 +232,40 @@ def _render_preview(
             model_str += f" ({record.model.quantization})"
         table.add_row("Model", model_str)
 
-    if record.outcome:
-        rating_str = f"{record.outcome.user_rating}/5"
-        if record.outcome.outcome_tags:
-            rating_str += f" — {', '.join(record.outcome.outcome_tags)}"
-        table.add_row("Rating", rating_str)
+    console.print(table)
 
-    # Quality
+    # Merged quality panel (per D-10)
+    quality_panel_rows = []
+
+    # Auto-computed scores
     tier = quality_result.get("quality_tier", "unknown")
     tier_colors = {"gold": "yellow", "silver": "white", "bronze": "dark_orange", "review_needed": "red"}
     tier_color = tier_colors.get(tier, "white")
-    score_str = f"{quality_result.get('composite_score', 0):.3f} [{tier_color}]({tier})[/{tier_color}]"
-    table.add_row("Quality score", score_str)
+    quality_panel_rows.append(f"[bold]Quality Tier:[/bold] [{tier_color}]{tier}[/{tier_color}]")
+    quality_panel_rows.append(
+        f"[bold]Composite Score:[/bold] {quality_result.get('composite_score', 0):.3f}"
+    )
 
-    # Sub-scores
     for name, value in quality_result.get("sub_scores", {}).items():
-        table.add_row(f"  {name}", f"{value:.3f}")
+        label = name.replace("_", " ").title()
+        quality_panel_rows.append(f"  {label}: {value:.3f}")
 
-    console.print(table)
+    # User annotations (per D-10: merged in same panel)
+    if record.outcome:
+        quality_panel_rows.append("")
+        quality_panel_rows.append(f"[bold]User Rating:[/bold] {record.outcome.user_rating}/5")
+        if record.outcome.outcome_tags:
+            quality_panel_rows.append(f"[bold]Tags:[/bold] {', '.join(record.outcome.outcome_tags)}")
+        if record.outcome.user_comment:
+            quality_panel_rows.append(f"[bold]Comment:[/bold] {record.outcome.user_comment}")
+
+    if record.pain_points:
+        quality_panel_rows.append("")
+        quality_panel_rows.append(f"[bold]Pain Points:[/bold] ({len(record.pain_points)})")
+        for pp in record.pain_points:
+            quality_panel_rows.append(f"  [{pp.severity}] {pp.category}: {pp.description}")
+
+    console.print(Panel("\n".join(quality_panel_rows), title="Quality & Annotations"))
 
     # Scrubbing transparency (per D-01, D-02, D-03)
     has_redactions = any(v > 0 for v in scrub_stats.values())
@@ -710,3 +727,65 @@ def rate(score: Optional[int], tags: Optional[str], comment: Optional[str]) -> N
         console.print(f"  Tags: {', '.join(tag_list)}")
     if user_comment:
         console.print(f"  Comment: {user_comment}")
+
+
+@cli.command()
+@click.option(
+    "--category",
+    type=click.Choice([c for c in PAIN_POINT_CATEGORIES], case_sensitive=False),
+    default=None,
+    help="Pain point category.",
+)
+@click.option("--description", default=None, help="Description of the pain point.")
+@click.option(
+    "--severity",
+    type=click.Choice(["low", "medium", "high", "critical"], case_sensitive=False),
+    default=None,
+    help="Severity level.",
+)
+def report(category: Optional[str], description: Optional[str], severity: Optional[str]) -> None:
+    """Report a pain point on a staged record.
+
+    Attaches a structured pain point (category, description, severity)
+    to a staged record. Uses interactive prompts when flags are not provided.
+    """
+    picked = _pick_staged_record()
+    if picked is None:
+        return
+    filepath, record = picked
+
+    # Interactive prompts when flags not provided (per D-09)
+    if category is None:
+        console.print("[bold]Pain point categories:[/bold]")
+        for i, cat in enumerate(PAIN_POINT_CATEGORIES, 1):
+            console.print(f"  {i}. {cat}")
+        cat_idx = click.prompt(
+            "Select category number",
+            type=click.IntRange(1, len(PAIN_POINT_CATEGORIES)),
+        )
+        category = PAIN_POINT_CATEGORIES[int(cat_idx) - 1]
+
+    if description is None:
+        description = click.prompt("Description")
+
+    if severity is None:
+        severity = click.prompt(
+            "Severity",
+            type=click.Choice(["low", "medium", "high", "critical"]),
+            default="medium",
+        )
+
+    pain_point = PainPoint(
+        category=category,
+        severity=severity,
+        description=description,
+    )
+
+    # Append to existing pain points (do not overwrite)
+    if record.pain_points is None:
+        record.pain_points = []
+    record.pain_points.append(pain_point)
+
+    _save_staged_record(filepath, record)
+    console.print(f"[green]Pain point reported: {category} ({severity})[/green]")
+    console.print(f"  {description}")
