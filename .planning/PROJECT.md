@@ -23,6 +23,9 @@ Real-world AI session data, tagged with full runtime context (model identity, co
 - ✓ Content-addressable record IDs and dedup via SHA-256 submission hash — existing
 - ✓ Local-first processing with no network calls required for core pipeline — existing
 - ✓ Fault-tolerant collector that never disrupts the host agent — existing
+- ✓ Consent level enforcement — fields stripped based on user's chosen consent level (anonymous, trajectory_only, metadata_only, full) — Validated in Phase 1: Privacy Foundation
+- ✓ Metadata anonymization — GPU generalization to family tier, timestamp jitter ±30min, RAM/VRAM power-of-2 rounding, OS version stripping — Validated in Phase 1: Privacy Foundation
+- ✓ Complete regex scrubber coverage — 40-char hex token scrubbing with context keywords, org domain flagging with safe-domain allowlist, IP false positive fix — Validated in Phase 1: Privacy Foundation
 
 ### Active
 
@@ -31,13 +34,10 @@ Real-world AI session data, tagged with full runtime context (model identity, co
 - [ ] Model-agnostic data collection — decouple from Hermes-specific paths and support any LLM-powered tool as a data source
 - [ ] Full runtime context in data packages — model name, version, parameter count, quantization, hyperparams, LoRA config, system prompts, tool definitions, hardware specs, inference settings, context window size
 - [ ] LLM-based semantic PII scrubbing — catch personal names, company names, project names that regex misses
-- [ ] Metadata anonymization — GPU generalization, timestamp jitter, RAM/VRAM rounding, OS version stripping
-- [ ] Consent level enforcement — strip fields based on user's chosen consent level (anonymous, trajectory_only, metadata_only, full)
 - [ ] Configurable contribution modes — ad-hoc with user review/approval before submit, or continuous with pre-set parameters
 - [ ] GitHub repository as dataset destination — structured repo that contributors push scrubbed records to
 - [ ] Browsable dataset catalog — structured organization so consumers can browse by model, quality tier, or runtime context and download subsets
 - [ ] User annotation refinement — auto-score first, then let users tag/adjust quality signals (pain points, what worked)
-- [ ] Complete regex scrubber coverage — add generic 40-char hex token pattern and org domain flagging per spec
 
 ### Out of Scope
 
@@ -50,7 +50,7 @@ Real-world AI session data, tagged with full runtime context (model identity, co
 ## Context
 
 - **Existing codebase**: ~8 Python modules implementing the core pipeline (schema, collector, scrubber, scorer, CLI, Hermes integration). See `.planning/codebase/` for full analysis.
-- **Current state**: Early MVP (v0.1.0). End-to-end flow partially works but several spec features are stubs or missing (LLM scrubber, metadata anonymization, consent enforcement, HuggingFace upload).
+- **Current state**: Phase 1 complete. Privacy foundation in place — consent enforcement, hardware anonymization, timestamp jitter, IP regex fixes, hex token scrubbing, and org domain flagging all wired into the pipeline. 158 tests passing. Remaining stubs: LLM scrubber, HuggingFace upload.
 - **Key gap**: Currently tightly coupled to Hermes Agent. The vision is model-agnostic — any AI-assisted coding tool should be able to contribute data.
 - **Privacy is paramount**: Contributors are sharing real session data. Maximum scrubbing by default. The pipeline must earn trust before community adoption.
 - **Phased rollout**: GitHub repo first to validate the pipeline, then transition to HuggingFace for broader community access.
@@ -92,4 +92,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-03-30 after initialization*
+*Last updated: 2026-03-31 after Phase 1 completion*
