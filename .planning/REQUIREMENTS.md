@@ -89,38 +89,38 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PRIV-01 | — | Pending |
-| PRIV-02 | — | Pending |
-| PRIV-03 | — | Pending |
-| PRIV-04 | — | Pending |
-| PRIV-05 | — | Pending |
-| PRIV-06 | — | Pending |
-| PRIV-07 | — | Pending |
-| PRIV-08 | — | Pending |
-| QUAL-01 | — | Pending |
-| QUAL-02 | — | Pending |
-| QUAL-03 | — | Pending |
-| QUAL-04 | — | Pending |
-| QUAL-05 | — | Pending |
-| PUB-01 | — | Pending |
-| PUB-02 | — | Pending |
-| PUB-03 | — | Pending |
-| PUB-04 | — | Pending |
-| PUB-05 | — | Pending |
-| CONS-01 | — | Pending |
-| CONS-02 | — | Pending |
-| CONS-03 | — | Pending |
-| CONS-04 | — | Pending |
-| CONT-01 | — | Pending |
-| CONT-02 | — | Pending |
-| CONT-03 | — | Pending |
-| CONT-04 | — | Pending |
+| PRIV-01 | Phase 1 | Pending |
+| PRIV-02 | Phase 1 | Pending |
+| PRIV-03 | Phase 1 | Pending |
+| PRIV-04 | Phase 1 | Pending |
+| PRIV-05 | Phase 1 | Pending |
+| PRIV-06 | Phase 1 | Pending |
+| PRIV-07 | Phase 3 | Pending |
+| PRIV-08 | Phase 3 | Pending |
+| QUAL-01 | Phase 2 | Pending |
+| QUAL-02 | Phase 2 | Pending |
+| QUAL-03 | Phase 2 | Pending |
+| QUAL-04 | Phase 2 | Pending |
+| QUAL-05 | Phase 2 | Pending |
+| PUB-01 | Phase 3 | Pending |
+| PUB-02 | Phase 3 | Pending |
+| PUB-03 | Phase 3 | Pending |
+| PUB-04 | Phase 3 | Pending |
+| PUB-05 | Phase 3 | Pending |
+| CONS-01 | Phase 5 | Pending |
+| CONS-02 | Phase 5 | Pending |
+| CONS-03 | Phase 5 | Pending |
+| CONS-04 | Phase 5 | Pending |
+| CONT-01 | Phase 4 | Pending |
+| CONT-02 | Phase 4 | Pending |
+| CONT-03 | Phase 4 | Pending |
+| CONT-04 | Phase 4 | Pending |
 
 **Coverage:**
 - v1 requirements: 26 total
-- Mapped to phases: 0
-- Unmapped: 26 ⚠️
+- Mapped to phases: 26
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-30*
-*Last updated: 2026-03-30 after initial definition*
+*Last updated: 2026-03-30 after roadmap creation*
