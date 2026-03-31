@@ -724,3 +724,233 @@ class TestRateCommand:
 
         # Quality from submit
         assert content.get("quality") is not None
+
+
+# ---------------------------------------------------------------------------
+# Report command tests
+# ---------------------------------------------------------------------------
+
+
+class TestReportCommand:
+    """Test the kajiba report command."""
+
+    def test_report_with_all_flags(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Report with all flags saves pain point to staging file."""
+        record_data = _minimal_record_data()
+        staging = tmp_path / "staging"
+        staging.mkdir()
+        (staging / "session_001.json").write_text(
+            json.dumps(record_data), encoding="utf-8",
+        )
+
+        monkeypatch.setattr("kajiba.cli.STAGING_DIR", staging)
+        monkeypatch.setattr("kajiba.cli.KAJIBA_BASE", tmp_path)
+
+        result = runner.invoke(cli, [
+            "report",
+            "--category", "tool_call_failure",
+            "--description", "Tool crashed",
+            "--severity", "high",
+        ])
+        assert result.exit_code == 0
+        assert "Pain point reported" in result.output
+
+        content = json.loads((staging / "session_001.json").read_text(encoding="utf-8"))
+        assert len(content["pain_points"]) == 1
+        pp = content["pain_points"][0]
+        assert pp["category"] == "tool_call_failure"
+        assert pp["description"] == "Tool crashed"
+        assert pp["severity"] == "high"
+
+    def test_report_appends_to_existing(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Report appends to existing pain_points, does not overwrite."""
+        record_data = _minimal_record_data()
+        record_data["pain_points"] = [
+            {
+                "category": "hallucination_factual",
+                "description": "Made up a function",
+                "severity": "medium",
+            },
+        ]
+        staging = tmp_path / "staging"
+        staging.mkdir()
+        (staging / "session_001.json").write_text(
+            json.dumps(record_data), encoding="utf-8",
+        )
+
+        monkeypatch.setattr("kajiba.cli.STAGING_DIR", staging)
+        monkeypatch.setattr("kajiba.cli.KAJIBA_BASE", tmp_path)
+
+        result = runner.invoke(cli, [
+            "report",
+            "--category", "tool_call_failure",
+            "--description", "Tool crashed",
+            "--severity", "high",
+        ])
+        assert result.exit_code == 0
+
+        content = json.loads((staging / "session_001.json").read_text(encoding="utf-8"))
+        assert len(content["pain_points"]) == 2
+        assert content["pain_points"][0]["category"] == "hallucination_factual"
+        assert content["pain_points"][1]["category"] == "tool_call_failure"
+
+    def test_report_no_staging(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Report with empty staging shows 'No sessions found'."""
+        staging = tmp_path / "staging"
+        staging.mkdir()
+
+        monkeypatch.setattr("kajiba.cli.STAGING_DIR", staging)
+        monkeypatch.setattr("kajiba.cli.KAJIBA_BASE", tmp_path)
+
+        result = runner.invoke(cli, [
+            "report",
+            "--category", "tool_call_failure",
+            "--description", "Test",
+            "--severity", "medium",
+        ])
+        assert result.exit_code == 0
+        assert "No sessions found" in result.output
+
+    def test_report_appears_in_help(self, runner: CliRunner) -> None:
+        """Report command should appear in kajiba --help."""
+        result = runner.invoke(cli, ["--help"])
+        assert result.exit_code == 0
+        assert "report" in result.output
+
+    def test_report_saves_to_staging(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Report a pain point, load file fresh, verify it persists."""
+        record_data = _minimal_record_data()
+        staging = tmp_path / "staging"
+        staging.mkdir()
+        staging_file = staging / "session_001.json"
+        staging_file.write_text(json.dumps(record_data), encoding="utf-8")
+
+        monkeypatch.setattr("kajiba.cli.STAGING_DIR", staging)
+        monkeypatch.setattr("kajiba.cli.KAJIBA_BASE", tmp_path)
+
+        runner.invoke(cli, [
+            "report",
+            "--category", "context_loss",
+            "--description", "Lost context",
+            "--severity", "low",
+        ])
+
+        from kajiba.schema import validate_record
+        fresh = validate_record(json.loads(staging_file.read_text(encoding="utf-8")))
+        assert fresh.pain_points is not None
+        assert len(fresh.pain_points) == 1
+        assert fresh.pain_points[0].category == "context_loss"
+
+
+# ---------------------------------------------------------------------------
+# Merged quality panel tests
+# ---------------------------------------------------------------------------
+
+
+class TestPreviewMergedQualityPanel:
+    """Test that preview shows merged quality + annotation panel."""
+
+    def test_preview_shows_user_rating(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Preview of a rated record shows user_rating in output."""
+        record_data = _minimal_record_data()
+        record_data["outcome"] = {
+            "user_rating": 4,
+            "outcome_tags": ["task_completed"],
+        }
+        staging = tmp_path / "staging"
+        staging.mkdir()
+        (staging / "session_001.json").write_text(
+            json.dumps(record_data), encoding="utf-8",
+        )
+
+        monkeypatch.setattr("kajiba.cli.STAGING_DIR", staging)
+        result = runner.invoke(cli, ["preview"])
+        assert result.exit_code == 0
+        assert "4/5" in result.output
+
+    def test_preview_shows_pain_point(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Preview of a record with pain_points shows category in output."""
+        record_data = _minimal_record_data()
+        record_data["pain_points"] = [
+            {
+                "category": "tool_call_failure",
+                "description": "Broken",
+                "severity": "medium",
+            },
+        ]
+        staging = tmp_path / "staging"
+        staging.mkdir()
+        (staging / "session_001.json").write_text(
+            json.dumps(record_data), encoding="utf-8",
+        )
+
+        monkeypatch.setattr("kajiba.cli.STAGING_DIR", staging)
+        result = runner.invoke(cli, ["preview"])
+        assert result.exit_code == 0
+        assert "Pain Points" in result.output
+        assert "tool_call_failure" in result.output
+
+
+class TestFullAnnotationPipeline:
+    """Test rate + report + submit end-to-end pipeline."""
+
+    def test_submit_preserves_rate_and_report(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Rate, report, then submit — outbox has outcome, pain_points, and quality."""
+        record_data = _minimal_record_data()
+        staging = tmp_path / "staging"
+        staging.mkdir()
+        outbox = tmp_path / "outbox"
+        outbox.mkdir()
+        (staging / "session_001.json").write_text(
+            json.dumps(record_data), encoding="utf-8",
+        )
+
+        monkeypatch.setattr("kajiba.cli.STAGING_DIR", staging)
+        monkeypatch.setattr("kajiba.cli.OUTBOX_DIR", outbox)
+        monkeypatch.setattr("kajiba.cli.KAJIBA_BASE", tmp_path)
+
+        # Rate
+        runner.invoke(cli, ["rate", "--score", "4", "--tags", "task_completed"])
+
+        # Report
+        runner.invoke(cli, [
+            "report",
+            "--category", "tool_call_failure",
+            "--description", "Tool was slow",
+            "--severity", "low",
+        ])
+
+        # Submit
+        result = runner.invoke(cli, ["submit"], input="y\n")
+        assert result.exit_code == 0
+
+        outbox_files = list(outbox.glob("*.jsonl"))
+        assert len(outbox_files) == 1
+        content = json.loads(outbox_files[0].read_text(encoding="utf-8").strip())
+
+        # Outcome from rate
+        assert content.get("outcome") is not None
+        assert content["outcome"]["user_rating"] == 4
+
+        # Pain points from report
+        assert content.get("pain_points") is not None
+        assert len(content["pain_points"]) >= 1
+        assert content["pain_points"][0]["category"] == "tool_call_failure"
+
+        # Quality from submit
+        assert content.get("quality") is not None
+        assert "quality_tier" in content["quality"]
