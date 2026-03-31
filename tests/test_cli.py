@@ -571,3 +571,156 @@ class TestExportAnnotations:
 
         # Quality must also be present alongside annotations
         assert content.get("quality") is not None
+
+
+# ---------------------------------------------------------------------------
+# Rate command tests
+# ---------------------------------------------------------------------------
+
+
+class TestRateCommand:
+    """Test the kajiba rate command."""
+
+    def test_rate_with_score_and_tags(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Rate with --score and --tags saves outcome to staging file."""
+        record_data = _minimal_record_data()
+        staging = tmp_path / "staging"
+        staging.mkdir()
+        (staging / "session_001.json").write_text(
+            json.dumps(record_data), encoding="utf-8",
+        )
+
+        monkeypatch.setattr("kajiba.cli.STAGING_DIR", staging)
+        monkeypatch.setattr("kajiba.cli.KAJIBA_BASE", tmp_path)
+
+        result = runner.invoke(cli, ["rate", "--score", "4", "--tags", "task_completed"])
+        assert result.exit_code == 0
+        assert "Rating saved" in result.output
+
+        # Re-read the staging file and verify outcome
+        content = json.loads((staging / "session_001.json").read_text(encoding="utf-8"))
+        assert content["outcome"]["user_rating"] == 4
+        assert content["outcome"]["outcome_tags"] == ["task_completed"]
+
+    def test_rate_with_score_only(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Rate with --score only saves outcome with empty tags."""
+        record_data = _minimal_record_data()
+        staging = tmp_path / "staging"
+        staging.mkdir()
+        (staging / "session_001.json").write_text(
+            json.dumps(record_data), encoding="utf-8",
+        )
+
+        monkeypatch.setattr("kajiba.cli.STAGING_DIR", staging)
+        monkeypatch.setattr("kajiba.cli.KAJIBA_BASE", tmp_path)
+
+        result = runner.invoke(cli, ["rate", "--score", "3", "--tags", ""])
+        assert result.exit_code == 0
+
+        content = json.loads((staging / "session_001.json").read_text(encoding="utf-8"))
+        assert content["outcome"]["user_rating"] == 3
+        assert content["outcome"]["outcome_tags"] == []
+
+    def test_rate_with_comment(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Rate with --comment saves user_comment."""
+        record_data = _minimal_record_data()
+        staging = tmp_path / "staging"
+        staging.mkdir()
+        (staging / "session_001.json").write_text(
+            json.dumps(record_data), encoding="utf-8",
+        )
+
+        monkeypatch.setattr("kajiba.cli.STAGING_DIR", staging)
+        monkeypatch.setattr("kajiba.cli.KAJIBA_BASE", tmp_path)
+
+        result = runner.invoke(
+            cli,
+            ["rate", "--score", "4", "--tags", "task_completed", "--comment", "Good session"],
+        )
+        assert result.exit_code == 0
+
+        content = json.loads((staging / "session_001.json").read_text(encoding="utf-8"))
+        assert content["outcome"]["user_comment"] == "Good session"
+
+    def test_rate_no_staging(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Rate with empty staging shows 'No sessions found'."""
+        staging = tmp_path / "staging"
+        staging.mkdir()
+
+        monkeypatch.setattr("kajiba.cli.STAGING_DIR", staging)
+        monkeypatch.setattr("kajiba.cli.KAJIBA_BASE", tmp_path)
+
+        result = runner.invoke(cli, ["rate", "--score", "4"])
+        assert result.exit_code == 0
+        assert "No sessions found" in result.output
+
+    def test_rate_appears_in_help(self, runner: CliRunner) -> None:
+        """Rate command should appear in kajiba --help."""
+        result = runner.invoke(cli, ["--help"])
+        assert result.exit_code == 0
+        assert "rate" in result.output
+
+    def test_rate_saves_to_staging(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Rate a record, then load it fresh from disk — outcome persists."""
+        record_data = _minimal_record_data()
+        staging = tmp_path / "staging"
+        staging.mkdir()
+        staging_file = staging / "session_001.json"
+        staging_file.write_text(json.dumps(record_data), encoding="utf-8")
+
+        monkeypatch.setattr("kajiba.cli.STAGING_DIR", staging)
+        monkeypatch.setattr("kajiba.cli.KAJIBA_BASE", tmp_path)
+
+        runner.invoke(cli, ["rate", "--score", "5", "--tags", "perfect"])
+
+        # Load fresh from disk
+        from kajiba.schema import validate_record
+        fresh = validate_record(json.loads(staging_file.read_text(encoding="utf-8")))
+        assert fresh.outcome is not None
+        assert fresh.outcome.user_rating == 5
+        assert "perfect" in fresh.outcome.outcome_tags
+
+    def test_rate_then_submit_preserves_both(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Rate a staged record, then submit — outbox has outcome + quality."""
+        record_data = _minimal_record_data()
+        staging = tmp_path / "staging"
+        staging.mkdir()
+        outbox = tmp_path / "outbox"
+        outbox.mkdir()
+        (staging / "session_001.json").write_text(
+            json.dumps(record_data), encoding="utf-8",
+        )
+
+        monkeypatch.setattr("kajiba.cli.STAGING_DIR", staging)
+        monkeypatch.setattr("kajiba.cli.OUTBOX_DIR", outbox)
+        monkeypatch.setattr("kajiba.cli.KAJIBA_BASE", tmp_path)
+
+        # Rate first
+        runner.invoke(cli, ["rate", "--score", "4", "--tags", "task_completed"])
+
+        # Submit (confirm with y)
+        result = runner.invoke(cli, ["submit"], input="y\n")
+        assert result.exit_code == 0
+
+        outbox_files = list(outbox.glob("*.jsonl"))
+        assert len(outbox_files) == 1
+        content = json.loads(outbox_files[0].read_text(encoding="utf-8").strip())
+
+        # Outcome from rate
+        assert content.get("outcome") is not None
+        assert content["outcome"]["user_rating"] == 4
+
+        # Quality from submit
+        assert content.get("quality") is not None
