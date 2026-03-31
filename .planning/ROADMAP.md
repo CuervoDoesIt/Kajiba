@@ -30,7 +30,12 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. A user running `kajiba preview` on a record containing a version string like `Python 3.11.0.0` sees it preserved — not redacted as an IP address
   4. A record containing `token=abc123def456...` (40 hex chars with context keyword) has the token scrubbed before export
   5. A record containing an org domain like `acme.io` shows a flagged-for-review warning rather than being silently auto-redacted or silently passed through
-**Plans**: TBD
+**Plans:** 3 plans
+
+Plans:
+- [ ] 01-01-PLAN.md — Fix IP regex, add hex token scrubbing, add org domain flagging with safe-domain allowlist
+- [ ] 01-02-PLAN.md — Create privacy module with consent enforcement, hardware anonymization, and timestamp jitter
+- [ ] 01-03-PLAN.md — Wire privacy pipeline into CLI commands and collector, add flagged warning display
 
 ### Phase 2: Data Quality & Transparency
 **Goal**: Contributors can see exactly what gets redacted and annotate quality signals before records enter the outbox
@@ -85,7 +90,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Privacy Foundation | 0/TBD | Not started | - |
+| 1. Privacy Foundation | 0/3 | Planning complete | - |
 | 2. Data Quality & Transparency | 0/TBD | Not started | - |
 | 3. Dataset Publishing | 0/TBD | Not started | - |
 | 4. Contribution Modes | 0/TBD | Not started | - |
