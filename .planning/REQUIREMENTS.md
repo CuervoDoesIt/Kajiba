@@ -21,7 +21,7 @@ Requirements for initial release. Each maps to roadmap phases.
 ### Data Quality
 
 - [ ] **QUAL-01**: Quality tier (gold/silver/bronze/review_needed) and composite score are stored in the outbox record at submit time
-- [ ] **QUAL-02**: Preview command shows inline redaction diff — original text with highlighted redactions side by side with scrubbed output
+- [x] **QUAL-02**: Preview command shows inline redaction diff — original text with highlighted redactions side by side with scrubbed output
 - [ ] **QUAL-03**: User can rate a staged record's quality via `kajiba rate` with a numeric score and optional tags
 - [ ] **QUAL-04**: User can report pain points on a staged record via `kajiba report` with category, description, and severity
 - [ ] **QUAL-05**: User annotations (ratings, pain points) are included in the exported record alongside auto-scores
@@ -98,7 +98,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PRIV-07 | Phase 3 | Pending |
 | PRIV-08 | Phase 3 | Pending |
 | QUAL-01 | Phase 2 | Pending |
-| QUAL-02 | Phase 2 | Pending |
+| QUAL-02 | Phase 2 | Complete |
 | QUAL-03 | Phase 2 | Pending |
 | QUAL-04 | Phase 2 | Pending |
 | QUAL-05 | Phase 2 | Pending |

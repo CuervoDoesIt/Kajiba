@@ -51,7 +51,7 @@ Plans:
 
 Plans:
 - [ ] 02-01-PLAN.md — Add QualityMetadata model, persist quality at submit/export, update history/stats to read stored quality
-- [ ] 02-02-PLAN.md — Enhance preview with redaction summary table and --detail inline highlighting
+- [x] 02-02-PLAN.md — Enhance preview with redaction summary table and --detail inline highlighting
 - [ ] 02-03-PLAN.md — Add rate and report CLI commands, merged quality panel, annotation visibility
 
 ### Phase 3: Dataset Publishing
