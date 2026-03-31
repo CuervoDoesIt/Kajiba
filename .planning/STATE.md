@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 01-02-PLAN.md
-last_updated: "2026-03-31T02:07:34.568Z"
+stopped_at: Completed 01-01-PLAN.md
+last_updated: "2026-03-31T02:09:06.324Z"
 last_activity: 2026-03-31
 progress:
   total_phases: 5
   completed_phases: 0
   total_plans: 3
-  completed_plans: 1
+  completed_plans: 2
   percent: 0
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-03-30)
 ## Current Position
 
 Phase: 01 (privacy-foundation) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Ready to execute
 Last activity: 2026-03-31
 
@@ -53,6 +53,7 @@ Progress: [░░░░░░░░░░] 0%
 
 *Updated after each plan completion*
 | Phase 01 P02 | 3min | 1 tasks | 2 files |
+| Phase 01-privacy-foundation P01 | 4min | 1 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -65,6 +66,9 @@ Recent decisions affecting current work:
 - Init: PRIV-07/PRIV-08 (deletion) placed in Phase 3 — deletion mechanism depends on the dataset repo existing; no repo = nothing to delete from
 - Init: Phase 2 (Quality) depends on Phase 1 — quality tier must be stored after consent enforcement is wired; prevents scoring unstripped records
 - [Phase 01]: round_to_tier uses ceiling semantics (round UP) for privacy; timestamp jitter uses SHA-256 seed for determinism
+- [Phase 01-privacy-foundation]: IP scrubbing uses 30-char prefix lookback with VERSION_PREFIX regex to skip version strings
+- [Phase 01-privacy-foundation]: Hex tokens require context keyword prefix (token/key/secret/etc.) to avoid scrubbing git commit hashes
+- [Phase 01-privacy-foundation]: Org domains flagged for review (FlaggedItem) rather than auto-redacted, with safe-domain allowlist
 
 ### Pending Todos
 
@@ -78,6 +82,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-31T02:07:34.561Z
-Stopped at: Completed 01-02-PLAN.md
+Last session: 2026-03-31T02:09:06.318Z
+Stopped at: Completed 01-01-PLAN.md
 Resume file: None
