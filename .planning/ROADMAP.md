@@ -47,7 +47,12 @@ Plans:
   3. A user can run `kajiba rate` on a staged record, provide a numeric score and optional tags, and those values appear in the exported record's annotation fields
   4. A user can run `kajiba report` on a staged record to attach a pain point with category, description, and severity, and those values appear in the exported record
   5. When a record is exported, user ratings and pain points appear alongside the auto-computed quality scores
-**Plans**: TBD
+**Plans:** 3 plans
+
+Plans:
+- [ ] 02-01-PLAN.md — Add QualityMetadata model, persist quality at submit/export, update history/stats to read stored quality
+- [ ] 02-02-PLAN.md — Enhance preview with redaction summary table and --detail inline highlighting
+- [ ] 02-03-PLAN.md — Add rate and report CLI commands, merged quality panel, annotation visibility
 
 ### Phase 3: Dataset Publishing
 **Goal**: Contributors can publish scrubbed records to a structured GitHub dataset repository via a safe PR-based workflow, and can request deletion of records they previously contributed
@@ -86,12 +91,12 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
+Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Privacy Foundation | 0/3 | Planning complete | - |
-| 2. Data Quality & Transparency | 0/TBD | Not started | - |
+| 1. Privacy Foundation | 3/3 | Complete | 2026-03-31 |
+| 2. Data Quality & Transparency | 0/3 | Planning complete | - |
 | 3. Dataset Publishing | 0/TBD | Not started | - |
 | 4. Contribution Modes | 0/TBD | Not started | - |
 | 5. Consumer Experience | 0/TBD | Not started | - |
