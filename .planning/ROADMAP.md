@@ -35,7 +35,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 Plans:
 - [x] 01-01-PLAN.md — Fix IP regex, add hex token scrubbing, add org domain flagging with safe-domain allowlist
 - [x] 01-02-PLAN.md — Create privacy module with consent enforcement, hardware anonymization, and timestamp jitter
-- [ ] 01-03-PLAN.md — Wire privacy pipeline into CLI commands and collector, add flagged warning display
+- [x] 01-03-PLAN.md — Wire privacy pipeline into CLI commands and collector, add flagged warning display
 
 ### Phase 2: Data Quality & Transparency
 **Goal**: Contributors can see exactly what gets redacted and annotate quality signals before records enter the outbox
