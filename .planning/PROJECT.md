@@ -26,6 +26,9 @@ Real-world AI session data, tagged with full runtime context (model identity, co
 - ✓ Consent level enforcement — fields stripped based on user's chosen consent level (anonymous, trajectory_only, metadata_only, full) — Validated in Phase 1: Privacy Foundation
 - ✓ Metadata anonymization — GPU generalization to family tier, timestamp jitter ±30min, RAM/VRAM power-of-2 rounding, OS version stripping — Validated in Phase 1: Privacy Foundation
 - ✓ Complete regex scrubber coverage — 40-char hex token scrubbing with context keywords, org domain flagging with safe-domain allowlist, IP false positive fix — Validated in Phase 1: Privacy Foundation
+- ✓ Quality score persistence — QualityMetadata model with tier, composite score, all 5 sub-scores stored in record at submit time; history/stats read stored values — Validated in Phase 2: Data Quality & Transparency
+- ✓ Redaction transparency — Preview shows summary table by default, --detail flag for inline-highlighted scrubbed text with red redactions and yellow flagged warnings — Validated in Phase 2: Data Quality & Transparency
+- ✓ User annotation refinement — `kajiba rate` (score + tags) and `kajiba report` (pain point with category/description/severity) commands with interactive picker and CLI flags; merged quality panel in preview — Validated in Phase 2: Data Quality & Transparency
 
 ### Active
 
@@ -37,7 +40,6 @@ Real-world AI session data, tagged with full runtime context (model identity, co
 - [ ] Configurable contribution modes — ad-hoc with user review/approval before submit, or continuous with pre-set parameters
 - [ ] GitHub repository as dataset destination — structured repo that contributors push scrubbed records to
 - [ ] Browsable dataset catalog — structured organization so consumers can browse by model, quality tier, or runtime context and download subsets
-- [ ] User annotation refinement — auto-score first, then let users tag/adjust quality signals (pain points, what worked)
 
 ### Out of Scope
 
@@ -50,7 +52,7 @@ Real-world AI session data, tagged with full runtime context (model identity, co
 ## Context
 
 - **Existing codebase**: ~8 Python modules implementing the core pipeline (schema, collector, scrubber, scorer, CLI, Hermes integration). See `.planning/codebase/` for full analysis.
-- **Current state**: Phase 1 complete. Privacy foundation in place — consent enforcement, hardware anonymization, timestamp jitter, IP regex fixes, hex token scrubbing, and org domain flagging all wired into the pipeline. 158 tests passing. Remaining stubs: LLM scrubber, HuggingFace upload.
+- **Current state**: Phase 2 complete. Privacy foundation and quality transparency in place — consent enforcement, hardware anonymization, redaction diff display, quality score persistence, and contributor annotations (rate/report) all wired into the pipeline. 188 tests passing. Remaining stubs: LLM scrubber, HuggingFace upload.
 - **Key gap**: Currently tightly coupled to Hermes Agent. The vision is model-agnostic — any AI-assisted coding tool should be able to contribute data.
 - **Privacy is paramount**: Contributors are sharing real session data. Maximum scrubbing by default. The pipeline must earn trust before community adoption.
 - **Phased rollout**: GitHub repo first to validate the pipeline, then transition to HuggingFace for broader community access.
@@ -92,4 +94,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-03-31 after Phase 1 completion*
+*Last updated: 2026-03-31 after Phase 2 completion*
