@@ -67,7 +67,7 @@ Plans:
 **Plans:** 2 plans
 
 Plans:
-- [ ] 03-01-PLAN.md — Create publisher.py module with file layout, sharding, catalog, README, deletion, and GitHubOps wrapper
+- [x] 03-01-PLAN.md — Create publisher.py module with file layout, sharding, catalog, README, deletion, and GitHubOps wrapper
 - [ ] 03-02-PLAN.md — Add publish and delete CLI commands with full PR workflow and integration tests
 
 ### Phase 4: Contribution Modes
