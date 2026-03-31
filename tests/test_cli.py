@@ -954,3 +954,216 @@ class TestFullAnnotationPipeline:
         # Quality from submit
         assert content.get("quality") is not None
         assert "quality_tier" in content["quality"]
+
+
+# ---------------------------------------------------------------------------
+# Publish command tests
+# ---------------------------------------------------------------------------
+
+
+def _make_outbox_record() -> dict:
+    """Build a minimal valid record dict for publish/delete test fixtures.
+
+    Returns:
+        Dict suitable for writing as an outbox JSONL line.
+    """
+    return {
+        "schema_version": "0.1.0",
+        "record_type": "task_trajectory",
+        "record_id": "kajiba_abc123456789",
+        "created_at": "2026-03-29T12:00:00Z",
+        "trajectory": {
+            "format": "sharegpt_extended",
+            "conversations": [
+                {"from": "human", "value": "Hello world"},
+                {"from": "gpt", "value": "Hi there!"},
+            ],
+            "turn_count": 2,
+            "total_tool_calls": 0,
+            "successful_tool_calls": 0,
+            "failed_tool_calls": 0,
+        },
+        "model": {
+            "model_name": "test-model",
+        },
+        "quality": {
+            "quality_tier": "bronze",
+            "composite_score": 0.5,
+            "sub_scores": {
+                "coherence": 0.5,
+                "tool_validity": 0.5,
+                "outcome_quality": 0.5,
+                "information_density": 0.5,
+                "metadata_completeness": 0.5,
+            },
+            "scored_at": "2026-03-29T12:00:00Z",
+        },
+        "submission": {
+            "consent_level": "full",
+        },
+    }
+
+
+class TestPublishCommand:
+    """Test the kajiba publish command."""
+
+    def test_publish_no_outbox_records(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Publish with empty outbox should show 'No records to publish'."""
+        from unittest.mock import MagicMock
+        from kajiba.publisher import GhResult
+
+        outbox_dir = tmp_path / "outbox"
+        outbox_dir.mkdir()
+        monkeypatch.setattr("kajiba.cli.OUTBOX_DIR", outbox_dir)
+        monkeypatch.setattr("kajiba.cli.KAJIBA_BASE", tmp_path)
+
+        # Mock GitHubOps so auth passes
+        mock_gh = MagicMock()
+        mock_gh.check_auth.return_value = GhResult(
+            success=True, stdout="", stderr="", returncode=0,
+        )
+        monkeypatch.setattr("kajiba.cli.GitHubOps", lambda *a, **kw: mock_gh)
+
+        result = runner.invoke(cli, ["publish"])
+        assert result.exit_code == 1
+        assert "No records to publish" in result.output
+
+    def test_publish_gh_not_installed(
+        self, runner: CliRunner, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Publish when gh CLI is not installed should show clear error."""
+        from unittest.mock import MagicMock
+        from kajiba.publisher import GhResult
+
+        mock_gh = MagicMock()
+        mock_gh.check_auth.return_value = GhResult(
+            success=False,
+            stdout="",
+            stderr="gh CLI not found. Install from https://cli.github.com/",
+            returncode=-1,
+        )
+        monkeypatch.setattr("kajiba.cli.GitHubOps", lambda *a, **kw: mock_gh)
+
+        result = runner.invoke(cli, ["publish"])
+        assert result.exit_code == 1
+        assert "gh CLI not found" in result.output
+
+    def test_publish_gh_not_authenticated(
+        self, runner: CliRunner, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Publish when gh is not authenticated should show auth error."""
+        from unittest.mock import MagicMock
+        from kajiba.publisher import GhResult
+
+        mock_gh = MagicMock()
+        mock_gh.check_auth.return_value = GhResult(
+            success=False,
+            stdout="",
+            stderr="You are not logged into any GitHub hosts.",
+            returncode=1,
+        )
+        monkeypatch.setattr("kajiba.cli.GitHubOps", lambda *a, **kw: mock_gh)
+
+        result = runner.invoke(cli, ["publish"])
+        assert result.exit_code == 1
+        assert "Not authenticated" in result.output
+
+    def test_publish_dry_run(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Publish --dry-run should show summary without creating a PR."""
+        from unittest.mock import MagicMock
+        from kajiba.publisher import GhResult
+
+        # Set up outbox with a fixture record
+        outbox_dir = tmp_path / "outbox"
+        outbox_dir.mkdir()
+        monkeypatch.setattr("kajiba.cli.OUTBOX_DIR", outbox_dir)
+        monkeypatch.setattr("kajiba.cli.KAJIBA_BASE", tmp_path)
+
+        record_data = _make_outbox_record()
+        outbox_file = outbox_dir / "record_test.jsonl"
+        outbox_file.write_text(
+            json.dumps(record_data) + "\n", encoding="utf-8",
+        )
+
+        # Mock GitHubOps
+        mock_gh = MagicMock()
+        mock_gh.check_auth.return_value = GhResult(
+            success=True, stdout="", stderr="", returncode=0,
+        )
+        mock_gh.get_username.return_value = GhResult(
+            success=True, stdout="testuser\n", stderr="", returncode=0,
+        )
+        mock_gh.fork_repo.return_value = GhResult(
+            success=True, stdout="", stderr="", returncode=0,
+        )
+        mock_gh.pull_latest.return_value = GhResult(
+            success=True, stdout="", stderr="", returncode=0,
+        )
+        mock_gh.create_branch.return_value = GhResult(
+            success=True, stdout="", stderr="", returncode=0,
+        )
+        monkeypatch.setattr("kajiba.cli.GitHubOps", lambda *a, **kw: mock_gh)
+
+        # Set CLONE_DIR to a temp directory with .git so pull_latest path is used
+        clone_dir = tmp_path / "dataset-clone"
+        clone_dir.mkdir()
+        (clone_dir / ".git").mkdir()
+        monkeypatch.setattr("kajiba.cli.CLONE_DIR", clone_dir)
+
+        result = runner.invoke(cli, ["publish", "--dry-run"])
+        assert result.exit_code == 0
+        assert "Dry Run" in result.output or "Dry run" in result.output
+        mock_gh.create_pr.assert_not_called()
+
+    def test_publish_help(self, runner: CliRunner) -> None:
+        """Publish --help should show --repo and --dry-run options."""
+        result = runner.invoke(cli, ["publish", "--help"])
+        assert result.exit_code == 0
+        assert "--repo" in result.output
+        assert "--dry-run" in result.output
+
+
+# ---------------------------------------------------------------------------
+# Delete command tests
+# ---------------------------------------------------------------------------
+
+
+class TestDeleteCommand:
+    """Test the kajiba delete command."""
+
+    def test_delete_no_record_id(self, runner: CliRunner) -> None:
+        """Delete without record_id argument should show error or usage."""
+        result = runner.invoke(cli, ["delete"])
+        assert result.exit_code != 0
+        assert "Missing argument" in result.output or "RECORD_ID" in result.output
+
+    def test_delete_gh_not_installed(
+        self, runner: CliRunner, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Delete when gh CLI is not installed should show clear error."""
+        from unittest.mock import MagicMock
+        from kajiba.publisher import GhResult
+
+        mock_gh = MagicMock()
+        mock_gh.check_auth.return_value = GhResult(
+            success=False,
+            stdout="",
+            stderr="gh CLI not found. Install from https://cli.github.com/",
+            returncode=-1,
+        )
+        monkeypatch.setattr("kajiba.cli.GitHubOps", lambda *a, **kw: mock_gh)
+
+        result = runner.invoke(cli, ["delete", "kajiba_abc123"])
+        assert result.exit_code == 1
+        assert "gh CLI not found" in result.output
+
+    def test_delete_help(self, runner: CliRunner) -> None:
+        """Delete --help should show RECORD_ID argument and --reason option."""
+        result = runner.invoke(cli, ["delete", "--help"])
+        assert result.exit_code == 0
+        assert "RECORD_ID" in result.output
+        assert "--reason" in result.output

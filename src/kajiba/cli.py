@@ -1022,3 +1022,126 @@ def publish(repo: Optional[str], dry_run: bool) -> None:
         f"PR: {pr_url}",
         title="Publish Complete",
     ))
+
+
+@cli.command()
+@click.argument("record_id")
+@click.option("--repo", default=None, help="Dataset repository (owner/repo)")
+@click.option("--reason", default="contributor_request", help="Reason for deletion")
+def delete(record_id: str, repo: Optional[str], reason: str) -> None:
+    """Request deletion of a record from the dataset repository via PR.
+
+    Implements D-09 deletion via index file (not physical removal) and
+    D-10 any record by ID (no identity verification).
+
+    RECORD_ID is the unique identifier of the record to delete.
+    """
+    # Step 1: Resolve dataset repo
+    if repo is None:
+        dataset_repo = _load_config_value("dataset_repo", DEFAULT_DATASET_REPO)
+    else:
+        dataset_repo = repo
+    repo_name = dataset_repo.split("/")[-1]
+
+    console.print(f"[bold]Requesting deletion from:[/bold] {dataset_repo}")
+    console.print(f"  Record ID: {record_id}")
+    console.print(f"  Reason: {reason}")
+
+    # Step 2: Check gh auth
+    gh_ops = GitHubOps(upstream_repo=dataset_repo)
+    auth_result = gh_ops.check_auth()
+    if auth_result.returncode == -1:
+        console.print(
+            "[red]Error:[/red] gh CLI not found. "
+            "Install from https://cli.github.com/"
+        )
+        raise SystemExit(1)
+    if not auth_result.success:
+        console.print(
+            "[red]Error:[/red] Not authenticated. "
+            "Run `gh auth login` first."
+        )
+        raise SystemExit(1)
+    console.print("[green]  Auth check passed[/green]")
+
+    # Step 3: Get username and ensure fork
+    username_result = gh_ops.get_username()
+    if not username_result.success:
+        console.print(f"[red]Error:[/red] Could not get GitHub username: {username_result.stderr}")
+        raise SystemExit(1)
+    username = username_result.stdout.strip()
+
+    fork_result = gh_ops.fork_repo()
+    if not fork_result.success:
+        console.print(f"[red]Error:[/red] Failed to fork repository: {fork_result.stderr}")
+        raise SystemExit(1)
+    console.print("[green]  Fork ready[/green]")
+
+    # Step 4: Clone or update
+    clone_dir = CLONE_DIR
+    if clone_dir.exists() and (clone_dir / ".git").is_dir():
+        pull_result = gh_ops.pull_latest(str(clone_dir))
+        if not pull_result.success:
+            console.print(f"[red]Error:[/red] Failed to update clone: {pull_result.stderr}")
+            raise SystemExit(1)
+        console.print("[green]  Clone updated[/green]")
+    else:
+        fork_url = f"https://github.com/{username}/{repo_name}.git"
+        clone_result = gh_ops.clone_fork(str(clone_dir), fork_url)
+        if not clone_result.success:
+            console.print(f"[red]Error:[/red] Failed to clone fork: {clone_result.stderr}")
+            raise SystemExit(1)
+        console.print("[green]  Fork cloned[/green]")
+
+    # Step 5: Create branch
+    branch_name = f"kajiba/delete-{record_id[:12]}"
+    branch_result = gh_ops.create_branch(str(clone_dir), branch_name)
+    if not branch_result.success:
+        console.print(f"[red]Error:[/red] Failed to create branch: {branch_result.stderr}")
+        raise SystemExit(1)
+    console.print(f"[green]  Branch created: {branch_name}[/green]")
+
+    # Step 6: Append deletion entry
+    deletion_entry = create_deletion_entry(record_id, reason)
+    deletions_path = clone_dir / "deletions.jsonl"
+    with open(deletions_path, "a", encoding="utf-8") as f:
+        f.write(deletion_entry + "\n")
+    console.print("[green]  Deletion entry appended to deletions.jsonl[/green]")
+
+    # Step 7: Commit, push, PR
+    commit_result = gh_ops.commit_all(
+        str(clone_dir),
+        f"kajiba: request deletion of {record_id}",
+    )
+    if not commit_result.success:
+        console.print(f"[red]Error:[/red] Failed to commit: {commit_result.stderr}")
+        raise SystemExit(1)
+    console.print("[green]  Changes committed[/green]")
+
+    push_result = gh_ops.push_branch(str(clone_dir), branch_name)
+    if not push_result.success:
+        console.print(f"[red]Error:[/red] Failed to push: {push_result.stderr}")
+        raise SystemExit(1)
+    console.print("[green]  Branch pushed[/green]")
+
+    pr_title = build_deletion_pr_title(record_id)
+    pr_body = build_deletion_pr_body(record_id, __version__)
+    head = f"{username}:{branch_name}"
+    pr_result = gh_ops.create_pr(pr_title, pr_body, head)
+
+    if not pr_result.success:
+        console.print(
+            f"[yellow]Warning:[/yellow] Deletion pushed to fork but PR creation failed.\n"
+            f"  {pr_result.stderr}\n"
+            f"  Create PR manually at https://github.com/{username}/{repo_name}"
+        )
+        return
+
+    pr_url = pr_result.stdout.strip()
+    console.print()
+    console.print(Panel(
+        f"[bold green]Deletion request submitted![/bold green]\n"
+        f"Record ID: {record_id}\n"
+        f"PR: {pr_url}",
+        title="Deletion Complete",
+    ))
