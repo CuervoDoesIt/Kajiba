@@ -9,9 +9,9 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Privacy & Trust
 
-- [ ] **PRIV-01**: User's consent level choice is enforced at export time — fields are stripped based on selected level (anonymous, trajectory_only, metadata_only, full)
-- [ ] **PRIV-02**: Hardware profiles are anonymized before export — GPU names generalized to families, RAM/VRAM rounded to standard tiers, OS version stripped
-- [ ] **PRIV-03**: Timestamps are jittered (±0-30 min) before export to prevent session correlation
+- [x] **PRIV-01**: User's consent level choice is enforced at export time — fields are stripped based on selected level (anonymous, trajectory_only, metadata_only, full)
+- [x] **PRIV-02**: Hardware profiles are anonymized before export — GPU names generalized to families, RAM/VRAM rounded to standard tiers, OS version stripped
+- [x] **PRIV-03**: Timestamps are jittered (±0-30 min) before export to prevent session correlation
 - [ ] **PRIV-04**: Generic 40-character hex tokens are scrubbed when preceded by context keywords (key=, token=, secret=)
 - [ ] **PRIV-05**: Organizational domain names (.company, .org, .io) are flagged for user review (not auto-redacted)
 - [ ] **PRIV-06**: IP address regex no longer false-positives on version strings (e.g., Python 3.11.0.0)
@@ -89,9 +89,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PRIV-01 | Phase 1 | Pending |
-| PRIV-02 | Phase 1 | Pending |
-| PRIV-03 | Phase 1 | Pending |
+| PRIV-01 | Phase 1 | Complete |
+| PRIV-02 | Phase 1 | Complete |
+| PRIV-03 | Phase 1 | Complete |
 | PRIV-04 | Phase 1 | Pending |
 | PRIV-05 | Phase 1 | Pending |
 | PRIV-06 | Phase 1 | Pending |
