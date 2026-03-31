@@ -17,7 +17,10 @@ from rich.table import Table
 from rich.text import Text
 
 from kajiba.privacy import anonymize_hardware, apply_consent_level, jitter_timestamp
-from kajiba.schema import SCHEMA_VERSION, KajibaRecord, QualityMetadata, SubmissionMetadata, validate_record
+from kajiba.schema import (
+    OUTCOME_TAGS, SCHEMA_VERSION, KajibaRecord, OutcomeSignals,
+    QualityMetadata, SubmissionMetadata, validate_record,
+)
 from kajiba.scorer import compute_quality_score
 from kajiba.scrubber import flag_org_domains, scrub_record
 
@@ -80,6 +83,80 @@ def _load_outbox_records() -> list[tuple[Path, dict]]:
         except Exception as exc:
             logger.error("Failed to load outbox file %s: %s", f, exc)
     return records
+
+
+def _load_all_staging() -> list[tuple[Path, KajibaRecord]]:
+    """Load all sessions from the staging directory.
+
+    Returns:
+        List of (file_path, KajibaRecord) tuples sorted by
+        modification time (newest first).
+    """
+    _ensure_dirs()
+    files = sorted(
+        list(STAGING_DIR.glob("*.json")) + list(STAGING_DIR.glob("*.jsonl")),
+        key=lambda f: f.stat().st_mtime,
+        reverse=True,
+    )
+    results: list[tuple[Path, KajibaRecord]] = []
+    for f in files:
+        try:
+            data = json.loads(f.read_text(encoding="utf-8"))
+            results.append((f, validate_record(data)))
+        except Exception as exc:
+            logger.error("Failed to load staging file %s: %s", f, exc)
+    return results
+
+
+def _pick_staged_record() -> Optional[tuple[Path, KajibaRecord]]:
+    """Load staged records and let user pick one.
+
+    Per D-08: Interactive picker when multiple exist. No implicit latest.
+
+    Returns:
+        (file_path, record) tuple, or None if no records or user cancels.
+    """
+    staged = _load_all_staging()
+    if not staged:
+        console.print("[yellow]No sessions found in staging directory.[/yellow]")
+        console.print(f"  Staging path: {STAGING_DIR}")
+        return None
+
+    if len(staged) == 1:
+        filepath, record = staged[0]
+        console.print(f"[dim]One staged record found: {filepath.name}[/dim]")
+        return filepath, record
+
+    console.print("[bold]Staged records:[/bold]")
+    for i, (fp, rec) in enumerate(staged, 1):
+        turns = len(rec.trajectory.conversations)
+        model = rec.model.model_name if rec.model else "unknown"
+        console.print(f"  {i}. {fp.name} — {turns} turns, model: {model}")
+
+    choice_str = click.prompt(
+        "Select record number",
+        type=click.IntRange(1, len(staged)),
+    )
+    return staged[int(choice_str) - 1]
+
+
+def _save_staged_record(filepath: Path, record: KajibaRecord) -> None:
+    """Save a modified record back to its staging file.
+
+    Uses model_dump(mode="json", by_alias=True) for round-trip
+    compatibility (from_ -> "from" alias). Re-validates before saving.
+
+    Args:
+        filepath: Path to the staging JSON file.
+        record: The modified KajibaRecord to save.
+    """
+    data = record.model_dump(mode="json", by_alias=True)
+    # Re-validate to catch any corruption
+    validate_record(data)
+    filepath.write_text(
+        json.dumps(data, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
 
 
 def _build_scrub_summary_table(scrub_stats: dict, flagged_count: int) -> Table:
@@ -562,3 +639,74 @@ def config() -> None:
     table.add_row("schema_version", SCHEMA_VERSION)
 
     console.print(table)
+
+
+@cli.command()
+@click.option("--score", type=click.IntRange(1, 5), default=None, help="Quality rating 1-5.")
+@click.option("--tags", default=None, help="Comma-separated outcome tags.")
+@click.option("--comment", default=None, help="Optional free-text comment.")
+def rate(score: Optional[int], tags: Optional[str], comment: Optional[str]) -> None:
+    """Rate a staged record's quality.
+
+    Attaches a user rating (1-5), optional outcome tags, and optional
+    comment to a staged record. Uses interactive prompts when flags
+    are not provided.
+    """
+    picked = _pick_staged_record()
+    if picked is None:
+        return
+    filepath, record = picked
+
+    # Detect interactive mode: no flags passed at all
+    interactive = score is None and tags is None and comment is None
+
+    # Interactive prompts when flags not provided (per D-07)
+    if score is None:
+        score = click.prompt("Rating (1-5)", type=click.IntRange(1, 5))
+
+    tag_list: list[str] = []
+    if tags is not None:
+        tag_list = [t.strip() for t in tags.split(",") if t.strip()]
+        # Validate tags against vocabulary
+        for tag in tag_list:
+            if tag not in OUTCOME_TAGS:
+                console.print(f"[red]Unknown tag: {tag!r}[/red]")
+                console.print(f"[dim]Valid tags: {', '.join(OUTCOME_TAGS)}[/dim]")
+                return
+    elif interactive:
+        # Interactive tag selection only in fully interactive mode
+        tag_input = click.prompt(
+            "Outcome tags (comma-separated, or press Enter to skip)",
+            default="",
+            show_default=False,
+        )
+        if tag_input.strip():
+            tag_list = [t.strip() for t in tag_input.split(",") if t.strip()]
+            for tag in tag_list:
+                if tag not in OUTCOME_TAGS:
+                    console.print(f"[red]Unknown tag: {tag!r}[/red]")
+                    return
+
+    user_comment = comment
+    if user_comment is None and interactive:
+        user_comment_input = click.prompt(
+            "Comment (or press Enter to skip)",
+            default="",
+            show_default=False,
+        )
+        if user_comment_input.strip():
+            user_comment = user_comment_input.strip()
+
+    # Attach or update outcome
+    record.outcome = OutcomeSignals(
+        user_rating=score,
+        outcome_tags=tag_list,
+        user_comment=user_comment if user_comment else None,
+    )
+
+    _save_staged_record(filepath, record)
+    console.print(f"[green]Rating saved: {score}/5[/green]")
+    if tag_list:
+        console.print(f"  Tags: {', '.join(tag_list)}")
+    if user_comment:
+        console.print(f"  Comment: {user_comment}")
