@@ -17,7 +17,7 @@ from rich.table import Table
 from rich.text import Text
 
 from kajiba.privacy import anonymize_hardware, apply_consent_level, jitter_timestamp
-from kajiba.schema import SCHEMA_VERSION, KajibaRecord, SubmissionMetadata, validate_record
+from kajiba.schema import SCHEMA_VERSION, KajibaRecord, QualityMetadata, SubmissionMetadata, validate_record
 from kajiba.scorer import compute_quality_score
 from kajiba.scrubber import flag_org_domains, scrub_record
 
@@ -82,11 +82,55 @@ def _load_outbox_records() -> list[tuple[Path, dict]]:
     return records
 
 
+def _build_scrub_summary_table(scrub_stats: dict, flagged_count: int) -> Table:
+    """Build a compact summary table of scrubbing results.
+
+    Args:
+        scrub_stats: Dict of category -> redaction count from ScrubLog.
+        flagged_count: Number of items flagged for review.
+
+    Returns:
+        Rich Table with category and count columns.
+    """
+    table = Table(title="Scrubbing Summary", show_header=True)
+    table.add_column("Category", style="bold")
+    table.add_column("Redacted", justify="right")
+    for category, count in scrub_stats.items():
+        if count > 0:
+            label = category.replace("_redacted", "").replace("_", " ").title()
+            table.add_row(label, str(count))
+    if flagged_count > 0:
+        table.add_row("[yellow]Flagged for Review[/yellow]", str(flagged_count))
+    return table
+
+
+def _build_highlighted_text(scrubbed_text: str) -> Text:
+    """Build Rich Text with REDACTED placeholders styled red.
+
+    Searches the scrubbed text for [REDACTED_*] markers and applies
+    bold red styling. Uses placeholder positions in the SCRUBBED text
+    (not original text positions from Redaction objects).
+
+    Args:
+        scrubbed_text: Text with REDACTED placeholder markers.
+
+    Returns:
+        Rich Text object with styled redaction markers.
+    """
+    import re as _re
+    text = Text(scrubbed_text)
+    for match in _re.finditer(r"\[REDACTED_\w+\]", scrubbed_text):
+        text.stylize("bold red", match.start(), match.end())
+    return text
+
+
 def _render_preview(
     record: KajibaRecord,
     quality_result: dict,
     scrub_stats: dict,
     flagged_items: Optional[list] = None,
+    detail: bool = False,
+    scrubbed_record: Optional[KajibaRecord] = None,
 ) -> None:
     """Render a rich preview of a record."""
     # Header table
@@ -129,31 +173,53 @@ def _render_preview(
 
     console.print(table)
 
-    # PII scrub results
-    if any(v > 0 for v in scrub_stats.values()):
-        scrub_table = Table(title="PII Scrubbing Results", show_header=False)
-        scrub_table.add_column("Category", style="bold")
-        scrub_table.add_column("Count")
-        for cat, count in scrub_stats.items():
-            if count > 0:
-                scrub_table.add_row(cat, str(count))
-        console.print(scrub_table)
+    # Scrubbing transparency (per D-01, D-02, D-03)
+    has_redactions = any(v > 0 for v in scrub_stats.values())
+    flagged_count = len(flagged_items) if flagged_items else 0
+
+    if has_redactions or flagged_count > 0:
+        # Always show summary table (D-03: default view)
+        summary_table = _build_scrub_summary_table(scrub_stats, flagged_count)
+        console.print(summary_table)
+
+        # Detail mode: show inline highlighted scrubbed text (D-01, D-03)
+        if detail and scrubbed_record:
+            console.print()
+            console.print("[bold]Inline Redactions:[/bold]")
+            for turn in scrubbed_record.trajectory.conversations:
+                role_label = f"[bold]{turn.from_}:[/bold] "
+                highlighted = _build_highlighted_text(turn.value)
+                console.print(Text.assemble(role_label, highlighted))
+                if turn.tool_calls:
+                    for tc in turn.tool_calls:
+                        if tc.tool_input:
+                            console.print(Text.assemble(
+                                "  [tool_input] ",
+                                _build_highlighted_text(tc.tool_input),
+                            ))
+                        if tc.tool_output:
+                            console.print(Text.assemble(
+                                "  [tool_output] ",
+                                _build_highlighted_text(tc.tool_output),
+                            ))
+
+        # Show flagged items as yellow warnings (D-02)
+        if flagged_items:
+            console.print()
+            flagged_text = Text()
+            flagged_text.append("WARNING: ", style="bold yellow")
+            flagged_text.append(
+                f"{len(flagged_items)} item(s) flagged for review (not auto-redacted):",
+            )
+            console.print(flagged_text)
+            for item in flagged_items:
+                console.print(f"  [yellow]* {item.text}[/yellow] — {item.reason}")
+            console.print(
+                "[dim]Flagged items will pass through if you submit"
+                " without addressing them.[/dim]"
+            )
     else:
         console.print("[green]No PII detected.[/green]")
-
-    # Show flagged items (per D-09)
-    if flagged_items:
-        console.print()
-        flagged_text = Text()
-        flagged_text.append("WARNING: ", style="bold yellow")
-        flagged_text.append(f"{len(flagged_items)} item(s) flagged for review (not auto-redacted):")
-        console.print(flagged_text)
-        for item in flagged_items:
-            console.print(f"  [yellow]* {item.text}[/yellow] — {item.reason}")
-        console.print(
-            "[dim]Flagged items will pass through if you submit"
-            " without addressing them (per D-11).[/dim]"
-        )
 
     # First and last turn preview
     turns = record.trajectory.conversations
@@ -186,7 +252,8 @@ def cli() -> None:
 
 
 @cli.command()
-def preview() -> None:
+@click.option("--detail", is_flag=True, default=False, help="Show full inline-highlighted redactions instead of summary.")
+def preview(detail: bool) -> None:
     """Preview the most recent session from staging."""
     record = _load_latest_staging()
     if record is None:
@@ -217,7 +284,12 @@ def preview() -> None:
         "quality_tier": quality.quality_tier,
     }
 
-    _render_preview(preview_record, quality_dict, scrub_stats, flagged_items=all_flagged)
+    _render_preview(
+        preview_record, quality_dict, scrub_stats,
+        flagged_items=all_flagged,
+        detail=detail,
+        scrubbed_record=scrubbed if detail else None,
+    )
 
 
 @cli.command()
