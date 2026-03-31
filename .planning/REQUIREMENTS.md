@@ -15,7 +15,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **PRIV-04**: Generic 40-character hex tokens are scrubbed when preceded by context keywords (key=, token=, secret=)
 - [x] **PRIV-05**: Organizational domain names (.company, .org, .io) are flagged for user review (not auto-redacted)
 - [x] **PRIV-06**: IP address regex no longer false-positives on version strings (e.g., Python 3.11.0.0)
-- [ ] **PRIV-07**: User can request deletion of a contributed record via `kajiba delete <record_id>`
+- [x] **PRIV-07**: User can request deletion of a contributed record via `kajiba delete <record_id>`
 - [x] **PRIV-08**: Deletion requests are tracked in a deletion index file in the dataset repository
 
 ### Data Quality
@@ -32,7 +32,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **PUB-02**: A catalog index file (catalog.json) is generated/updated on each publish, listing available models, tiers, record counts, and metadata
 - [x] **PUB-03**: Contributions to the dataset repository use a PR-based workflow (not direct push) for review and poisoning defense
 - [x] **PUB-04**: A dataset card (README.md) is auto-generated from dataset statistics including license, scrubbing methods, quality distribution, and model coverage
-- [ ] **PUB-05**: User can publish scrubbed records to the dataset repository via `kajiba publish`
+- [x] **PUB-05**: User can publish scrubbed records to the dataset repository via `kajiba publish`
 
 ### Consumer Experience
 
@@ -95,7 +95,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PRIV-04 | Phase 1 | Complete |
 | PRIV-05 | Phase 1 | Complete |
 | PRIV-06 | Phase 1 | Complete |
-| PRIV-07 | Phase 3 | Pending |
+| PRIV-07 | Phase 3 | Complete |
 | PRIV-08 | Phase 3 | Complete |
 | QUAL-01 | Phase 2 | Complete |
 | QUAL-02 | Phase 2 | Complete |
@@ -106,7 +106,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PUB-02 | Phase 3 | Complete |
 | PUB-03 | Phase 3 | Complete |
 | PUB-04 | Phase 3 | Complete |
-| PUB-05 | Phase 3 | Pending |
+| PUB-05 | Phase 3 | Complete |
 | CONS-01 | Phase 5 | Pending |
 | CONS-02 | Phase 5 | Pending |
 | CONS-03 | Phase 5 | Pending |

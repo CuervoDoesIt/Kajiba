@@ -68,7 +68,7 @@ Plans:
 
 Plans:
 - [x] 03-01-PLAN.md — Create publisher.py module with file layout, sharding, catalog, README, deletion, and GitHubOps wrapper
-- [ ] 03-02-PLAN.md — Add publish and delete CLI commands with full PR workflow and integration tests
+- [x] 03-02-PLAN.md — Add publish and delete CLI commands with full PR workflow and integration tests
 
 ### Phase 4: Contribution Modes
 **Goal**: Contributors can choose between reviewing each record manually or running a background mode that auto-submits records above a quality threshold
