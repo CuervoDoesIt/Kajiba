@@ -64,7 +64,11 @@ Plans:
   3. The dataset repository contains an auto-generated `README.md` that describes the dataset's license, scrubbing methods, quality distribution, and model coverage
   4. Running `kajiba delete <record_id>` creates or updates a deletion index file in the dataset repository recording the deletion request
   5. A contributor reviewing a PR to the dataset repository can confirm that no record was pushed without consent-enforcement having been applied
-**Plans**: TBD
+**Plans:** 2 plans
+
+Plans:
+- [ ] 03-01-PLAN.md — Create publisher.py module with file layout, sharding, catalog, README, deletion, and GitHubOps wrapper
+- [ ] 03-02-PLAN.md — Add publish and delete CLI commands with full PR workflow and integration tests
 
 ### Phase 4: Contribution Modes
 **Goal**: Contributors can choose between reviewing each record manually or running a background mode that auto-submits records above a quality threshold
@@ -97,6 +101,6 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 |-------|----------------|--------|-----------|
 | 1. Privacy Foundation | 3/3 | Complete | 2026-03-31 |
 | 2. Data Quality & Transparency | 0/3 | Planning complete | - |
-| 3. Dataset Publishing | 0/TBD | Not started | - |
+| 3. Dataset Publishing | 0/2 | Planning complete | - |
 | 4. Contribution Modes | 0/TBD | Not started | - |
 | 5. Consumer Experience | 0/TBD | Not started | - |
