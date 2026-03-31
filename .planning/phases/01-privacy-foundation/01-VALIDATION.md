@@ -38,22 +38,27 @@ created: 2026-03-30
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 01-01-01 | 01 | 1 | PRIV-01 | unit | `python -m pytest tests/test_privacy.py::TestConsentEnforcement -x` | ❌ W0 | ⬜ pending |
-| 01-01-02 | 01 | 1 | PRIV-01 | unit | `python -m pytest tests/test_privacy.py::TestConsentEnforcement::test_anonymous_strips_all_metadata -x` | ❌ W0 | ⬜ pending |
-| 01-02-01 | 02 | 1 | PRIV-02 | unit | `python -m pytest tests/test_privacy.py::TestHardwareAnonymization::test_gpu_generalization -x` | ❌ W0 | ⬜ pending |
-| 01-02-02 | 02 | 1 | PRIV-02 | unit | `python -m pytest tests/test_privacy.py::TestHardwareAnonymization::test_ram_rounding -x` | ❌ W0 | ⬜ pending |
-| 01-02-03 | 02 | 1 | PRIV-02 | unit | `python -m pytest tests/test_privacy.py::TestHardwareAnonymization::test_os_family_only -x` | ❌ W0 | ⬜ pending |
-| 01-03-01 | 03 | 1 | PRIV-03 | unit | `python -m pytest tests/test_privacy.py::TestTimestampJitter -x` | ❌ W0 | ⬜ pending |
-| 01-03-02 | 03 | 1 | PRIV-03 | unit | `python -m pytest tests/test_privacy.py::TestTimestampJitter::test_jitter_deterministic -x` | ❌ W0 | ⬜ pending |
-| 01-04-01 | 04 | 1 | PRIV-04 | unit | `python -m pytest tests/test_scrubber.py::TestHexTokenScrubbing -x` | ❌ W0 | ⬜ pending |
-| 01-04-02 | 04 | 1 | PRIV-04 | unit | `python -m pytest tests/test_scrubber.py::TestHexTokenScrubbing::test_git_commit_preserved -x` | ❌ W0 | ⬜ pending |
-| 01-05-01 | 05 | 1 | PRIV-05 | unit | `python -m pytest tests/test_scrubber.py::TestOrgDomainFlagging -x` | ❌ W0 | ⬜ pending |
-| 01-05-02 | 05 | 1 | PRIV-05 | unit | `python -m pytest tests/test_scrubber.py::TestOrgDomainFlagging::test_safe_domains_not_flagged -x` | ❌ W0 | ⬜ pending |
-| 01-05-03 | 05 | 1 | PRIV-05 | unit | `python -m pytest tests/test_cli.py::TestPreviewFlaggedWarnings -x` | ❌ W0 | ⬜ pending |
-| 01-06-01 | 06 | 1 | PRIV-06 | unit | `python -m pytest tests/test_scrubber.py::TestIPFalsePositiveFix -x` | ❌ W0 | ⬜ pending |
-| 01-06-02 | 06 | 1 | PRIV-06 | unit | `python -m pytest tests/test_scrubber.py::TestIPFalsePositiveFix::test_real_ips_still_detected -x` | ❌ W0 | ⬜ pending |
+| 01-T1-01 | 01 | 1 | PRIV-06 | unit | `python -m pytest tests/test_scrubber.py::TestIPFalsePositiveFix -x` | W0 | pending |
+| 01-T1-02 | 01 | 1 | PRIV-06 | unit | `python -m pytest tests/test_scrubber.py::TestIPFalsePositiveFix::test_real_ips_still_detected -x` | W0 | pending |
+| 01-T1-03 | 01 | 1 | PRIV-04 | unit | `python -m pytest tests/test_scrubber.py::TestHexTokenScrubbing -x` | W0 | pending |
+| 01-T1-04 | 01 | 1 | PRIV-04 | unit | `python -m pytest tests/test_scrubber.py::TestHexTokenScrubbing::test_git_commit_preserved -x` | W0 | pending |
+| 01-T1-05 | 01 | 1 | PRIV-05 | unit | `python -m pytest tests/test_scrubber.py::TestOrgDomainFlagging -x` | W0 | pending |
+| 01-T1-06 | 01 | 1 | PRIV-05 | unit | `python -m pytest tests/test_scrubber.py::TestOrgDomainFlagging::test_safe_domains_not_flagged -x` | W0 | pending |
+| 02-T1-01 | 02 | 1 | PRIV-01 | unit | `python -m pytest tests/test_privacy.py::TestConsentEnforcement -x` | W0 | pending |
+| 02-T1-02 | 02 | 1 | PRIV-01 | unit | `python -m pytest tests/test_privacy.py::TestConsentEnforcement::test_anonymous_strips_all_metadata -x` | W0 | pending |
+| 02-T1-03 | 02 | 1 | PRIV-02 | unit | `python -m pytest tests/test_privacy.py::TestHardwareAnonymization::test_gpu_generalization -x` | W0 | pending |
+| 02-T1-04 | 02 | 1 | PRIV-02 | unit | `python -m pytest tests/test_privacy.py::TestHardwareAnonymization::test_ram_rounding -x` | W0 | pending |
+| 02-T1-05 | 02 | 1 | PRIV-02 | unit | `python -m pytest tests/test_privacy.py::TestHardwareAnonymization::test_os_family_only -x` | W0 | pending |
+| 02-T1-06 | 02 | 1 | PRIV-03 | unit | `python -m pytest tests/test_privacy.py::TestTimestampJitter -x` | W0 | pending |
+| 02-T1-07 | 02 | 1 | PRIV-03 | unit | `python -m pytest tests/test_privacy.py::TestTimestampJitter::test_jitter_deterministic -x` | W0 | pending |
+| 03-T1-01 | 03 | 2 | PRIV-01..06 | integration | `python -m pytest tests/ -x -v` | existing | pending |
+| 03-T2-01 | 03 | 2 | PRIV-05 | integration | `python -m pytest tests/test_cli.py::TestPreviewFlaggedWarnings -x` | W0 | pending |
+| 03-T2-02 | 03 | 2 | PRIV-01 | integration | `python -m pytest tests/test_cli.py::TestSubmitConsentEnforcement -x` | W0 | pending |
+| 03-T2-03 | 03 | 2 | PRIV-02 | integration | `python -m pytest tests/test_cli.py::TestExportPrivacyPipeline -x` | W0 | pending |
 
-*Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
+*Status: pending / green / red / flaky*
+
+*Task ID format: {plan}-T{task}-{seq} (e.g., 01-T1-01 = Plan 01, Task 1, verification 1)*
 
 ---
 
