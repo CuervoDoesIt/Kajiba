@@ -224,6 +224,19 @@ class ScrubLog(BaseModel):
     items_flagged: int = 0
 
 
+class QualityMetadata(BaseModel):
+    """Stored quality assessment for a record.
+
+    Persisted at submit time so history/stats can read scores
+    without recomputation.
+    """
+
+    quality_tier: str  # "gold", "silver", "bronze", "review_needed"
+    composite_score: float = Field(ge=0.0, le=1.0)
+    sub_scores: dict[str, float]
+    scored_at: datetime
+
+
 class SubmissionMetadata(BaseModel):
     """Metadata about the submission itself."""
 
@@ -260,6 +273,7 @@ class KajibaRecord(BaseModel):
     outcome: Optional[OutcomeSignals] = None
     pain_points: Optional[list[PainPoint]] = None
     submission: Optional[SubmissionMetadata] = None
+    quality: Optional[QualityMetadata] = None
 
     model_config = {"populate_by_name": True}
 

@@ -344,6 +344,15 @@ def submit() -> None:
         final.submission = SubmissionMetadata()
     final.submission.scrub_log = scrub_log
 
+    # Persist quality score in record (per D-04/D-06)
+    quality_result_obj = compute_quality_score(final)
+    final.quality = QualityMetadata(
+        quality_tier=quality_result_obj.quality_tier,
+        composite_score=quality_result_obj.composite_score,
+        sub_scores=quality_result_obj.sub_scores,
+        scored_at=datetime.now(UTC),
+    )
+
     # Compute IDs and write to outbox
     final.compute_record_id()
     final.compute_submission_hash()
@@ -355,7 +364,7 @@ def submit() -> None:
 
     console.print(f"[green]Record submitted to {outbox_file}[/green]")
     console.print(f"  Record ID: {final.record_id}")
-    console.print(f"  Quality tier: {quality.quality_tier}")
+    console.print(f"  Quality tier: {quality_result_obj.quality_tier}")
 
 
 @cli.command()
@@ -381,6 +390,15 @@ def export(path: str) -> None:
     if final.submission is None:
         final.submission = SubmissionMetadata()
     final.submission.scrub_log = scrub_log
+
+    # Persist quality score in record (per D-04/D-06)
+    quality_result_obj = compute_quality_score(final)
+    final.quality = QualityMetadata(
+        quality_tier=quality_result_obj.quality_tier,
+        composite_score=quality_result_obj.composite_score,
+        sub_scores=quality_result_obj.sub_scores,
+        scored_at=datetime.now(UTC),
+    )
 
     # Compute IDs
     final.compute_record_id()
@@ -410,6 +428,7 @@ def history() -> None:
     table.add_column("Turns", justify="right")
     table.add_column("Created At")
     table.add_column("Quality Tier")
+    table.add_column("Score", justify="right")
 
     for filepath, data in records:
         record_id = data.get("record_id", "—")
@@ -418,14 +437,28 @@ def history() -> None:
         created = data.get("created_at", "—")
         if isinstance(created, str) and len(created) > 19:
             created = created[:19]
-        # Re-score for tier display
-        try:
-            rec = validate_record(data)
-            tier = compute_quality_score(rec).quality_tier
-        except Exception:
-            tier = "?"
 
-        table.add_row(filepath.name, str(record_id), record_type, turn_count, str(created), tier)
+        # Read stored quality, fallback to recompute for old records (per D-11)
+        quality_data = data.get("quality")
+        if quality_data and "quality_tier" in quality_data:
+            tier = quality_data["quality_tier"]
+        else:
+            try:
+                rec = validate_record(data)
+                tier = compute_quality_score(rec).quality_tier
+            except Exception:
+                tier = "?"
+
+        score_str = (
+            f"{quality_data['composite_score']:.3f}"
+            if quality_data and "composite_score" in quality_data
+            else "\u2014"
+        )
+
+        table.add_row(
+            filepath.name, str(record_id), record_type,
+            turn_count, str(created), tier, score_str,
+        )
 
     console.print(table)
 
@@ -445,10 +478,16 @@ def stats() -> None:
 
     for _, data in records:
         try:
-            rec = validate_record(data)
-            tier = compute_quality_score(rec).quality_tier
+            # Read stored quality, fallback to recompute for old records
+            quality_data = data.get("quality")
+            if quality_data and "quality_tier" in quality_data:
+                tier = quality_data["quality_tier"]
+            else:
+                rec = validate_record(data)
+                tier = compute_quality_score(rec).quality_tier
             tier_counts[tier] = tier_counts.get(tier, 0) + 1
 
+            rec = validate_record(data)
             if rec.outcome:
                 for tag in rec.outcome.outcome_tags:
                     tag_counts[tag] = tag_counts.get(tag, 0) + 1
