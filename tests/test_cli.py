@@ -256,6 +256,124 @@ class TestSubmitConsentEnforcement:
         assert content.get("hardware") is not None
 
 
+class TestPreviewRedactionSummary:
+    """Test that preview shows a redaction summary table."""
+
+    def test_summary_shows_email_count(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Preview a record with an email shows summary row with Emails category."""
+        record_data = _minimal_record_data(
+            conversation_text="Contact test@example.com for info",
+        )
+        staging = tmp_path / "staging"
+        staging.mkdir()
+        (staging / "session_001.json").write_text(
+            json.dumps(record_data), encoding="utf-8",
+        )
+
+        monkeypatch.setattr("kajiba.cli.STAGING_DIR", staging)
+        result = runner.invoke(cli, ["preview"])
+        assert result.exit_code == 0
+        assert "Scrubbing Summary" in result.output
+        assert "Emails" in result.output
+
+    def test_summary_shows_multiple_categories(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Preview a record with email and file path shows both categories."""
+        record_data = _minimal_record_data(
+            conversation_text="Email test@example.com and path /home/user/secret.txt",
+        )
+        staging = tmp_path / "staging"
+        staging.mkdir()
+        (staging / "session_001.json").write_text(
+            json.dumps(record_data), encoding="utf-8",
+        )
+
+        monkeypatch.setattr("kajiba.cli.STAGING_DIR", staging)
+        result = runner.invoke(cli, ["preview"])
+        assert result.exit_code == 0
+        assert "Emails" in result.output
+        assert "File Paths" in result.output
+
+    def test_no_pii_shows_clean_message(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Preview a record with no PII shows 'No PII detected' message."""
+        record_data = _minimal_record_data(
+            conversation_text="Hello world",
+        )
+        staging = tmp_path / "staging"
+        staging.mkdir()
+        (staging / "session_001.json").write_text(
+            json.dumps(record_data), encoding="utf-8",
+        )
+
+        monkeypatch.setattr("kajiba.cli.STAGING_DIR", staging)
+        result = runner.invoke(cli, ["preview"])
+        assert result.exit_code == 0
+        assert "No PII detected" in result.output
+
+
+class TestPreviewRedactionDetail:
+    """Test that preview --detail shows inline highlighted redactions."""
+
+    def test_detail_shows_redacted_markers(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Preview --detail with email shows REDACTED_EMAIL in output."""
+        record_data = _minimal_record_data(
+            conversation_text="Contact test@example.com",
+        )
+        staging = tmp_path / "staging"
+        staging.mkdir()
+        (staging / "session_001.json").write_text(
+            json.dumps(record_data), encoding="utf-8",
+        )
+
+        monkeypatch.setattr("kajiba.cli.STAGING_DIR", staging)
+        result = runner.invoke(cli, ["preview", "--detail"])
+        assert result.exit_code == 0
+        assert "REDACTED_EMAIL" in result.output
+
+    def test_detail_shows_redacted_path(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Preview --detail with file path shows REDACTED_PATH in output."""
+        record_data = _minimal_record_data(
+            conversation_text="File at /home/user/secret.txt",
+        )
+        staging = tmp_path / "staging"
+        staging.mkdir()
+        (staging / "session_001.json").write_text(
+            json.dumps(record_data), encoding="utf-8",
+        )
+
+        monkeypatch.setattr("kajiba.cli.STAGING_DIR", staging)
+        result = runner.invoke(cli, ["preview", "--detail"])
+        assert result.exit_code == 0
+        assert "REDACTED_PATH" in result.output
+
+    def test_no_detail_hides_inline_section(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Preview without --detail does not show Inline Redactions heading."""
+        record_data = _minimal_record_data(
+            conversation_text="Contact test@example.com",
+        )
+        staging = tmp_path / "staging"
+        staging.mkdir()
+        (staging / "session_001.json").write_text(
+            json.dumps(record_data), encoding="utf-8",
+        )
+
+        monkeypatch.setattr("kajiba.cli.STAGING_DIR", staging)
+        result = runner.invoke(cli, ["preview"])
+        assert result.exit_code == 0
+        assert "Inline Redactions" not in result.output
+
+
 class TestExportPrivacyPipeline:
     """Test that export applies hardware anonymization."""
 
