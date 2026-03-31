@@ -408,3 +408,166 @@ class TestExportPrivacyPipeline:
         assert hw.get("ram_gb") == 16
         # VRAM should be rounded up (24 -> 32)
         assert hw.get("gpu_vram_gb") == 32
+
+
+# ---------------------------------------------------------------------------
+# Quality persistence tests
+# ---------------------------------------------------------------------------
+
+
+class TestSubmitQualityPersistence:
+    """Test that submit persists quality metadata in outbox records."""
+
+    def test_submit_writes_quality_to_outbox(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """After submit, the outbox JSONL contains a quality key with all fields."""
+        record_data = _minimal_record_data()
+        staging = tmp_path / "staging"
+        staging.mkdir()
+        outbox = tmp_path / "outbox"
+        outbox.mkdir()
+        (staging / "session_001.json").write_text(
+            json.dumps(record_data), encoding="utf-8",
+        )
+
+        monkeypatch.setattr("kajiba.cli.STAGING_DIR", staging)
+        monkeypatch.setattr("kajiba.cli.OUTBOX_DIR", outbox)
+        monkeypatch.setattr("kajiba.cli.KAJIBA_BASE", tmp_path)
+
+        result = runner.invoke(cli, ["submit"], input="y\n")
+        assert result.exit_code == 0
+
+        outbox_files = list(outbox.glob("*.jsonl"))
+        assert len(outbox_files) == 1
+        content = json.loads(outbox_files[0].read_text(encoding="utf-8").strip())
+
+        # Quality key must exist
+        quality = content.get("quality")
+        assert quality is not None, "quality key missing from outbox record"
+        assert "quality_tier" in quality
+        assert "composite_score" in quality
+        assert "sub_scores" in quality
+        assert "scored_at" in quality
+
+        # composite_score must be a valid float between 0.0 and 1.0
+        assert 0.0 <= quality["composite_score"] <= 1.0
+
+        # sub_scores must contain all 5 dimensions
+        expected_dims = {
+            "coherence", "tool_validity", "outcome_quality",
+            "information_density", "metadata_completeness",
+        }
+        assert set(quality["sub_scores"].keys()) == expected_dims
+
+
+class TestHistoryStoredQuality:
+    """Test that history reads stored quality without recomputation."""
+
+    def test_history_uses_stored_quality_tier(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """History with an outbox record containing quality.quality_tier displays it."""
+        record_data = _minimal_record_data()
+        record_data["record_id"] = "kajiba_test123456"
+        record_data["quality"] = {
+            "quality_tier": "gold",
+            "composite_score": 0.9,
+            "sub_scores": {
+                "coherence": 0.95,
+                "tool_validity": 1.0,
+                "outcome_quality": 0.85,
+                "information_density": 0.8,
+                "metadata_completeness": 0.7,
+            },
+            "scored_at": "2026-03-29T12:00:00Z",
+        }
+
+        outbox = tmp_path / "outbox"
+        outbox.mkdir()
+        (outbox / "record_test.jsonl").write_text(
+            json.dumps(record_data) + "\n", encoding="utf-8",
+        )
+
+        monkeypatch.setattr("kajiba.cli.OUTBOX_DIR", outbox)
+        monkeypatch.setattr("kajiba.cli.KAJIBA_BASE", tmp_path)
+
+        result = runner.invoke(cli, ["history"])
+        assert result.exit_code == 0
+        assert "gold" in result.output
+
+    def test_history_fallback_for_old_records(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """History with an old record missing quality field falls back to recomputation."""
+        record_data = _minimal_record_data()
+        record_data["record_id"] = "kajiba_oldrecord12"
+        # No quality key -- old record
+
+        outbox = tmp_path / "outbox"
+        outbox.mkdir()
+        (outbox / "record_old.jsonl").write_text(
+            json.dumps(record_data) + "\n", encoding="utf-8",
+        )
+
+        monkeypatch.setattr("kajiba.cli.OUTBOX_DIR", outbox)
+        monkeypatch.setattr("kajiba.cli.KAJIBA_BASE", tmp_path)
+
+        result = runner.invoke(cli, ["history"])
+        assert result.exit_code == 0
+        # Should show a tier (from recomputation), not crash
+        # The tier for a minimal record is typically "bronze" or "review_needed"
+        assert any(tier in result.output for tier in ["gold", "silver", "bronze", "review_needed"])
+
+
+class TestExportAnnotations:
+    """Test that user annotations survive through the export pipeline."""
+
+    def test_submit_preserves_outcome_and_pain_points(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Staged record with outcome + pain_points retains them in outbox after submit."""
+        record_data = _minimal_record_data()
+        record_data["outcome"] = {
+            "user_rating": 4,
+            "outcome_tags": ["task_completed"],
+        }
+        record_data["pain_points"] = [
+            {
+                "category": "tool_call_failure",
+                "description": "Broken tool call",
+                "severity": "medium",
+            },
+        ]
+
+        staging = tmp_path / "staging"
+        staging.mkdir()
+        outbox = tmp_path / "outbox"
+        outbox.mkdir()
+        (staging / "session_001.json").write_text(
+            json.dumps(record_data), encoding="utf-8",
+        )
+
+        monkeypatch.setattr("kajiba.cli.STAGING_DIR", staging)
+        monkeypatch.setattr("kajiba.cli.OUTBOX_DIR", outbox)
+        monkeypatch.setattr("kajiba.cli.KAJIBA_BASE", tmp_path)
+
+        result = runner.invoke(cli, ["submit"], input="y\n")
+        assert result.exit_code == 0
+
+        outbox_files = list(outbox.glob("*.jsonl"))
+        assert len(outbox_files) == 1
+        content = json.loads(outbox_files[0].read_text(encoding="utf-8").strip())
+
+        # Outcome must survive
+        assert content.get("outcome") is not None
+        assert content["outcome"]["user_rating"] == 4
+        assert "task_completed" in content["outcome"]["outcome_tags"]
+
+        # Pain points must survive
+        assert content.get("pain_points") is not None
+        assert len(content["pain_points"]) >= 1
+        assert content["pain_points"][0]["category"] == "tool_call_failure"
+
+        # Quality must also be present alongside annotations
+        assert content.get("quality") is not None
