@@ -655,25 +655,27 @@ def stats() -> None:
         console.print(pp_table)
 
 
-@cli.command()
-def config() -> None:
-    """Show current Kajiba configuration."""
+@cli.group(invoke_without_command=True)
+@click.pass_context
+def config(ctx: click.Context) -> None:
+    """Manage Kajiba configuration."""
+    if ctx.invoked_subcommand is None:
+        ctx.invoke(config_show)
+
+
+@config.command("show")
+def config_show() -> None:
+    """Show all configuration values."""
     config_path = Path.home() / ".hermes" / "config.yaml"
 
-    kajiba_config = {
-        "consent_level": "full",
-        "auto_submit": False,
-        "llm_pii_scrub": True,
-        "scrub_strictness": "high",
-    }
-
+    # Build merged config: defaults + file overrides
+    file_config: dict = {}
     if config_path.exists():
         try:
             import yaml  # type: ignore[import-untyped]
             with config_path.open() as f:
                 full_config = yaml.safe_load(f) or {}
-            if "kajiba" in full_config:
-                kajiba_config.update(full_config["kajiba"])
+            file_config = full_config.get("kajiba", {})
         except ImportError:
             console.print("[dim]PyYAML not installed; showing defaults only.[/dim]")
         except Exception as exc:
@@ -682,16 +684,84 @@ def config() -> None:
     table = Table(title="Kajiba Configuration")
     table.add_column("Setting", style="bold")
     table.add_column("Value")
+    table.add_column("Source", style="dim")
 
-    for key, value in kajiba_config.items():
-        table.add_row(key, str(value))
+    for key, schema in VALID_CONFIG_KEYS.items():
+        if key in file_config:
+            table.add_row(key, str(file_config[key]), "config")
+        else:
+            table.add_row(key, str(schema["default"]), "default")
 
-    table.add_row("config_path", str(config_path))
-    table.add_row("staging_dir", str(STAGING_DIR))
-    table.add_row("outbox_dir", str(OUTBOX_DIR))
-    table.add_row("schema_version", SCHEMA_VERSION)
+    table.add_row("config_path", str(config_path), "")
+    table.add_row("staging_dir", str(STAGING_DIR), "")
+    table.add_row("outbox_dir", str(OUTBOX_DIR), "")
+    table.add_row("schema_version", SCHEMA_VERSION, "")
 
     console.print(table)
+
+
+@config.command("set")
+@click.argument("key")
+@click.argument("value")
+def config_set(key: str, value: str) -> None:
+    """Set a configuration value."""
+    if key not in VALID_CONFIG_KEYS:
+        console.print(f"[red]Unknown config key: {key}[/red]")
+        valid_keys = ", ".join(VALID_CONFIG_KEYS.keys())
+        console.print(f"[dim]Valid keys: {valid_keys}[/dim]")
+        return
+
+    schema = VALID_CONFIG_KEYS[key]
+    if schema["type"] == "choice":
+        if value not in schema["choices"]:
+            console.print(f"[red]Invalid value for {key}: {value}[/red]")
+            console.print(f"[dim]Valid options: {', '.join(schema['choices'])}[/dim]")
+            return
+    elif schema["type"] == "int":
+        if not value.lstrip("-").isdigit():
+            console.print(f"[red]Invalid value for {key}: {value} (must be an integer)[/red]")
+            return
+        if "min" in schema and int(value) < schema["min"]:
+            console.print(f"[red]Invalid value for {key}: {value} (minimum: {schema['min']})[/red]")
+            return
+    elif schema["type"] == "bool":
+        if value.lower() not in ("true", "false"):
+            console.print(f"[red]Invalid value for {key}: {value} (must be true or false)[/red]")
+            return
+
+    _save_config_value(key, value)
+    console.print(f"[green]Set {key} = {value}[/green]")
+
+
+@config.command("get")
+@click.argument("key")
+def config_get(key: str) -> None:
+    """Get a configuration value."""
+    if key not in VALID_CONFIG_KEYS:
+        console.print(f"[red]Unknown config key: {key}[/red]")
+        return
+
+    default = str(VALID_CONFIG_KEYS[key]["default"])
+    value = _load_config_value(key, default)
+
+    if value == default:
+        # Check if the value actually comes from config file or is just the default
+        config_path = Path.home() / ".hermes" / "config.yaml"
+        from_file = False
+        if config_path.exists():
+            try:
+                import yaml  # type: ignore[import-untyped]
+                with config_path.open() as f:
+                    full_config = yaml.safe_load(f) or {}
+                from_file = key in full_config.get("kajiba", {})
+            except Exception:
+                pass
+        if from_file:
+            console.print(f"{key} = {value}")
+        else:
+            console.print(f"{key} = {value} [dim](default)[/dim]")
+    else:
+        console.print(f"{key} = {value}")
 
 
 @cli.command()
