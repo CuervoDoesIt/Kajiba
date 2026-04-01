@@ -79,7 +79,12 @@ Plans:
   2. In continuous mode, records that meet the configured quality threshold are automatically submitted to the outbox without per-record interaction
   3. A user can switch between ad-hoc and continuous modes by running `kajiba config` with no restart required
   4. Continuous mode minimum quality tier, consent level, and auto-submit interval are all configurable via `kajiba config`
-**Plans**: TBD
+**Plans:** 3 plans
+
+Plans:
+- [ ] 04-01-PLAN.md — Create config.py module with shared helpers, restructure config command to set/get/show subcommands
+- [ ] 04-02-PLAN.md — Add kajiba review command with one-at-a-time approve/reject/skip flow and activity notifications
+- [ ] 04-03-PLAN.md — Extend collector on_session_end for continuous mode auto-submit with quality threshold
 
 ### Phase 5: Consumer Experience
 **Goal**: Fine-tuners can browse the published dataset catalog and download filtered subsets without leaving the CLI
@@ -102,5 +107,5 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 | 1. Privacy Foundation | 3/3 | Complete | 2026-03-31 |
 | 2. Data Quality & Transparency | 0/3 | Planning complete | - |
 | 3. Dataset Publishing | 0/2 | Planning complete | - |
-| 4. Contribution Modes | 0/TBD | Not started | - |
+| 4. Contribution Modes | 0/3 | Planning complete | - |
 | 5. Consumer Experience | 0/TBD | Not started | - |
