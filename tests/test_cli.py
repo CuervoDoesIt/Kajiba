@@ -1301,3 +1301,276 @@ class TestConfigSubcommands:
         result = runner.invoke(cli, ["config", "set", "auto_submit", "true"])
         assert result.exit_code == 0
         assert "Set auto_submit = true" in result.output
+
+
+# ---------------------------------------------------------------------------
+# Review command tests (Plan 02)
+# ---------------------------------------------------------------------------
+
+
+class TestReviewCommand:
+    """Test the kajiba review command."""
+
+    def test_review_empty_staging(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Review with no staged records prints empty-state message."""
+        staging = tmp_path / "staging"
+        staging.mkdir()
+
+        monkeypatch.setattr("kajiba.cli.STAGING_DIR", staging)
+        monkeypatch.setattr("kajiba.cli.KAJIBA_BASE", tmp_path)
+
+        result = runner.invoke(cli, ["review"])
+        assert result.exit_code == 0
+        assert "No records in staging to review." in result.output
+
+    def test_review_approve_moves_to_outbox(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Review with one record, approve -> record moves to outbox, staging deleted."""
+        record_data = _minimal_record_data()
+        staging = tmp_path / "staging"
+        staging.mkdir()
+        outbox = tmp_path / "outbox"
+        outbox.mkdir()
+        staging_file = staging / "session_001.json"
+        staging_file.write_text(json.dumps(record_data), encoding="utf-8")
+
+        monkeypatch.setattr("kajiba.cli.STAGING_DIR", staging)
+        monkeypatch.setattr("kajiba.cli.OUTBOX_DIR", outbox)
+        monkeypatch.setattr("kajiba.cli.KAJIBA_BASE", tmp_path)
+
+        result = runner.invoke(cli, ["review"], input="approve\n")
+        assert result.exit_code == 0
+        assert "Approved and submitted" in result.output
+
+        # Outbox should have a file
+        outbox_files = list(outbox.glob("*.jsonl"))
+        assert len(outbox_files) == 1
+
+        # Staging file should be deleted
+        assert not staging_file.exists()
+
+    def test_review_reject_removes_from_staging(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Review with one record, reject -> staging file deleted."""
+        record_data = _minimal_record_data()
+        staging = tmp_path / "staging"
+        staging.mkdir()
+        outbox = tmp_path / "outbox"
+        outbox.mkdir()
+        staging_file = staging / "session_001.json"
+        staging_file.write_text(json.dumps(record_data), encoding="utf-8")
+
+        monkeypatch.setattr("kajiba.cli.STAGING_DIR", staging)
+        monkeypatch.setattr("kajiba.cli.OUTBOX_DIR", outbox)
+        monkeypatch.setattr("kajiba.cli.KAJIBA_BASE", tmp_path)
+
+        result = runner.invoke(cli, ["review"], input="reject\n")
+        assert result.exit_code == 0
+        assert "Record rejected and removed from staging." in result.output
+
+        # Staging file should be deleted
+        assert not staging_file.exists()
+
+        # Outbox should be empty (rejected, not submitted)
+        outbox_files = list(outbox.glob("*.jsonl"))
+        assert len(outbox_files) == 0
+
+    def test_review_skip_preserves_staging(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Review with one record, skip -> staging file preserved."""
+        record_data = _minimal_record_data()
+        staging = tmp_path / "staging"
+        staging.mkdir()
+        outbox = tmp_path / "outbox"
+        outbox.mkdir()
+        staging_file = staging / "session_001.json"
+        staging_file.write_text(json.dumps(record_data), encoding="utf-8")
+
+        monkeypatch.setattr("kajiba.cli.STAGING_DIR", staging)
+        monkeypatch.setattr("kajiba.cli.OUTBOX_DIR", outbox)
+        monkeypatch.setattr("kajiba.cli.KAJIBA_BASE", tmp_path)
+
+        result = runner.invoke(cli, ["review"], input="skip\n")
+        assert result.exit_code == 0
+        assert "Skipped." in result.output
+
+        # Staging file should still exist
+        assert staging_file.exists()
+
+    def test_review_quit_with_summary(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Review with two records, approve then quit -> first submitted, second untouched."""
+        staging = tmp_path / "staging"
+        staging.mkdir()
+        outbox = tmp_path / "outbox"
+        outbox.mkdir()
+
+        record_data_1 = _minimal_record_data(conversation_text="First session")
+        record_data_2 = _minimal_record_data(conversation_text="Second session")
+        staging_1 = staging / "session_001.json"
+        staging_2 = staging / "session_002.json"
+        staging_1.write_text(json.dumps(record_data_1), encoding="utf-8")
+        staging_2.write_text(json.dumps(record_data_2), encoding="utf-8")
+
+        monkeypatch.setattr("kajiba.cli.STAGING_DIR", staging)
+        monkeypatch.setattr("kajiba.cli.OUTBOX_DIR", outbox)
+        monkeypatch.setattr("kajiba.cli.KAJIBA_BASE", tmp_path)
+
+        result = runner.invoke(cli, ["review"], input="approve\nquit\n")
+        assert result.exit_code == 0
+        assert "1 approved" in result.output
+        assert "0 rejected" in result.output
+        assert "0 skipped" in result.output
+
+    def test_review_summary_line(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Review summary shows 'Review complete: N approved, N rejected, N skipped'."""
+        record_data = _minimal_record_data()
+        staging = tmp_path / "staging"
+        staging.mkdir()
+        outbox = tmp_path / "outbox"
+        outbox.mkdir()
+        (staging / "session_001.json").write_text(
+            json.dumps(record_data), encoding="utf-8",
+        )
+
+        monkeypatch.setattr("kajiba.cli.STAGING_DIR", staging)
+        monkeypatch.setattr("kajiba.cli.OUTBOX_DIR", outbox)
+        monkeypatch.setattr("kajiba.cli.KAJIBA_BASE", tmp_path)
+
+        result = runner.invoke(cli, ["review"], input="skip\n")
+        assert result.exit_code == 0
+        assert "Review complete:" in result.output
+
+    def test_review_approve_calls_submit_record(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Review approve creates an outbox file (proves _submit_record was called)."""
+        record_data = _minimal_record_data()
+        staging = tmp_path / "staging"
+        staging.mkdir()
+        outbox = tmp_path / "outbox"
+        outbox.mkdir()
+        (staging / "session_001.json").write_text(
+            json.dumps(record_data), encoding="utf-8",
+        )
+
+        monkeypatch.setattr("kajiba.cli.STAGING_DIR", staging)
+        monkeypatch.setattr("kajiba.cli.OUTBOX_DIR", outbox)
+        monkeypatch.setattr("kajiba.cli.KAJIBA_BASE", tmp_path)
+
+        result = runner.invoke(cli, ["review"], input="approve\n")
+        assert result.exit_code == 0
+
+        # Outbox file exists => _submit_record was called
+        outbox_files = list(outbox.glob("*.jsonl"))
+        assert len(outbox_files) == 1
+
+    def test_review_submit_error_preserves_staging(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """If _submit_record raises during approve, staging file is NOT deleted."""
+        from unittest.mock import patch
+
+        record_data = _minimal_record_data()
+        staging = tmp_path / "staging"
+        staging.mkdir()
+        outbox = tmp_path / "outbox"
+        outbox.mkdir()
+        staging_file = staging / "session_001.json"
+        staging_file.write_text(json.dumps(record_data), encoding="utf-8")
+
+        monkeypatch.setattr("kajiba.cli.STAGING_DIR", staging)
+        monkeypatch.setattr("kajiba.cli.OUTBOX_DIR", outbox)
+        monkeypatch.setattr("kajiba.cli.KAJIBA_BASE", tmp_path)
+
+        with patch("kajiba.cli._submit_record", side_effect=RuntimeError("disk full")):
+            result = runner.invoke(cli, ["review"], input="approve\n")
+
+        assert result.exit_code == 0
+        # Staging file must still exist (data loss prevention)
+        assert staging_file.exists()
+        assert "Error submitting record" in result.output
+
+
+# ---------------------------------------------------------------------------
+# Activity notification tests (Plan 02)
+# ---------------------------------------------------------------------------
+
+
+class TestActivityNotification:
+    """Test that activity notifications appear at start of CLI output."""
+
+    def test_notification_shown_when_activity_exists(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Activity notification appears when activity.jsonl has entries."""
+        import kajiba.config as config_mod
+
+        # Set up activity log with an entry
+        activity_log = tmp_path / "activity.jsonl"
+        activity_log.write_text(
+            '{"action": "auto_submitted", "record_id": "test123", '
+            '"quality_tier": "silver", "timestamp": "2026-04-01T00:00:00Z"}\n',
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(config_mod, "ACTIVITY_LOG", activity_log)
+
+        # Also set staging so review shows empty-state
+        staging = tmp_path / "staging"
+        staging.mkdir()
+        monkeypatch.setattr("kajiba.cli.STAGING_DIR", staging)
+        monkeypatch.setattr("kajiba.cli.KAJIBA_BASE", tmp_path)
+
+        result = runner.invoke(cli, ["review"])
+        assert result.exit_code == 0
+        assert "auto-submitted" in result.output
+
+    def test_notification_cleared_after_display(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Activity log file is deleted after notification is shown."""
+        import kajiba.config as config_mod
+
+        activity_log = tmp_path / "activity.jsonl"
+        activity_log.write_text(
+            '{"action": "auto_submitted", "record_id": "test123", '
+            '"quality_tier": "silver", "timestamp": "2026-04-01T00:00:00Z"}\n',
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(config_mod, "ACTIVITY_LOG", activity_log)
+
+        staging = tmp_path / "staging"
+        staging.mkdir()
+        monkeypatch.setattr("kajiba.cli.STAGING_DIR", staging)
+        monkeypatch.setattr("kajiba.cli.KAJIBA_BASE", tmp_path)
+
+        runner.invoke(cli, ["review"])
+        # Activity log should be deleted after display
+        assert not activity_log.exists()
+
+    def test_no_notification_when_no_activity(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """No notification appears when activity.jsonl is missing."""
+        import kajiba.config as config_mod
+
+        activity_log = tmp_path / "activity.jsonl"
+        # Do not create the file
+        monkeypatch.setattr(config_mod, "ACTIVITY_LOG", activity_log)
+
+        staging = tmp_path / "staging"
+        staging.mkdir()
+        monkeypatch.setattr("kajiba.cli.STAGING_DIR", staging)
+        monkeypatch.setattr("kajiba.cli.KAJIBA_BASE", tmp_path)
+
+        result = runner.invoke(cli, ["review"])
+        assert result.exit_code == 0
+        assert "auto-submitted" not in result.output
