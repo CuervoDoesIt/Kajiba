@@ -5,6 +5,7 @@ Hooks into Hermes Agent's session lifecycle to capture telemetry
 non-intrusively.
 """
 
+import json
 import logging
 import platform
 import subprocess
@@ -21,16 +22,22 @@ from kajiba.schema import (
     OutcomeSignals,
     PainPoint,
     PainPointCategoryType,
+    QualityMetadata,
     SeverityType,
     SubmissionMetadata,
     ToolCall,
     Trajectory,
 )
+from kajiba.config import _load_config_value, _log_activity, tier_meets_threshold
 from kajiba.privacy import anonymize_hardware, apply_consent_level, jitter_timestamp
 from kajiba.scorer import compute_quality_score
 from kajiba.scrubber import scrub_record
 
 logger = logging.getLogger(__name__)
+
+KAJIBA_BASE = Path.home() / ".hermes" / "kajiba"
+STAGING_DIR = KAJIBA_BASE / "staging"
+OUTBOX_DIR = KAJIBA_BASE / "outbox"
 
 
 def _detect_hardware() -> HardwareProfile:
@@ -220,7 +227,15 @@ class KajibaCollector:
             logger.exception("Error in on_turn_complete")
 
     def on_session_end(self, session_id: str) -> None:
-        """Finalize record and compute trajectory stats.
+        """Finalize record and optionally auto-submit in continuous mode.
+
+        In ad-hoc mode (default), saves the record to staging for manual review.
+        In continuous mode, computes quality score and auto-submits if the record
+        meets the configured minimum quality tier. Below-threshold records are
+        saved to staging.
+
+        All operations are fault-tolerant: errors are logged but never raised
+        to the caller.
 
         Args:
             session_id: The session identifier (for validation).
@@ -235,6 +250,63 @@ class KajibaCollector:
                 "Kajiba collector ended for session %s (%d turns)",
                 session_id, len(self._conversations),
             )
+
+            # Check contribution mode (per D-04, D-07)
+            contribution_mode = _load_config_value("contribution_mode", "ad-hoc")
+            if contribution_mode != "continuous":
+                # Ad-hoc mode: save to staging for manual review (D-02)
+                self._save_to_staging()
+                return
+
+            # --- Continuous mode auto-submit (D-04) ---
+            record = self._build_record()
+            scrubbed, scrub_log = scrub_record(record)
+            anonymized = anonymize_hardware(scrubbed)
+            quality = compute_quality_score(anonymized)
+
+            min_tier = _load_config_value("min_quality_tier", "silver")
+            if tier_meets_threshold(quality.quality_tier, min_tier):
+                # Auto-submit: apply full privacy pipeline
+                jittered = jitter_timestamp(anonymized)
+
+                consent_level = "full"
+                if record.submission and record.submission.consent_level:
+                    consent_level = record.submission.consent_level
+                final = apply_consent_level(jittered, consent_level)
+
+                if final.submission is None:
+                    final.submission = SubmissionMetadata()
+                final.submission.scrub_log = scrub_log
+
+                final.quality = QualityMetadata(
+                    quality_tier=quality.quality_tier,
+                    composite_score=quality.composite_score,
+                    sub_scores=quality.sub_scores,
+                    scored_at=datetime.now(UTC),
+                )
+
+                final.compute_record_id()
+                final.compute_submission_hash()
+
+                OUTBOX_DIR.mkdir(parents=True, exist_ok=True)
+                outbox_file = OUTBOX_DIR / f"record_{final.record_id}.jsonl"
+                record_json = final.model_dump(mode="json", by_alias=True)
+                outbox_file.write_text(
+                    json.dumps(record_json, ensure_ascii=False) + "\n",
+                    encoding="utf-8",
+                )
+
+                _log_activity("auto_submitted", final.record_id or "", quality.quality_tier)
+                logger.info("Auto-submitted record (tier: %s)", quality.quality_tier)
+            else:
+                # Below threshold: save to staging for manual review (D-09)
+                self._save_to_staging()
+                _log_activity("queued_for_review", self._session_id or "", quality.quality_tier)
+                logger.info(
+                    "Record queued for review (tier: %s, min: %s)",
+                    quality.quality_tier, min_tier,
+                )
+
         except Exception:
             logger.exception("Error in on_session_end")
 
@@ -318,6 +390,24 @@ class KajibaCollector:
             pain_points=self._pain_points if self._pain_points else None,
             submission=SubmissionMetadata(),
         )
+
+    def _save_to_staging(self) -> None:
+        """Save the current session data to a staging file.
+
+        Builds the record from collected data and writes it to the staging
+        directory as a JSON file. Does NOT apply any privacy processing --
+        that happens at submit/export time.
+        """
+        record = self._build_record()
+        STAGING_DIR.mkdir(parents=True, exist_ok=True)
+        filename = f"session_{self._session_id or 'unknown'}.json"
+        staging_file = STAGING_DIR / filename
+        record_json = record.model_dump(mode="json", by_alias=True)
+        staging_file.write_text(
+            json.dumps(record_json, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        logger.info("Saved session to staging: %s", staging_file)
 
     def export_record(self) -> KajibaRecord:
         """Export the collected session data as a privacy-processed KajibaRecord.
