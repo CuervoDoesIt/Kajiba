@@ -1167,3 +1167,137 @@ class TestDeleteCommand:
         assert result.exit_code == 0
         assert "RECORD_ID" in result.output
         assert "--reason" in result.output
+
+
+# ---------------------------------------------------------------------------
+# Config subcommands tests (Task 2)
+# ---------------------------------------------------------------------------
+
+yaml = pytest.importorskip("yaml")
+
+
+class TestConfigSubcommands:
+    """Tests for the restructured config command with set/get/show subcommands."""
+
+    def test_bare_config_shows_table(self, runner: CliRunner) -> None:
+        """Bare `kajiba config` still shows config table (backward compat)."""
+        result = runner.invoke(cli, ["config"])
+        assert result.exit_code == 0
+        assert "Configuration" in result.output
+
+    def test_config_show_has_source_column(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """`kajiba config show` shows table with Source column."""
+        monkeypatch.setattr(Path, "home", lambda: tmp_path)
+        result = runner.invoke(cli, ["config", "show"])
+        assert result.exit_code == 0
+        assert "Source" in result.output
+
+    def test_config_show_source_indicates_default(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Config show Source column shows 'default' for hardcoded defaults."""
+        monkeypatch.setattr(Path, "home", lambda: tmp_path)
+        result = runner.invoke(cli, ["config", "show"])
+        assert result.exit_code == 0
+        assert "default" in result.output
+
+    def test_config_show_source_indicates_config(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Config show Source column shows 'config' for values from config.yaml."""
+        monkeypatch.setattr(Path, "home", lambda: tmp_path)
+        config_path = tmp_path / ".hermes" / "config.yaml"
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        config_path.write_text(
+            yaml.safe_dump({"kajiba": {"consent_level": "anonymous"}}),
+            encoding="utf-8",
+        )
+        result = runner.invoke(cli, ["config", "show"])
+        assert result.exit_code == 0
+        assert "config" in result.output
+
+    def test_config_set_valid_choice(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """`kajiba config set contribution_mode continuous` persists and prints green."""
+        monkeypatch.setattr(Path, "home", lambda: tmp_path)
+        result = runner.invoke(cli, ["config", "set", "contribution_mode", "continuous"])
+        assert result.exit_code == 0
+        assert "Set contribution_mode = continuous" in result.output
+
+    def test_config_set_min_quality_tier(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """`kajiba config set min_quality_tier gold` persists value."""
+        monkeypatch.setattr(Path, "home", lambda: tmp_path)
+        result = runner.invoke(cli, ["config", "set", "min_quality_tier", "gold"])
+        assert result.exit_code == 0
+        assert "Set min_quality_tier = gold" in result.output
+
+    def test_config_set_invalid_choice(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """`kajiba config set min_quality_tier platinum` prints error."""
+        monkeypatch.setattr(Path, "home", lambda: tmp_path)
+        result = runner.invoke(cli, ["config", "set", "min_quality_tier", "platinum"])
+        assert result.exit_code == 0
+        assert "Invalid value for min_quality_tier" in result.output
+        assert "gold, silver, bronze" in result.output
+
+    def test_config_set_unknown_key(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """`kajiba config set unknown_key foo` prints error."""
+        monkeypatch.setattr(Path, "home", lambda: tmp_path)
+        result = runner.invoke(cli, ["config", "set", "unknown_key", "foo"])
+        assert result.exit_code == 0
+        assert "Unknown config key: unknown_key" in result.output
+
+    def test_config_get_after_set(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """`kajiba config get contribution_mode` returns value after set."""
+        monkeypatch.setattr(Path, "home", lambda: tmp_path)
+        runner.invoke(cli, ["config", "set", "contribution_mode", "continuous"])
+        result = runner.invoke(cli, ["config", "get", "contribution_mode"])
+        assert result.exit_code == 0
+        assert "contribution_mode = continuous" in result.output
+
+    def test_config_get_default_value(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """`kajiba config get min_quality_tier` shows default with (default) suffix."""
+        monkeypatch.setattr(Path, "home", lambda: tmp_path)
+        result = runner.invoke(cli, ["config", "get", "min_quality_tier"])
+        assert result.exit_code == 0
+        assert "min_quality_tier = silver" in result.output
+        assert "default" in result.output
+
+    def test_config_get_unknown_key(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """`kajiba config get unknown_key` prints error."""
+        monkeypatch.setattr(Path, "home", lambda: tmp_path)
+        result = runner.invoke(cli, ["config", "get", "unknown_key"])
+        assert result.exit_code == 0
+        assert "Unknown config key: unknown_key" in result.output
+
+    def test_config_set_integer_value(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """`kajiba config set auto_submit_interval 30` stores integer 30."""
+        monkeypatch.setattr(Path, "home", lambda: tmp_path)
+        result = runner.invoke(cli, ["config", "set", "auto_submit_interval", "30"])
+        assert result.exit_code == 0
+        assert "Set auto_submit_interval = 30" in result.output
+
+    def test_config_set_boolean_value(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """`kajiba config set auto_submit true` stores boolean True."""
+        monkeypatch.setattr(Path, "home", lambda: tmp_path)
+        result = runner.invoke(cli, ["config", "set", "auto_submit", "true"])
+        assert result.exit_code == 0
+        assert "Set auto_submit = true" in result.output
