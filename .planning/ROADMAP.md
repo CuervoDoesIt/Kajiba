@@ -83,8 +83,8 @@ Plans:
 
 Plans:
 - [x] 04-01-PLAN.md — Create config.py module with shared helpers, restructure config command to set/get/show subcommands
-- [ ] 04-02-PLAN.md — Add kajiba review command with one-at-a-time approve/reject/skip flow and activity notifications
-- [ ] 04-03-PLAN.md — Extend collector on_session_end for continuous mode auto-submit with quality threshold
+- [x] 04-02-PLAN.md — Add kajiba review command with one-at-a-time approve/reject/skip flow and activity notifications
+- [x] 04-03-PLAN.md — Extend collector on_session_end for continuous mode auto-submit with quality threshold
 
 ### Phase 5: Consumer Experience
 **Goal**: Fine-tuners can browse the published dataset catalog and download filtered subsets without leaving the CLI
