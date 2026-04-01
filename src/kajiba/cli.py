@@ -17,6 +17,7 @@ from rich.table import Table
 from rich.text import Text
 
 from kajiba import __version__
+from kajiba.config import _load_config_value, _save_config_value, VALID_CONFIG_KEYS
 from kajiba.privacy import anonymize_hardware, apply_consent_level, jitter_timestamp
 from kajiba.publisher import (
     CLONE_DIR,
@@ -348,6 +349,59 @@ def _render_preview(
 
 
 # ---------------------------------------------------------------------------
+# Submit pipeline helper
+# ---------------------------------------------------------------------------
+
+
+def _submit_record(
+    record: KajibaRecord,
+    scrubbed: KajibaRecord,
+    scrub_log: "object",
+) -> tuple[Path, "object"]:
+    """Apply full privacy pipeline and write record to outbox.
+
+    Args:
+        record: Original record (for reading consent level).
+        scrubbed: Pre-scrubbed record.
+        scrub_log: Scrub log from scrub_record().
+
+    Returns:
+        Tuple of (outbox_file_path, quality_result).
+    """
+    anonymized = anonymize_hardware(scrubbed)
+    jittered = jitter_timestamp(anonymized)
+
+    consent_level = "full"
+    if record.submission and record.submission.consent_level:
+        consent_level = record.submission.consent_level
+    final = apply_consent_level(jittered, consent_level)
+
+    if final.submission is None:
+        final.submission = SubmissionMetadata()
+    final.submission.scrub_log = scrub_log
+
+    quality_result = compute_quality_score(final)
+    final.quality = QualityMetadata(
+        quality_tier=quality_result.quality_tier,
+        composite_score=quality_result.composite_score,
+        sub_scores=quality_result.sub_scores,
+        scored_at=datetime.now(UTC),
+    )
+
+    final.compute_record_id()
+    final.compute_submission_hash()
+
+    _ensure_dirs()
+    outbox_file = OUTBOX_DIR / f"record_{final.record_id}.jsonl"
+    record_json = final.model_dump(mode="json", by_alias=True)
+    outbox_file.write_text(
+        json.dumps(record_json, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    return outbox_file, quality_result
+
+
+# ---------------------------------------------------------------------------
 # CLI commands
 # ---------------------------------------------------------------------------
 
@@ -437,42 +491,10 @@ def submit() -> None:
         console.print("[yellow]Submission cancelled.[/yellow]")
         return
 
-    # Apply full privacy pipeline: scrub -> anonymize -> jitter -> consent strip
-    anonymized = anonymize_hardware(scrubbed)
-    jittered = jitter_timestamp(anonymized)
-
-    # Read consent level from record's submission metadata (per D-03)
-    consent_level = "full"
-    if record.submission and record.submission.consent_level:
-        consent_level = record.submission.consent_level
-    final = apply_consent_level(jittered, consent_level)
-
-    # Attach scrub log to final record
-    if final.submission is None:
-        final.submission = SubmissionMetadata()
-    final.submission.scrub_log = scrub_log
-
-    # Persist quality score in record (per D-04/D-06)
-    quality_result_obj = compute_quality_score(final)
-    final.quality = QualityMetadata(
-        quality_tier=quality_result_obj.quality_tier,
-        composite_score=quality_result_obj.composite_score,
-        sub_scores=quality_result_obj.sub_scores,
-        scored_at=datetime.now(UTC),
-    )
-
-    # Compute IDs and write to outbox
-    final.compute_record_id()
-    final.compute_submission_hash()
-
-    _ensure_dirs()
-    outbox_file = OUTBOX_DIR / f"record_{final.record_id}.jsonl"
-    record_json = final.model_dump(mode="json", by_alias=True)
-    outbox_file.write_text(json.dumps(record_json, ensure_ascii=False) + "\n", encoding="utf-8")
-
+    outbox_file, quality_result = _submit_record(record, scrubbed, scrub_log)
     console.print(f"[green]Record submitted to {outbox_file}[/green]")
-    console.print(f"  Record ID: {final.record_id}")
-    console.print(f"  Quality tier: {quality_result_obj.quality_tier}")
+    console.print(f"  Record ID: {outbox_file.stem.replace('record_', '')}")
+    console.print(f"  Quality tier: {quality_result.quality_tier}")
 
 
 @cli.command()
@@ -809,30 +831,6 @@ def report(category: Optional[str], description: Optional[str], severity: Option
 # Publishing commands
 # ---------------------------------------------------------------------------
 
-
-def _load_config_value(key: str, default: str) -> str:
-    """Read a single value from ~/.hermes/config.yaml under the kajiba section.
-
-    Args:
-        key: The config key to look up (e.g. "dataset_repo").
-        default: Fallback value if key is absent or yaml unavailable.
-
-    Returns:
-        The config value as a string, or the default.
-    """
-    config_path = Path.home() / ".hermes" / "config.yaml"
-    if not config_path.exists():
-        return default
-    try:
-        import yaml  # type: ignore[import-untyped]
-        with config_path.open() as f:
-            full_config = yaml.safe_load(f) or {}
-        kajiba_section = full_config.get("kajiba", {})
-        return str(kajiba_section.get(key, default))
-    except ImportError:
-        return default
-    except Exception:
-        return default
 
 
 @cli.command()
