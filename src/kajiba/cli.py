@@ -17,7 +17,12 @@ from rich.table import Table
 from rich.text import Text
 
 from kajiba import __version__
-from kajiba.config import _load_config_value, _save_config_value, VALID_CONFIG_KEYS
+from kajiba.config import (
+    _load_config_value,
+    _save_config_value,
+    _show_pending_notifications,
+    VALID_CONFIG_KEYS,
+)
 from kajiba.privacy import anonymize_hardware, apply_consent_level, jitter_timestamp
 from kajiba.publisher import (
     CLONE_DIR,
@@ -411,6 +416,10 @@ def _submit_record(
 def cli() -> None:
     """Kajiba — Community data pipeline for open-source local model improvement."""
     logging.basicConfig(level=logging.WARNING)
+    # D-10: Show pending activity notifications before any command output
+    notification = _show_pending_notifications()
+    if notification:
+        console.print(f"[dim]{notification}[/dim]")
 
 
 @cli.command()
@@ -895,6 +904,100 @@ def report(category: Optional[str], description: Optional[str], severity: Option
     _save_staged_record(filepath, record)
     console.print(f"[green]Pain point reported: {category} ({severity})[/green]")
     console.print(f"  {description}")
+
+
+# ---------------------------------------------------------------------------
+# Review command (ad-hoc contribution mode)
+# ---------------------------------------------------------------------------
+
+
+@cli.command()
+def review() -> None:
+    """Review and approve staged records one at a time.
+
+    Shows each pending staged record with a full preview (quality scores,
+    scrubbing summary, flagged items), then prompts for action:
+    approve (submit to outbox), reject (remove from staging), skip, or quit.
+    """
+    staged = _load_all_staging()
+    if not staged:
+        console.print("[yellow]No records in staging to review.[/yellow]")
+        return
+
+    approved = 0
+    rejected = 0
+    skipped = 0
+
+    for filepath, record in staged:
+        console.print(f"\n[bold]Reviewing:[/bold] {filepath.name}")
+
+        # Reuse existing preview infrastructure (per D-01)
+        scrubbed, scrub_log = scrub_record(record)
+
+        # Collect flagged items from all conversation turns
+        all_flagged: list = []
+        for turn in record.trajectory.conversations:
+            all_flagged.extend(flag_org_domains(turn.value))
+            if turn.tool_calls:
+                for tc in turn.tool_calls:
+                    all_flagged.extend(flag_org_domains(tc.tool_input))
+                    all_flagged.extend(flag_org_domains(tc.tool_output))
+
+        preview_record = anonymize_hardware(scrubbed)
+        quality = compute_quality_score(preview_record)
+        scrub_stats = scrub_log.model_dump()
+        quality_dict = {
+            "composite_score": quality.composite_score,
+            "sub_scores": quality.sub_scores,
+            "quality_tier": quality.quality_tier,
+        }
+
+        _render_preview(
+            preview_record, quality_dict, scrub_stats,
+            flagged_items=all_flagged,
+        )
+
+        # Prompt: approve / reject / skip / quit (per D-03, UI-SPEC)
+        action = click.prompt(
+            "Action",
+            type=click.Choice(
+                ["approve", "reject", "skip", "quit"],
+                case_sensitive=False,
+            ),
+            default="skip",
+        )
+
+        if action == "approve":
+            try:
+                outbox_file, _qr = _submit_record(record, scrubbed, scrub_log)
+                filepath.unlink()  # Only remove staging after successful submit
+                console.print(
+                    f"[green]Approved and submitted: {outbox_file.name}[/green]"
+                )
+                approved += 1
+            except Exception as exc:
+                console.print(
+                    f"[red]Error submitting record: {exc}[/red]"
+                )
+                console.print(
+                    "[yellow]Record kept in staging for retry.[/yellow]"
+                )
+        elif action == "reject":
+            filepath.unlink()
+            console.print(
+                "[red]Record rejected and removed from staging.[/red]"
+            )
+            rejected += 1
+        elif action == "skip":
+            console.print("[dim]Skipped.[/dim]")
+            skipped += 1
+        elif action == "quit":
+            break
+
+    console.print(
+        f"\n[bold]Review complete:[/bold] {approved} approved, "
+        f"{rejected} rejected, {skipped} skipped"
+    )
 
 
 # ---------------------------------------------------------------------------
