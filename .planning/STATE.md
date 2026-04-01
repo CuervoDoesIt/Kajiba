@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: verifying
-stopped_at: Phase 4 context gathered
-last_updated: "2026-04-01T10:40:37.879Z"
-last_activity: 2026-03-31
+status: executing
+stopped_at: Completed 04-01-PLAN.md
+last_updated: "2026-04-01T13:22:58.437Z"
+last_activity: 2026-04-01
 progress:
   total_phases: 5
   completed_phases: 3
-  total_plans: 8
-  completed_plans: 8
+  total_plans: 11
+  completed_plans: 9
   percent: 0
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-30)
 
 **Core value:** Real-world AI session data, tagged with full runtime context, flowing into a community dataset that accelerates local model fine-tuning for everyone.
-**Current focus:** Phase 03 — dataset-publishing
+**Current focus:** Phase 04 — contribution-modes
 
 ## Current Position
 
-Phase: 4
-Plan: Not started
-Status: Phase complete — ready for verification
-Last activity: 2026-03-31
+Phase: 04 (contribution-modes) — EXECUTING
+Plan: 2 of 3
+Status: Ready to execute
+Last activity: 2026-04-01
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -60,6 +60,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 02 P03 | 6min | 2 tasks | 2 files |
 | Phase 03-dataset-publishing P01 | 5min | 1 tasks | 2 files |
 | Phase 03-dataset-publishing P02 | 4min | 2 tasks | 2 files |
+| Phase 04-contribution-modes P01 | 5min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -82,6 +83,9 @@ Recent decisions affecting current work:
 - [Phase 02]: Interactive vs scripted CLI mode: detect from all-flags-None check, not per-flag; quality display moved to dedicated Panel for merged auto+user view
 - [Phase 03-dataset-publishing]: SHA-256 first 2 hex chars mod 256 for deterministic shard assignment; forward-slash paths for cross-platform; GitHubOps wraps gh/git CLI behind mockable GhResult interface
 - [Phase 03-dataset-publishing]: Publish command re-verifies consent on every record before writing to shards; delete uses first 12 chars of record_id for branch name; dry-run writes locally but skips commit/push/PR
+- [Phase 04-contribution-modes]: VALID_CONFIG_KEYS uses dict-of-dicts schema with type/choices/default for runtime validation
+- [Phase 04-contribution-modes]: Config commands use Click group with invoke_without_command=True for backward compat
+- [Phase 04-contribution-modes]: _submit_record kept in cli.py (not config.py) to localize privacy pipeline imports
 
 ### Pending Todos
 
@@ -95,6 +99,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-01T10:40:37.872Z
-Stopped at: Phase 4 context gathered
-Resume file: .planning/phases/04-contribution-modes/04-CONTEXT.md
+Last session: 2026-04-01T13:22:58.429Z
+Stopped at: Completed 04-01-PLAN.md
+Resume file: None

@@ -82,7 +82,7 @@ Plans:
 **Plans:** 3 plans
 
 Plans:
-- [ ] 04-01-PLAN.md — Create config.py module with shared helpers, restructure config command to set/get/show subcommands
+- [x] 04-01-PLAN.md — Create config.py module with shared helpers, restructure config command to set/get/show subcommands
 - [ ] 04-02-PLAN.md — Add kajiba review command with one-at-a-time approve/reject/skip flow and activity notifications
 - [ ] 04-03-PLAN.md — Extend collector on_session_end for continuous mode auto-submit with quality threshold
 

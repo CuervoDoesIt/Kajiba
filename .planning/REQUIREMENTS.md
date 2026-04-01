@@ -45,8 +45,8 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [ ] **CONT-01**: User can contribute in ad-hoc mode — review and approve each record before submission
 - [ ] **CONT-02**: User can contribute in continuous mode — records meeting configured quality threshold are auto-submitted
-- [ ] **CONT-03**: User can switch between ad-hoc and continuous modes via `kajiba config`
-- [ ] **CONT-04**: Continuous mode parameters are configurable: minimum quality tier, consent level, auto-submit interval
+- [x] **CONT-03**: User can switch between ad-hoc and continuous modes via `kajiba config`
+- [x] **CONT-04**: Continuous mode parameters are configurable: minimum quality tier, consent level, auto-submit interval
 
 ## v2 Requirements
 
@@ -113,8 +113,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CONS-04 | Phase 5 | Pending |
 | CONT-01 | Phase 4 | Pending |
 | CONT-02 | Phase 4 | Pending |
-| CONT-03 | Phase 4 | Pending |
-| CONT-04 | Phase 4 | Pending |
+| CONT-03 | Phase 4 | Complete |
+| CONT-04 | Phase 4 | Complete |
 
 **Coverage:**
 - v1 requirements: 26 total
