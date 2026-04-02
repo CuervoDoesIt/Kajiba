@@ -38,8 +38,8 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [x] **CONS-01**: Dataset repository is organized by quality tier so consumers can download subsets by tier
 - [x] **CONS-02**: Catalog index includes model family, parameter count, quantization type, and context window for each record set
-- [ ] **CONS-03**: User can browse the dataset catalog via `kajiba browse` with filters for model, tier, and hardware
-- [ ] **CONS-04**: User can download a filtered subset of the dataset via `kajiba download` with model/tier/hardware filters
+- [x] **CONS-03**: User can browse the dataset catalog via `kajiba browse` with filters for model, tier, and hardware
+- [x] **CONS-04**: User can download a filtered subset of the dataset via `kajiba download` with model/tier/hardware filters
 
 ### Contribution Modes
 
@@ -109,8 +109,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PUB-05 | Phase 3 | Complete |
 | CONS-01 | Phase 5 | Complete |
 | CONS-02 | Phase 5 | Complete |
-| CONS-03 | Phase 5 | Pending |
-| CONS-04 | Phase 5 | Pending |
+| CONS-03 | Phase 5 | Complete |
+| CONS-04 | Phase 5 | Complete |
 | CONT-01 | Phase 4 | Complete |
 | CONT-02 | Phase 4 | Complete |
 | CONT-03 | Phase 4 | Complete |
