@@ -1735,3 +1735,245 @@ class TestBrowseCommand:
         assert result.exit_code == 1
         assert "gh CLI not found" in result.output
         assert "https://cli.github.com/" in result.output
+
+
+# ---------------------------------------------------------------------------
+# Download command tests
+# ---------------------------------------------------------------------------
+
+
+def _make_mock_gh_ops_for_download(
+    catalog_json: str = "",
+    shard_contents: dict = None,
+    failed_shards: set = None,
+):
+    """Create a mock GitHubOps for download tests.
+
+    Args:
+        catalog_json: JSON string for catalog.json response.
+        shard_contents: Dict mapping shard path to content string.
+        failed_shards: Set of shard paths that should fail.
+    """
+    from unittest.mock import MagicMock
+    from kajiba.publisher import GhResult
+
+    if shard_contents is None:
+        shard_contents = {}
+    if failed_shards is None:
+        failed_shards = set()
+
+    mock_ops = MagicMock()
+    mock_ops.check_auth.return_value = GhResult(
+        success=True, stdout="", stderr="", returncode=0,
+    )
+
+    def _get_file_contents(path: str, raw: bool = False):
+        if path == "catalog.json":
+            return GhResult(
+                success=True, stdout=catalog_json, stderr="", returncode=0,
+            )
+        if path in failed_shards:
+            return GhResult(
+                success=False, stdout="", stderr="Not Found", returncode=1,
+            )
+        content = shard_contents.get(path, '{"record_id": "test"}\n')
+        return GhResult(
+            success=True, stdout=content, stderr="", returncode=0,
+        )
+
+    mock_ops.get_file_contents.side_effect = _get_file_contents
+    return mock_ops
+
+
+class TestDownloadCommand:
+    """Test the kajiba download command."""
+
+    def test_download_with_filters(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """download --model llama-3 --tier gold fetches matching shards to output dir."""
+        catalog_json = _load_enriched_catalog()
+        shard_data = '{"record_id": "r1"}\n{"record_id": "r2"}\n'
+        mock_gh = _make_mock_gh_ops_for_download(
+            catalog_json=catalog_json,
+            shard_contents={
+                "data/llama-3/gold/shard_a3.jsonl": shard_data,
+                "data/llama-3/gold/shard_f7.jsonl": shard_data,
+            },
+        )
+        monkeypatch.setattr("kajiba.cli.GitHubOps", lambda *a, **kw: mock_gh)
+        monkeypatch.setattr("kajiba.cli.DOWNLOADS_DIR", tmp_path)
+
+        result = runner.invoke(cli, [
+            "download", "--model", "llama-3", "--tier", "gold",
+            "--output", str(tmp_path),
+        ])
+        assert result.exit_code == 0
+        assert "Downloaded" in result.output
+        # Verify files exist in model/tier directory structure
+        shard_a3 = tmp_path / "data" / "llama-3" / "gold" / "shard_a3.jsonl"
+        shard_f7 = tmp_path / "data" / "llama-3" / "gold" / "shard_f7.jsonl"
+        assert shard_a3.exists()
+        assert shard_f7.exists()
+
+    def test_download_unfiltered_abort(
+        self, runner: CliRunner, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """download without filters shows confirmation prompt, aborts on N (D-12)."""
+        catalog_json = _load_enriched_catalog()
+        mock_gh = _make_mock_gh_ops_for_download(catalog_json=catalog_json)
+        monkeypatch.setattr("kajiba.cli.GitHubOps", lambda *a, **kw: mock_gh)
+
+        result = runner.invoke(cli, ["download"], input="N\n")
+        assert result.exit_code == 0
+        assert "This will download all" in result.output
+        assert "Downloaded" not in result.output
+
+    def test_download_unfiltered_confirm(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """download without filters proceeds when user confirms y."""
+        catalog_json = _load_enriched_catalog()
+        mock_gh = _make_mock_gh_ops_for_download(catalog_json=catalog_json)
+        monkeypatch.setattr("kajiba.cli.GitHubOps", lambda *a, **kw: mock_gh)
+        monkeypatch.setattr("kajiba.cli.DOWNLOADS_DIR", tmp_path)
+
+        result = runner.invoke(cli, ["download", "--output", str(tmp_path)], input="y\n")
+        assert result.exit_code == 0
+        assert "Downloaded" in result.output
+
+    def test_download_filtered_skips_confirmation(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """download with --model skips confirmation (filter = intent demonstrated)."""
+        catalog_json = _load_enriched_catalog()
+        mock_gh = _make_mock_gh_ops_for_download(catalog_json=catalog_json)
+        monkeypatch.setattr("kajiba.cli.GitHubOps", lambda *a, **kw: mock_gh)
+        monkeypatch.setattr("kajiba.cli.DOWNLOADS_DIR", tmp_path)
+
+        result = runner.invoke(cli, [
+            "download", "--model", "llama-3", "--tier", "gold",
+            "--output", str(tmp_path),
+        ])
+        assert result.exit_code == 0
+        # No confirmation prompt expected
+        assert "This will download all" not in result.output
+        assert "Downloaded" in result.output
+
+    def test_download_no_match(
+        self, runner: CliRunner, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """download with no catalog match shows no-match feedback (D-11)."""
+        catalog_json = _load_enriched_catalog()
+        mock_gh = _make_mock_gh_ops_for_download(catalog_json=catalog_json)
+        monkeypatch.setattr("kajiba.cli.GitHubOps", lambda *a, **kw: mock_gh)
+
+        result = runner.invoke(cli, ["download", "--model", "nonexistent"])
+        assert result.exit_code == 0
+        assert "No records match" in result.output
+
+    def test_download_skip_existing(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """download skips files that already exist at the destination."""
+        catalog_json = _load_enriched_catalog()
+        mock_gh = _make_mock_gh_ops_for_download(catalog_json=catalog_json)
+        monkeypatch.setattr("kajiba.cli.GitHubOps", lambda *a, **kw: mock_gh)
+
+        # Pre-create one shard file
+        existing = tmp_path / "data" / "llama-3" / "gold" / "shard_a3.jsonl"
+        existing.parent.mkdir(parents=True, exist_ok=True)
+        existing.write_text("existing content\n", encoding="utf-8")
+
+        result = runner.invoke(cli, [
+            "download", "--model", "llama-3", "--tier", "gold",
+            "--output", str(tmp_path),
+        ])
+        assert result.exit_code == 0
+        assert "Skipped" in result.output
+        # Existing file should not be overwritten
+        assert existing.read_text(encoding="utf-8") == "existing content\n"
+
+    def test_download_completion_summary(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """download shows completion summary with shard/record/size counts (D-07)."""
+        catalog_json = _load_enriched_catalog()
+        shard_data = '{"record_id": "r1"}\n{"record_id": "r2"}\n'
+        mock_gh = _make_mock_gh_ops_for_download(
+            catalog_json=catalog_json,
+            shard_contents={
+                "data/llama-3/gold/shard_a3.jsonl": shard_data,
+                "data/llama-3/gold/shard_f7.jsonl": shard_data,
+            },
+        )
+        monkeypatch.setattr("kajiba.cli.GitHubOps", lambda *a, **kw: mock_gh)
+
+        result = runner.invoke(cli, [
+            "download", "--model", "llama-3", "--tier", "gold",
+            "--output", str(tmp_path),
+        ])
+        assert result.exit_code == 0
+        assert "Downloaded 2 shard(s)" in result.output
+        assert "4 record(s)" in result.output
+
+    def test_download_custom_output(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """download --output /custom/path writes to the custom path."""
+        catalog_json = _load_enriched_catalog()
+        mock_gh = _make_mock_gh_ops_for_download(catalog_json=catalog_json)
+        monkeypatch.setattr("kajiba.cli.GitHubOps", lambda *a, **kw: mock_gh)
+
+        custom_dir = tmp_path / "custom_output"
+        result = runner.invoke(cli, [
+            "download", "--model", "llama-3", "--tier", "gold",
+            "--output", str(custom_dir),
+        ])
+        assert result.exit_code == 0
+        assert "Downloaded" in result.output
+        assert str(custom_dir) in result.output
+
+    def test_download_gh_not_found(
+        self, runner: CliRunner, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """download when gh CLI not found shows install URL."""
+        from unittest.mock import MagicMock
+        from kajiba.publisher import GhResult
+
+        mock_gh = MagicMock()
+        mock_gh.get_file_contents.return_value = GhResult(
+            success=False, stdout="", stderr="gh CLI not found", returncode=-1,
+        )
+        monkeypatch.setattr("kajiba.cli.GitHubOps", lambda *a, **kw: mock_gh)
+
+        result = runner.invoke(cli, ["download", "--model", "test"])
+        assert result.exit_code == 1
+        assert "gh CLI not found" in result.output
+        assert "https://cli.github.com/" in result.output
+
+    def test_download_shard_failure_continues(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """download continues when individual shard fetch fails, reports failure."""
+        catalog_json = _load_enriched_catalog()
+        shard_data = '{"record_id": "r1"}\n'
+        mock_gh = _make_mock_gh_ops_for_download(
+            catalog_json=catalog_json,
+            shard_contents={
+                "data/llama-3/gold/shard_f7.jsonl": shard_data,
+            },
+            failed_shards={"data/llama-3/gold/shard_a3.jsonl"},
+        )
+        monkeypatch.setattr("kajiba.cli.GitHubOps", lambda *a, **kw: mock_gh)
+
+        result = runner.invoke(cli, [
+            "download", "--model", "llama-3", "--tier", "gold",
+            "--output", str(tmp_path),
+        ])
+        assert result.exit_code == 0
+        assert "Failed to download" in result.output
+        assert "Downloaded 1 shard(s)" in result.output
+        # Verify the successful shard was still written
+        successful = tmp_path / "data" / "llama-3" / "gold" / "shard_f7.jsonl"
+        assert successful.exists()
