@@ -957,6 +957,88 @@ class TestFullAnnotationPipeline:
 
 
 # ---------------------------------------------------------------------------
+# Nyquist gap-fill: stats stored quality + export quality persistence
+# ---------------------------------------------------------------------------
+
+
+class TestStatsStoredQuality:
+    """Test that stats reads stored quality tier from outbox records."""
+
+    def test_stats_reads_stored_quality_tier(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Stats with outbox records containing quality.quality_tier reads the stored tier."""
+        record_data = _minimal_record_data()
+        record_data["record_id"] = "kajiba_stat_test01"
+        record_data["quality"] = {
+            "quality_tier": "gold",
+            "composite_score": 0.92,
+            "sub_scores": {
+                "coherence": 0.95,
+                "tool_validity": 1.0,
+                "outcome_quality": 0.85,
+                "information_density": 0.8,
+                "metadata_completeness": 0.7,
+            },
+            "scored_at": "2026-03-29T12:00:00Z",
+        }
+
+        outbox = tmp_path / "outbox"
+        outbox.mkdir()
+        (outbox / "record_stat.jsonl").write_text(
+            json.dumps(record_data) + "\n", encoding="utf-8",
+        )
+
+        monkeypatch.setattr("kajiba.cli.OUTBOX_DIR", outbox)
+        monkeypatch.setattr("kajiba.cli.KAJIBA_BASE", tmp_path)
+
+        result = runner.invoke(cli, ["stats"])
+        assert result.exit_code == 0
+        assert "gold" in result.output
+
+
+class TestExportQualityPersistence:
+    """Test that export persists quality metadata in the exported file."""
+
+    def test_export_writes_quality_to_file(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """After export, the exported JSONL contains a quality key with all fields."""
+        record_data = _minimal_record_data()
+        staging = tmp_path / "staging"
+        staging.mkdir()
+        (staging / "session_001.json").write_text(
+            json.dumps(record_data), encoding="utf-8",
+        )
+
+        monkeypatch.setattr("kajiba.cli.STAGING_DIR", staging)
+
+        export_path = tmp_path / "export.jsonl"
+        result = runner.invoke(cli, ["export", str(export_path)])
+        assert result.exit_code == 0
+
+        content = json.loads(export_path.read_text(encoding="utf-8").strip())
+
+        # Quality key must exist
+        quality = content.get("quality")
+        assert quality is not None, "quality key missing from exported record"
+        assert "quality_tier" in quality
+        assert "composite_score" in quality
+        assert "sub_scores" in quality
+        assert "scored_at" in quality
+
+        # composite_score must be a valid float between 0.0 and 1.0
+        assert 0.0 <= quality["composite_score"] <= 1.0
+
+        # sub_scores must contain all 5 dimensions
+        expected_dims = {
+            "coherence", "tool_validity", "outcome_quality",
+            "information_density", "metadata_completeness",
+        }
+        assert set(quality["sub_scores"].keys()) == expected_dims
+
+
+# ---------------------------------------------------------------------------
 # Publish command tests
 # ---------------------------------------------------------------------------
 
@@ -1167,6 +1249,100 @@ class TestDeleteCommand:
         assert result.exit_code == 0
         assert "RECORD_ID" in result.output
         assert "--reason" in result.output
+
+    def test_delete_appends_to_deletions_jsonl(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Delete happy path appends a deletion entry to deletions.jsonl and opens a PR (PRIV-07)."""
+        from unittest.mock import MagicMock
+        from kajiba.publisher import GhResult
+
+        mock_gh = MagicMock()
+        success = GhResult(success=True, stdout="", stderr="", returncode=0)
+        mock_gh.check_auth.return_value = success
+        mock_gh.get_username.return_value = GhResult(
+            success=True, stdout="testuser\n", stderr="", returncode=0,
+        )
+        mock_gh.fork_repo.return_value = success
+        mock_gh.pull_latest.return_value = success
+        mock_gh.create_branch.return_value = success
+        mock_gh.commit_all.return_value = success
+        mock_gh.push_branch.return_value = success
+        mock_gh.create_pr.return_value = GhResult(
+            success=True, stdout="https://github.com/testuser/kajiba-dataset/pull/1\n",
+            stderr="", returncode=0,
+        )
+        monkeypatch.setattr("kajiba.cli.GitHubOps", lambda *a, **kw: mock_gh)
+
+        clone_dir = tmp_path / "dataset-clone"
+        clone_dir.mkdir()
+        (clone_dir / ".git").mkdir()
+        monkeypatch.setattr("kajiba.cli.CLONE_DIR", clone_dir)
+
+        result = runner.invoke(cli, ["delete", "kajiba_test_del_001", "--reason", "pii_found"])
+        assert result.exit_code == 0
+
+        # Verify deletions.jsonl was created with the entry
+        deletions_path = clone_dir / "deletions.jsonl"
+        assert deletions_path.exists(), "deletions.jsonl should be created"
+        content = deletions_path.read_text(encoding="utf-8").strip()
+        entry = json.loads(content)
+        assert entry["record_id"] == "kajiba_test_del_001"
+        assert entry["reason"] == "pii_found"
+        assert "deleted_at" in entry
+
+        # Verify PR was created
+        mock_gh.create_pr.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Publish consent re-verification tests (PUB-05 / D-03)
+# ---------------------------------------------------------------------------
+
+
+class TestPublishConsentReverification:
+    """Test that publish re-verifies consent level on all records before writing shards (PUB-05/D-03)."""
+
+    def test_publish_calls_apply_consent_level(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Publish invokes apply_consent_level for each outbox record before writing shards."""
+        from unittest.mock import MagicMock, patch
+        from kajiba.publisher import GhResult
+
+        outbox_dir = tmp_path / "outbox"
+        outbox_dir.mkdir()
+        monkeypatch.setattr("kajiba.cli.OUTBOX_DIR", outbox_dir)
+        monkeypatch.setattr("kajiba.cli.KAJIBA_BASE", tmp_path)
+
+        record_data = _make_outbox_record()
+        outbox_file = outbox_dir / "record_test.jsonl"
+        outbox_file.write_text(
+            json.dumps(record_data) + "\n", encoding="utf-8",
+        )
+
+        mock_gh = MagicMock()
+        success = GhResult(success=True, stdout="", stderr="", returncode=0)
+        mock_gh.check_auth.return_value = success
+        mock_gh.get_username.return_value = GhResult(
+            success=True, stdout="testuser\n", stderr="", returncode=0,
+        )
+        mock_gh.fork_repo.return_value = success
+        mock_gh.pull_latest.return_value = success
+        mock_gh.create_branch.return_value = success
+        monkeypatch.setattr("kajiba.cli.GitHubOps", lambda *a, **kw: mock_gh)
+
+        clone_dir = tmp_path / "dataset-clone"
+        clone_dir.mkdir()
+        (clone_dir / ".git").mkdir()
+        monkeypatch.setattr("kajiba.cli.CLONE_DIR", clone_dir)
+
+        with patch("kajiba.cli.apply_consent_level", wraps=__import__("kajiba.privacy", fromlist=["apply_consent_level"]).apply_consent_level) as mock_consent:
+            result = runner.invoke(cli, ["publish", "--dry-run"])
+            assert result.exit_code == 0
+            assert mock_consent.call_count >= 1, (
+                "apply_consent_level must be called at least once during publish"
+            )
 
 
 # ---------------------------------------------------------------------------
