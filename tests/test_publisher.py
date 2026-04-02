@@ -682,6 +682,57 @@ class TestCreateDeletionEntry:
 
 
 # ---------------------------------------------------------------------------
+# TestDeletionIndex
+# ---------------------------------------------------------------------------
+
+
+class TestDeletionIndex:
+    """Tests for deletion index tracking end-to-end (PRIV-08).
+
+    Verifies that deletion entries written to deletions.jsonl are
+    correctly picked up by generate_catalog.
+    """
+
+    def test_deletion_entries_counted_by_catalog(self, tmp_path: Path) -> None:
+        """create_deletion_entry entries written to file are counted by generate_catalog."""
+        # Create some data so catalog has something to scan
+        shard_dir = tmp_path / "data" / "test-model" / "gold"
+        shard_dir.mkdir(parents=True)
+        shard_file = shard_dir / "shard_00.jsonl"
+        shard_file.write_text(
+            json.dumps({"record_id": "kajiba_keep001", "model": {"model_name": "test-model"},
+                         "quality": {"quality_tier": "gold", "composite_score": 0.8,
+                                     "sub_scores": {}, "scored_at": "2026-03-30T12:00:00Z"}}) + "\n",
+            encoding="utf-8",
+        )
+
+        # Write two deletion entries using the real function
+        deletions_path = tmp_path / "deletions.jsonl"
+        with open(deletions_path, "a", encoding="utf-8") as f:
+            f.write(create_deletion_entry("kajiba_del001") + "\n")
+            f.write(create_deletion_entry("kajiba_del002", reason="pii_found") + "\n")
+
+        catalog = generate_catalog(tmp_path)
+        assert catalog["deletions_count"] == 2
+        assert catalog["total_records"] == 1  # Only the non-deleted record in data/
+
+    def test_deletion_entries_are_valid_jsonl(self, tmp_path: Path) -> None:
+        """Each line written by create_deletion_entry is independently parseable JSON."""
+        deletions_path = tmp_path / "deletions.jsonl"
+        with open(deletions_path, "a", encoding="utf-8") as f:
+            for i in range(5):
+                f.write(create_deletion_entry(f"kajiba_batch{i:03d}") + "\n")
+
+        lines = deletions_path.read_text(encoding="utf-8").strip().split("\n")
+        assert len(lines) == 5
+        for line in lines:
+            parsed = json.loads(line)
+            assert "record_id" in parsed
+            assert "deleted_at" in parsed
+            assert parsed["reason"] == "contributor_request"
+
+
+# ---------------------------------------------------------------------------
 # TestGitHubOps
 # ---------------------------------------------------------------------------
 
