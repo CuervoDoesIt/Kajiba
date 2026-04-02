@@ -36,11 +36,13 @@ Real-world AI session data, tagged with full runtime context (model identity, co
 
 ### Active
 
-<!-- Next milestone scope. -->
+<!-- Current milestone: v1.1 Hermes Pipeline Validation -->
 
-- [ ] Model-agnostic data collection — decouple from Hermes-specific paths and support any LLM-powered tool as a data source
-- [ ] Full runtime context in data packages — model name, version, parameter count, quantization, hyperparams, LoRA config, system prompts, tool definitions, hardware specs, inference settings, context window size
+- [ ] Kajiba rewritten as a real Hermes plugin matching the actual plugin API (register(ctx), hook events, plugin.yaml manifest)
+- [ ] Turn capture from Hermes's separate event streams (pre/post_llm_call, post_tool_call) into KajibaCollector
 - [ ] LLM-based semantic PII scrubbing — catch personal names, company names, project names that regex misses
+- [ ] HITL session collection workflow with manual review at each pipeline step
+- [ ] End-to-end pipeline validation: collect → scrub → score → publish → download → fine-tune a local 3B model
 
 ### Out of Scope
 
@@ -50,13 +52,28 @@ Real-world AI session data, tagged with full runtime context (model identity, co
 - Real-time streaming — batch processing, not live telemetry
 - Model evaluation / benchmarking — out of scope entirely
 
+## Current Milestone: v1.1 Hermes Pipeline Validation
+
+**Goal:** Prove the end-to-end pipeline works with the real Hermes Agent — collect actual session data, walk it through scrub/score/publish, and fine-tune a local model with the result.
+
+**Target features:**
+- WSL2 + Hermes Agent + Ollama environment setup (documented, reproducible)
+- Kajiba rewritten as a real Hermes plugin (matching the actual plugin API)
+- Turn capture from Hermes's separate event streams (pre/post_llm_call, post_tool_call)
+- HITL session collection with manual review at each pipeline step
+- LLM-based semantic PII scrubbing (using real session data to test against)
+- QLoRA fine-tune experiment with Llama 3.2 3B on collected Kajiba data
+
 ## Context
 
 - **Shipped**: v1.0 MVP on 2026-04-02
 - **Codebase**: 10 Python modules, 10,478 LOC, 356 tests passing
 - **Tech stack**: Python 3.11+, Pydantic v2, Click, Rich, pytest
 - **CLI commands**: preview, submit, export, history, stats, config (set/get/show), rate, report, review, publish, delete, browse, download — 13 commands total
-- **Key gap**: Currently tightly coupled to Hermes Agent. The vision is model-agnostic — any AI-assisted coding tool should be able to contribute data.
+- **Hermes Agent**: v0.6.0 (NousResearch/hermes-agent), MIT license, plugin-based architecture with hook events
+- **Integration gap**: Current `hermes_integration.py` was built against an assumed API. Real Hermes plugin system uses `ctx.register_hook()` inside a plugin directory, not Protocol-based injection.
+- **Hardware**: Dev machine has RTX 4070 8GB VRAM — Hermes 3 8B Q4 for collection, 3B model for fine-tuning
+- **API access**: OpenAI subscription, Anthropic API key available as collection fallbacks
 - **Privacy**: Maximum scrubbing by default. Full pipeline: regex scrub → hardware anonymize → timestamp jitter → consent enforce. Org domains flagged for review.
 - **Remaining stubs**: LLM scrubber (`scrubber_llm.py`), HuggingFace upload (`huggingface_hub` extra)
 
@@ -99,4 +116,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-02 after v1.0 milestone completion*
+*Last updated: 2026-04-02 after v1.1 milestone start*
