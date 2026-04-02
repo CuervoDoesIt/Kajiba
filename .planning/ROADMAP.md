@@ -98,7 +98,7 @@ Plans:
 **Plans:** 2 plans
 
 Plans:
-- [ ] 05-01-PLAN.md — Extend generate_catalog() with model metadata enrichment, add GitHubOps read methods and filter_catalog() function
+- [x] 05-01-PLAN.md — Extend generate_catalog() with model metadata enrichment, add GitHubOps read methods and filter_catalog() function
 - [ ] 05-02-PLAN.md — Add kajiba browse and kajiba download CLI commands with Rich rendering and progress bar
 
 ## Progress

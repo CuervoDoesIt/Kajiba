@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: verifying
-stopped_at: Phase 5 context gathered
-last_updated: "2026-04-01T21:20:25.157Z"
-last_activity: 2026-04-01
+status: executing
+stopped_at: Completed 05-01-PLAN.md
+last_updated: "2026-04-02T02:03:47.523Z"
+last_activity: 2026-04-02
 progress:
   total_phases: 5
   completed_phases: 4
-  total_plans: 11
-  completed_plans: 11
+  total_plans: 13
+  completed_plans: 12
   percent: 0
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-30)
 
 **Core value:** Real-world AI session data, tagged with full runtime context, flowing into a community dataset that accelerates local model fine-tuning for everyone.
-**Current focus:** Phase 04 — contribution-modes
+**Current focus:** Phase 05 — consumer-experience
 
 ## Current Position
 
-Phase: 5
-Plan: Not started
-Status: Phase complete — ready for verification
-Last activity: 2026-04-01
+Phase: 05 (consumer-experience) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
+Last activity: 2026-04-02
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -63,6 +63,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 04-contribution-modes P01 | 5min | 2 tasks | 4 files |
 | Phase 04-contribution-modes P02 | 3min | 1 tasks | 2 files |
 | Phase 04-contribution-modes P03 | 3min | 1 tasks | 2 files |
+| Phase 05 P01 | 4min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -90,6 +91,9 @@ Recent decisions affecting current work:
 - [Phase 04-contribution-modes]: _submit_record kept in cli.py (not config.py) to localize privacy pipeline imports
 - [Phase 04-contribution-modes]: Staging file only removed after successful _submit_record (data loss prevention); activity notifications in cli() group callback
 - [Phase 04-contribution-modes]: Auto-submit pipeline inlined in collector.on_session_end to avoid circular imports with cli.py
+- [Phase 05]: Metadata enrichment uses in-loop extraction with dedup for single-pass efficiency
+- [Phase 05]: filter_catalog is a standalone pure function (not a method) for reuse by browse and download commands
+- [Phase 05]: Model filter is case-insensitive substring on both slug and display_name for flexible matching
 
 ### Pending Todos
 
@@ -103,6 +107,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-01T21:20:25.148Z
-Stopped at: Phase 5 context gathered
-Resume file: .planning/phases/05-consumer-experience/05-CONTEXT.md
+Last session: 2026-04-02T02:03:47.516Z
+Stopped at: Completed 05-01-PLAN.md
+Resume file: None
