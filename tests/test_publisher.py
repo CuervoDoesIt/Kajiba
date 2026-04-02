@@ -388,6 +388,169 @@ class TestGenerateCatalog:
 
 
 # ---------------------------------------------------------------------------
+# TestGenerateCatalogEnriched
+# ---------------------------------------------------------------------------
+
+
+class TestGenerateCatalogEnriched:
+    """Tests for catalog model-metadata enrichment (parameter_counts, quantizations, context_windows)."""
+
+    def _populate_enriched_data(self, repo_root: Path) -> None:
+        """Pre-populate data/ with shard files containing model metadata."""
+        # Create a shard for llama-3/gold with model metadata
+        shard_dir = repo_root / "data" / "llama-3" / "gold"
+        shard_dir.mkdir(parents=True)
+        shard_file = shard_dir / "shard_00.jsonl"
+        records = [
+            {
+                "record_id": "kajiba_enrich001",
+                "model": {
+                    "model_name": "Llama 3",
+                    "parameter_count": "8B",
+                    "quantization": "Q4_K_M",
+                    "context_window": 8192,
+                },
+                "quality": {
+                    "quality_tier": "gold",
+                    "composite_score": 0.90,
+                    "sub_scores": {},
+                    "scored_at": "2026-04-01T00:00:00Z",
+                },
+                "hardware": {"gpu_name": "NVIDIA RTX 40xx"},
+            },
+            {
+                "record_id": "kajiba_enrich002",
+                "model": {
+                    "model_name": "Llama 3",
+                    "parameter_count": "70B",
+                    "quantization": "Q8_0",
+                    "context_window": 131072,
+                },
+                "quality": {
+                    "quality_tier": "gold",
+                    "composite_score": 0.92,
+                    "sub_scores": {},
+                    "scored_at": "2026-04-01T00:00:00Z",
+                },
+                "hardware": {"gpu_name": "NVIDIA RTX 40xx"},
+            },
+        ]
+        with open(shard_file, "w", encoding="utf-8") as f:
+            for rec in records:
+                f.write(json.dumps(rec) + "\n")
+
+    def test_parameter_counts_extracted(self, tmp_path: Path) -> None:
+        """generate_catalog extracts parameter_count into parameter_counts list."""
+        self._populate_enriched_data(tmp_path)
+        catalog = generate_catalog(tmp_path)
+        model_info = catalog["models"]["llama-3"]
+        assert "parameter_counts" in model_info
+        assert "8B" in model_info["parameter_counts"]
+        assert "70B" in model_info["parameter_counts"]
+
+    def test_quantizations_extracted(self, tmp_path: Path) -> None:
+        """generate_catalog extracts quantization into quantizations list."""
+        self._populate_enriched_data(tmp_path)
+        catalog = generate_catalog(tmp_path)
+        model_info = catalog["models"]["llama-3"]
+        assert "quantizations" in model_info
+        assert "Q4_K_M" in model_info["quantizations"]
+        assert "Q8_0" in model_info["quantizations"]
+
+    def test_context_windows_extracted(self, tmp_path: Path) -> None:
+        """generate_catalog extracts context_window into context_windows list."""
+        self._populate_enriched_data(tmp_path)
+        catalog = generate_catalog(tmp_path)
+        model_info = catalog["models"]["llama-3"]
+        assert "context_windows" in model_info
+        assert 8192 in model_info["context_windows"]
+        assert 131072 in model_info["context_windows"]
+
+    def test_deduplicates_metadata_values(self, tmp_path: Path) -> None:
+        """Two records with same parameter_count produce a single entry."""
+        shard_dir = tmp_path / "data" / "test-model" / "gold"
+        shard_dir.mkdir(parents=True)
+        shard_file = shard_dir / "shard_00.jsonl"
+        records = [
+            {
+                "record_id": f"kajiba_dup{i:03d}",
+                "model": {
+                    "model_name": "Test Model",
+                    "parameter_count": "8B",
+                    "quantization": "Q4_K_M",
+                    "context_window": 8192,
+                },
+                "quality": {
+                    "quality_tier": "gold",
+                    "composite_score": 0.85,
+                    "sub_scores": {},
+                    "scored_at": "2026-04-01T00:00:00Z",
+                },
+                "hardware": {"gpu_name": "NVIDIA RTX 40xx"},
+            }
+            for i in range(3)
+        ]
+        with open(shard_file, "w", encoding="utf-8") as f:
+            for rec in records:
+                f.write(json.dumps(rec) + "\n")
+        catalog = generate_catalog(tmp_path)
+        model_info = catalog["models"]["test-model"]
+        assert len(model_info["parameter_counts"]) == 1
+        assert len(model_info["quantizations"]) == 1
+        assert len(model_info["context_windows"]) == 1
+
+    def test_handles_no_model_metadata(self, tmp_path: Path) -> None:
+        """Records with no model metadata produce empty enrichment lists."""
+        shard_dir = tmp_path / "data" / "unknown-model" / "silver"
+        shard_dir.mkdir(parents=True)
+        shard_file = shard_dir / "shard_00.jsonl"
+        record = {
+            "record_id": "kajiba_nomodel001",
+            "quality": {
+                "quality_tier": "silver",
+                "composite_score": 0.70,
+                "sub_scores": {},
+                "scored_at": "2026-04-01T00:00:00Z",
+            },
+            "hardware": {"gpu_name": "NVIDIA RTX 40xx"},
+        }
+        with open(shard_file, "w", encoding="utf-8") as f:
+            f.write(json.dumps(record) + "\n")
+        catalog = generate_catalog(tmp_path)
+        model_info = catalog["models"]["unknown-model"]
+        assert model_info["parameter_counts"] == []
+        assert model_info["quantizations"] == []
+        assert model_info["context_windows"] == []
+
+    def test_handles_partial_model_metadata(self, tmp_path: Path) -> None:
+        """Records with only parameter_count set still work (others stay empty)."""
+        shard_dir = tmp_path / "data" / "partial-model" / "gold"
+        shard_dir.mkdir(parents=True)
+        shard_file = shard_dir / "shard_00.jsonl"
+        record = {
+            "record_id": "kajiba_partial001",
+            "model": {
+                "model_name": "Partial Model",
+                "parameter_count": "13B",
+            },
+            "quality": {
+                "quality_tier": "gold",
+                "composite_score": 0.88,
+                "sub_scores": {},
+                "scored_at": "2026-04-01T00:00:00Z",
+            },
+            "hardware": {"gpu_name": "NVIDIA RTX 40xx"},
+        }
+        with open(shard_file, "w", encoding="utf-8") as f:
+            f.write(json.dumps(record) + "\n")
+        catalog = generate_catalog(tmp_path)
+        model_info = catalog["models"]["partial-model"]
+        assert model_info["parameter_counts"] == ["13B"]
+        assert model_info["quantizations"] == []
+        assert model_info["context_windows"] == []
+
+
+# ---------------------------------------------------------------------------
 # TestGenerateReadme
 # ---------------------------------------------------------------------------
 

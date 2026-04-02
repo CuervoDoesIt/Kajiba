@@ -1,0 +1,58 @@
+{
+  "schema_version": "0.1.0",
+  "generated_at": "2026-04-01T00:00:00+00:00",
+  "total_records": 68,
+  "total_size_bytes": 524288,
+  "models": {
+    "llama-3": {
+      "display_name": "Llama 3",
+      "parameter_counts": ["8B", "70B"],
+      "quantizations": ["Q4_K_M", "Q8_0"],
+      "context_windows": [8192, 131072],
+      "tiers": {
+        "gold": {
+          "record_count": 12,
+          "avg_quality_score": 0.91,
+          "shards": ["shard_a3.jsonl", "shard_f7.jsonl"],
+          "total_size_bytes": 245760,
+          "last_updated": "2026-04-01T00:00:00+00:00"
+        },
+        "silver": {
+          "record_count": 28,
+          "avg_quality_score": 0.74,
+          "shards": ["shard_01.jsonl", "shard_b2.jsonl", "shard_c4.jsonl"],
+          "total_size_bytes": 163840,
+          "last_updated": "2026-04-01T00:00:00+00:00"
+        }
+      },
+      "total_records": 40,
+      "hardware_distribution": {"NVIDIA RTX 40xx": 15, "NVIDIA RTX 30xx": 8, "Apple M2": 5}
+    },
+    "gpt-4o": {
+      "display_name": "GPT-4o",
+      "parameter_counts": [],
+      "quantizations": [],
+      "context_windows": [128000],
+      "tiers": {
+        "gold": {
+          "record_count": 8,
+          "avg_quality_score": 0.88,
+          "shards": ["shard_d1.jsonl"],
+          "total_size_bytes": 81920,
+          "last_updated": "2026-04-01T00:00:00+00:00"
+        },
+        "silver": {
+          "record_count": 15,
+          "avg_quality_score": 0.72,
+          "shards": ["shard_e5.jsonl", "shard_f9.jsonl"],
+          "total_size_bytes": 32768,
+          "last_updated": "2026-04-01T00:00:00+00:00"
+        }
+      },
+      "total_records": 23,
+      "hardware_distribution": {"Apple M3 Pro": 12, "NVIDIA RTX 40xx": 3}
+    }
+  },
+  "quality_distribution": {"gold": 20, "silver": 43, "bronze": 5, "review_needed": 0},
+  "deletions_count": 0
+}
