@@ -32,6 +32,7 @@ Real-world AI session data, tagged with full runtime context (model identity, co
 - ✓ Dataset publishing — `kajiba publish` pushes scrubbed outbox records to GitHub dataset repo via fork+PR workflow with consent re-verification; sharded JSONL under `{model}/{tier}/` directories; catalog.json and README.md auto-generated — Validated in Phase 3: Dataset Publishing
 - ✓ Deletion mechanism — `kajiba delete <record_id>` appends deletion entries to `deletions.jsonl` via PR; soft delete by index, no physical removal — Validated in Phase 3: Dataset Publishing
 - ✓ Configurable contribution modes — ad-hoc review gate with approve/reject/skip/quit flow; continuous auto-submit for records meeting quality threshold; mode switching via `kajiba config set contribution_mode`; configurable min_quality_tier, consent_level, auto_submit_interval — Validated in Phase 4: Contribution Modes
+- ✓ Browsable dataset catalog — `kajiba browse` shows Rich table with model drill-down (parameter counts, quantization, context windows); `kajiba download` fetches filtered JSONL subsets with progress bar, skip-existing, and confirmation prompt; `filter_catalog()` with AND-composable model/tier filtering — Validated in Phase 5: Consumer Experience
 
 ### Active
 
@@ -40,7 +41,7 @@ Real-world AI session data, tagged with full runtime context (model identity, co
 - [ ] Model-agnostic data collection — decouple from Hermes-specific paths and support any LLM-powered tool as a data source
 - [ ] Full runtime context in data packages — model name, version, parameter count, quantization, hyperparams, LoRA config, system prompts, tool definitions, hardware specs, inference settings, context window size
 - [ ] LLM-based semantic PII scrubbing — catch personal names, company names, project names that regex misses
-- [ ] Browsable dataset catalog — structured organization so consumers can browse by model, quality tier, or runtime context and download subsets
+- ~~Browsable dataset catalog~~ → Validated in Phase 5: Consumer Experience
 
 ### Out of Scope
 
@@ -53,7 +54,7 @@ Real-world AI session data, tagged with full runtime context (model identity, co
 ## Context
 
 - **Existing codebase**: ~8 Python modules implementing the core pipeline (schema, collector, scrubber, scorer, CLI, Hermes integration). See `.planning/codebase/` for full analysis.
-- **Current state**: Phase 4 complete. Contribution modes in place — ad-hoc review gate and continuous auto-submit with configurable quality threshold. Config module with set/get/show subcommands. 313 tests passing. Remaining stubs: LLM scrubber, HuggingFace upload.
+- **Current state**: Phase 5 complete (all 5 phases done). Full pipeline operational — collection, PII scrubbing, quality scoring, publishing, contribution modes, and consumer browse/download. 350 tests passing. Remaining stubs: LLM scrubber, HuggingFace upload.
 - **Key gap**: Currently tightly coupled to Hermes Agent. The vision is model-agnostic — any AI-assisted coding tool should be able to contribute data.
 - **Privacy is paramount**: Contributors are sharing real session data. Maximum scrubbing by default. The pipeline must earn trust before community adoption.
 - **Phased rollout**: GitHub repo first to validate the pipeline, then transition to HuggingFace for broader community access.
@@ -95,4 +96,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-01 after Phase 4 completion*
+*Last updated: 2026-04-02 after Phase 5 completion*
