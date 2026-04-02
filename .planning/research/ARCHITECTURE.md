@@ -1,8 +1,8 @@
 # Architecture Research
 
-**Domain:** Community AI Training Data Pipeline
-**Researched:** 2026-03-30
-**Confidence:** MEDIUM-HIGH (core patterns verified against official Python docs and real dataset repos; community-specific patterns derived from analogous systems)
+**Domain:** Hermes Plugin Integration + LLM PII Scrubbing + Fine-tuning Data Export
+**Researched:** 2026-04-02
+**Confidence:** HIGH (Hermes plugin API verified against official docs; LLM scrubbing patterns verified via multiple sources; fine-tuning export verified via Unsloth/PEFT official docs)
 
 ---
 
@@ -10,464 +10,546 @@
 
 ### System Overview
 
-The evolved Kajiba architecture introduces three new vertical concerns layered on top of the existing linear pipeline: a **Source Layer** (pluggable adapters for any AI tool), a **Contribution Mode Layer** (ad-hoc vs continuous behavioral contract), and a **Dataset Repository Layer** (structured Git repo + catalog for consumers). The existing Capture → Scrub → Score → Export core pipeline is preserved and made source-agnostic.
+The v1.1 milestone adds three vertical concerns to the existing pipeline. None of them require restructuring the core data flow (collect → scrub → score → publish). They sit at the edges: a new **Plugin Entry Layer** replacing the Protocol stub, a new **Semantic Scrub Layer** inserted between regex scrub and quality scoring, and a new **Export Format Layer** appended after quality scoring.
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                         CONTRIBUTOR MACHINE                             │
-│                                                                         │
-│  ┌─────────────────────────────────────────────────────────────────┐   │
-│  │                      SOURCE LAYER                               │   │
-│  │                                                                 │   │
-│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐  │   │
-│  │  │ HermesAdapter│  │ GenericAdapter│  │ FutureToolAdapter... │  │   │
-│  │  │ (existing)   │  │ (new)         │  │ (community plugins)  │  │   │
-│  │  └──────┬───────┘  └──────┬───────┘  └──────────┬───────────┘  │   │
-│  │         │                 │                      │              │   │
-│  │         └─────────────────┼──────────────────────┘              │   │
-│  │                           │                                     │   │
-│  │               ┌───────────▼────────────┐                        │   │
-│  │               │   SourceAdapter ABC    │                        │   │
-│  │               │ (common interface)     │                        │   │
-│  │               └───────────┬────────────┘                        │   │
-│  └───────────────────────────┼─────────────────────────────────────┘   │
-│                              │ raw session dict                        │
-│  ┌───────────────────────────▼─────────────────────────────────────┐   │
-│  │                   CORE PIPELINE (existing)                      │   │
-│  │                                                                 │   │
-│  │   ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌─────────┐  │   │
-│  │   │ Collector│───▶│ Scrubber │───▶│  Scorer  │───▶│ Outbox  │  │   │
-│  │   │ (schema) │    │ (PII)    │    │ (quality)│    │ (JSONL) │  │   │
-│  │   └──────────┘    └──────────┘    └──────────┘    └────┬────┘  │   │
-│  └──────────────────────────────────────────────────────────┼──────┘   │
-│                                                             │           │
-│  ┌──────────────────────────────────────────────────────────┼──────┐   │
-│  │              CONTRIBUTION MODE LAYER                     │      │   │
-│  │                                                          │      │   │
-│  │  ┌─────────────────────────────────────────────────────┐ │      │   │
-│  │  │  ContributionManager                                │ │      │   │
-│  │  │  - mode: "adhoc" | "continuous"                     │◀┘      │   │
-│  │  │  - consent_level: anonymous|trajectory|metadata|full│        │   │
-│  │  │  - auto_submit: bool                                │        │   │
-│  │  │  - review_queue: List[PendingRecord]                │        │   │
-│  │  └──────────────────────────┬──────────────────────────┘        │   │
-│  │                             │                                   │   │
-│  │     ad-hoc: pause, show     │     continuous: process           │   │
-│  │     preview, await confirm  │     automatically per config      │   │
-│  └─────────────────────────────┼───────────────────────────────────┘   │
-└────────────────────────────────┼────────────────────────────────────────┘
-                                 │ scrubbed + scored JSONL records
-                                 ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                   DATASET REPOSITORY (GitHub)                           │
-│                                                                         │
-│  kajiba-dataset/                                                        │
-│  ├── README.md              (browsable catalog entry point)             │
-│  ├── catalog.json           (machine-readable index, auto-generated)    │
-│  ├── data/                                                              │
-│  │   ├── by-model/                                                      │
-│  │   │   ├── hermes-3-8b/                                               │
-│  │   │   │   ├── gold/     *.jsonl                                      │
-│  │   │   │   ├── silver/   *.jsonl                                      │
-│  │   │   │   └── bronze/   *.jsonl                                      │
-│  │   │   └── llama-3.1-8b/                                              │
-│  │   │       └── ...                                                    │
-│  │   └── by-tier/          (symlinks or duplicate index)                │
-│  │       ├── gold/                                                      │
-│  │       └── silver/                                                    │
-│  └── schemas/                                                           │
-│      └── v1/kajiba_record.schema.json                                   │
-│                                                                         │
-│         ▲ contributors push via CLI ("kajiba publish")                  │
-│         ▼ consumers pull subsets via CLI or direct git clone/filter     │
-└─────────────────────────────────────────────────────────────────────────┘
+~/.hermes/plugins/kajiba/
+├── plugin.yaml          ← NEW: Hermes plugin manifest
+├── __init__.py          ← NEW: register(ctx) entry point
+└── hooks.py             ← NEW: on_session_start/end, pre/post_llm_call handlers
+
+         │  ctx.register_hook("on_session_start", ...)
+         │  ctx.register_hook("post_llm_call", ...)
+         │  ctx.register_hook("on_session_end", ...)
+         ▼
+
+src/kajiba/
+├── collector.py         ← CHANGED: new hook signatures from Hermes plugin API
+├── hermes_integration.py ← REPLACED: old Protocol stub → thin dispatcher
+├── scrubber.py          ← UNCHANGED: regex Layer B
+├── scrubber_llm.py      ← IMPLEMENTED: semantic Layer C (was stub)
+├── scorer.py            ← UNCHANGED
+├── cli.py               ← MINOR CHANGE: llm-scrub toggle in preview/submit
+└── schema.py            ← UNCHANGED
+
+Data Flow (updated for v1.1):
+
+Session turn arrives via post_llm_call hook
+     │
+     ▼
+collector.on_turn_complete(turn_dict)        ← mapped from hook kwargs
+     │
+     ▼
+scrubber.scrub_record(record)                ← Layer B: regex PII (existing)
+     │ scrubbed KajibaRecord + ScrubLog
+     ▼
+scrubber_llm.scrub_semantic(text, model_fn)  ← Layer C: semantic PII (NEW)
+     │ merged ScrubResult with all redactions
+     ▼
+scorer.compute_quality_score(record)         ← unchanged
+     │ QualityResult
+     ▼
+~/.hermes/kajiba/staging/session_{id}.json   ← HITL review gate
+     │ user: kajiba review → approve
+     ▼
+record.to_sharegpt() / to_dpo_candidate()   ← existing methods, no changes
+     │ sharegpt or DPO dict
+     ▼
+export as JSONL for fine-tuning              ← no new code required
 ```
 
-### Component Responsibilities
+### Component Responsibilities After v1.1
 
-| Component | Responsibility | Inputs | Outputs | Communicates With |
-|-----------|---------------|--------|---------|------------------|
-| `SourceAdapter` (ABC) | Define the contract every source must satisfy | (abstract) | raw session dict | Collector |
-| `HermesAdapter` | Map Hermes Agent events to SourceAdapter interface | Hermes event hooks | raw session dict | SourceAdapter |
-| `GenericAdapter` | Accept a manually-constructed session dict from any tool | CLI input / direct call | raw session dict | SourceAdapter |
-| `SourceRegistry` | Discover and hold all registered adapters by name | adapter classes | adapter instance by key | CLI, ContributionManager |
-| `KajibaCollector` (existing) | Build a `KajibaRecord` from a raw session dict | raw session dict | `KajibaRecord` | Scrubber, Scorer |
-| `Scrubber` (existing) | PII-strip the record | `KajibaRecord` | scrubbed `KajibaRecord` + `ScrubLog` | Scorer, Outbox |
-| `Scorer` (existing) | Assign composite quality score and tier | `KajibaRecord` | `QualityResult` | CLI, ContributionManager |
-| `ContributionManager` | Gate outbox → publish based on mode and consent | mode config, `KajibaRecord`, user input | approved JSONL | Publisher |
-| `Publisher` | Write records into the dataset repo directory structure | approved JSONL, `KajibaRecord` metadata | JSONL files in `data/by-model/` | Dataset Repository |
-| `CatalogBuilder` | Regenerate `catalog.json` from repo contents | repo data directory | `catalog.json` | Dataset Repository |
-| `CLI` (extended) | Expose `publish`, `review`, `sync`, `sources` commands | user input | (side effects) | All components |
+| Component | Status | Responsibility | Changes |
+|-----------|--------|---------------|---------|
+| `~/.hermes/plugins/kajiba/__init__.py` | NEW | `register(ctx)` entry point; wire all hooks | New file |
+| `~/.hermes/plugins/kajiba/plugin.yaml` | NEW | Plugin manifest declaring hook subscriptions | New file |
+| `hermes_integration.py` | REPLACED | Dispatch Hermes hook kwargs to `KajibaCollector` methods | Full rewrite of 95 LOC |
+| `collector.py` | CHANGED | Accept `model` (str) + `platform` (str) from Hermes hooks instead of `model_config` (dict) | `on_session_start`, `on_session_end` signatures update |
+| `scrubber_llm.py` | IMPLEMENTED | Semantic PII detection via local Ollama model; structured JSON output | Stub → real implementation |
+| `scrubber.py` | UNCHANGED | Regex-based Layer B scrubbing | No changes |
+| `scorer.py` | UNCHANGED | Quality scoring | No changes |
+| `cli.py` | MINOR CHANGE | Add `--llm-scrub` flag to `preview` and `submit` | ~20 LOC change |
+| `schema.py` | UNCHANGED | Data model | No changes |
 
 ---
 
 ## Recommended Project Structure
 
-The existing `src/kajiba/` flat layout is sufficient for the new modules. Introduce sub-packages only when the source adapter ecosystem needs external plugin distribution.
+The v1.1 changes require two filesystem locations, not just `src/kajiba/`:
 
 ```
-src/kajiba/
-├── __init__.py
-├── schema.py                 (existing — no changes required for Phase 1)
-├── collector.py              (decouple from Hermes-specific calls)
-├── scrubber.py               (existing)
-├── scrubber_llm.py           (existing stub)
-├── scorer.py                 (existing)
-├── cli.py                    (add: publish, review, sources commands)
+D:/Kajiba/                               (or wherever the dev machine has this)
+├── src/kajiba/
+│   ├── hermes_integration.py            ← REPLACED (thin dispatcher to collector)
+│   ├── collector.py                     ← CHANGED (hook signature updates)
+│   ├── scrubber_llm.py                  ← IMPLEMENTED (LLM semantic scrub)
+│   ├── scrubber.py                      ← unchanged
+│   ├── scorer.py                        ← unchanged
+│   ├── schema.py                        ← unchanged
+│   └── cli.py                           ← minor change (llm-scrub flag)
 │
-├── sources/                  (NEW sub-package — source adapters)
-│   ├── __init__.py           (SourceRegistry + adapter discovery)
-│   ├── base.py               (SourceAdapter ABC + SessionData dataclass)
-│   ├── hermes.py             (refactored HermesAdapter — wraps existing hermes_integration.py)
-│   └── generic.py            (GenericAdapter — accepts raw dict/JSON input)
-│
-├── contribution/             (NEW sub-package — contribution modes)
-│   ├── __init__.py
-│   ├── manager.py            (ContributionManager — ad-hoc vs continuous logic)
-│   └── consent.py            (ConsentEnforcer — field stripping by consent level)
-│
-└── publisher/                (NEW sub-package — dataset repo output)
-    ├── __init__.py
-    ├── git_publisher.py      (write JSONL to dataset repo, git add/commit/push)
-    └── catalog.py            (CatalogBuilder — regenerate catalog.json)
+└── .planning/
+    └── research/                        ← this document lives here
 
-kajiba-dataset/               (SEPARATE git repository)
-├── README.md
-├── catalog.json
-├── data/
-│   └── by-model/
-│       └── {model-slug}/
-│           ├── gold/
-│           ├── silver/
-│           └── bronze/
-└── schemas/
-    └── v1/
-        └── kajiba_record.schema.json
+~/.hermes/plugins/kajiba/                ← PLUGIN INSTALL LOCATION (new dir)
+├── plugin.yaml
+├── __init__.py                          ← register(ctx) entry point
+└── hooks.py                             ← hook handler functions
+
+~/.hermes/kajiba/
+├── staging/                             ← unchanged
+└── outbox/                              ← unchanged
 ```
 
-**Rationale for `sources/` sub-package over flat modules:** Once community contributors write adapters for tools like Cursor, Aider, or Continue, they need a clear namespace to target (`kajiba.sources.cursor`). A sub-package makes the namespace discoverable and allows future `importlib.metadata` entry_point registration without restructuring.
+**Structure rationale:**
 
-**Rationale for separate dataset repo:** The `kajiba-dataset` repo grows append-only with contributor data. Mixing it into the Kajiba code repo would pollute git history and make code contributions harder. Consumers clone or sparse-checkout only the dataset repo.
+- The plugin lives at `~/.hermes/plugins/kajiba/` because that is where Hermes discovers plugins. It is NOT inside `src/kajiba/` — it is a consumer of the Kajiba library, not part of the library itself.
+- `hermes_integration.py` remains in the library so the collector can be used standalone (without Hermes) in tests and the CLI. The plugin directory imports from it.
+- `scrubber_llm.py` stays in `src/kajiba/` (same as the regex scrubber) because it is part of the library's scrubbing pipeline, not plugin-specific.
 
 ---
 
 ## Architectural Patterns
 
-### Pattern 1: Abstract Source Adapter (ABC with Protocol fallback)
+### Pattern 1: Plugin Register Function Wiring ctx Hooks to Existing Collector
 
-Use `ABC` with `@abstractmethod` to define the source interface. This is the right tool when:
-- You control all adapters (they are in the same codebase)
-- You want to prevent instantiation of incomplete adapters at class-definition time
-- The interface is non-trivial (more than one method)
+The Hermes plugin API contract is: define `register(ctx)`, call `ctx.register_hook(event, handler)` inside it. The handlers must accept `**kwargs` for forward compatibility.
 
-For community-contributed adapters that live outside the Kajiba package, expose a `Protocol` version of the same interface for structural subtyping — they can satisfy the contract without inheriting from Kajiba's ABC.
+The hook signatures from Hermes v0.5.0+ (confirmed via official docs) are:
 
 ```python
-# src/kajiba/sources/base.py
-from abc import ABC, abstractmethod
-from dataclasses import dataclass
-from typing import Any
+# on_session_start kwargs: session_id (str), model (str), platform (str)
+# on_session_end kwargs:   session_id (str), completed (bool), interrupted (bool),
+#                          model (str), platform (str)
+# pre_llm_call kwargs:     session_id (str), user_message (str),
+#                          conversation_history (list), is_first_turn (bool),
+#                          model (str), platform (str)
+# post_llm_call kwargs:    session_id (str), user_message (str),
+#                          assistant_response (str), conversation_history (list),
+#                          model (str), platform (str)
+# post_tool_call kwargs:   tool_name (str), args (dict), result (str), task_id (str)
+```
+
+The adapter pattern: wrap hook kwargs into the dict shape `KajibaCollector` already accepts. This means the collector's method signatures must also change to accept the new kwarg names.
+
+```python
+# ~/.hermes/plugins/kajiba/__init__.py
+from kajiba.collector import KajibaCollector
+
+_collector: KajibaCollector | None = None
+
+def register(ctx) -> None:
+    global _collector
+    _collector = KajibaCollector()
+
+    ctx.register_hook("on_session_start", _on_session_start)
+    ctx.register_hook("post_llm_call", _on_post_llm_call)
+    ctx.register_hook("post_tool_call", _on_post_tool_call)
+    ctx.register_hook("on_session_end", _on_session_end)
+```
+
+```python
+# ~/.hermes/plugins/kajiba/hooks.py
+def _on_session_start(session_id: str, model: str, platform: str, **kwargs) -> None:
+    if _collector is None:
+        return
+    _collector.on_session_start(
+        session_id=session_id,
+        model_name=model,
+        platform=platform,
+    )
+
+def _on_post_llm_call(
+    session_id: str,
+    user_message: str,
+    assistant_response: str,
+    conversation_history: list,
+    model: str,
+    platform: str,
+    **kwargs,
+) -> None:
+    if _collector is None:
+        return
+    # Build turn dict that collector.on_turn_complete already accepts
+    _collector.on_turn_complete({
+        "role": "gpt",
+        "content": assistant_response,
+    })
+
+def _on_session_end(
+    session_id: str,
+    completed: bool,
+    interrupted: bool,
+    model: str,
+    platform: str,
+    **kwargs,
+) -> None:
+    if _collector is None:
+        return
+    _collector.on_session_end(session_id=session_id)
+```
+
+**Why this pattern:** The `_collector` module-level singleton is correct here because Hermes fires `on_session_start` before any turn hooks, establishing session context. The singleton is reset on each `on_session_start` call inside the collector (existing behavior).
+
+**Trade-off:** Module-level state is not thread-safe. For Hermes's single-session CLI use case this is fine. If Hermes ever runs concurrent sessions per process, this needs a `session_id → collector` dict.
+
+### Pattern 2: KajibaCollector Signature Adaptation (Minimal Breaking Change)
+
+`collector.py` currently has `on_session_start(self, session_id: str, model_config: dict)`. The Hermes plugin API does not pass `model_config` as a dict — it passes `model: str` (the model name string) and `platform: str`.
+
+The minimal change: add `model_name` and `platform` as keyword arguments to `on_session_start`, keep `model_config` as an optional parameter for backwards compatibility (used in tests and standalone CLI):
+
+```python
+def on_session_start(
+    self,
+    session_id: str,
+    model_config: Optional[dict] = None,   # kept for backwards compat
+    *,
+    model_name: Optional[str] = None,       # new: from Hermes hook
+    platform: Optional[str] = None,         # new: from Hermes hook
+) -> None:
+    # If called from plugin, construct minimal model_config from kwargs
+    if model_config is None and model_name is not None:
+        model_config = {"model_name": model_name, "provider": platform}
+    ...
+```
+
+This preserves all existing tests that call `on_session_start(session_id="x", model_config={...})` while enabling the plugin path.
+
+### Pattern 3: LLM Semantic Scrubber — Structured Output via Ollama
+
+The LLM scrubber calls a local model (Hermes 3 8B Q4 via Ollama) with a focused PII detection prompt. The model returns a JSON array of detected entities. This must be robust to model output variance.
+
+**Recommended approach:** Use Ollama's `format="json"` parameter + Pydantic validation + retry on parse failure. This resolves >95% of structured output issues per community benchmarks.
+
+```python
+# src/kajiba/scrubber_llm.py
+
+import json
+import logging
+from dataclasses import dataclass, field
+from typing import Callable
+
+logger = logging.getLogger(__name__)
+
+PII_DETECTION_PROMPT = """\
+You are a privacy auditor. Identify ALL personally identifiable information in the text below.
+
+Return ONLY a JSON array. Each item must have exactly these fields:
+- "text": the exact string found in the input (verbatim match required)
+- "category": one of: person_name, company_name, project_name, location, username, other
+- "confidence": one of: high, medium, low
+
+Text to analyze:
+<<<
+{text}
+>>>
+
+Rules:
+- Public figures in their public capacity are NOT PII (e.g., "Linus Torvalds" in a Linux commit context)
+- Generic company names from docs (GitHub, Microsoft) are NOT PII
+- Internal project codenames, employer names, real usernames ARE PII
+- Return [] if no PII found
+"""
 
 @dataclass
-class SessionData:
-    """Normalized session dict that the Collector accepts."""
-    session_id: str
-    model_config: dict[str, Any]
-    turns: list[dict[str, Any]]
-    source_tool: str          # e.g., "hermes", "cursor", "aider"
-    source_version: str | None = None
+class SemanticRedaction:
+    original_text: str
+    replacement_tag: str
+    confidence: str      # "high", "medium", "low"
+    category: str        # "person_name", "company_name", "project_name", ...
 
-class SourceAdapter(ABC):
-    """Every source adapter must satisfy this contract."""
+@dataclass
+class ScrubResult:
+    scrubbed_text: str
+    redactions: list[SemanticRedaction] = field(default_factory=list)
+    stats: dict[str, int] = field(default_factory=dict)
 
-    @abstractmethod
-    def get_source_name(self) -> str:
-        """Short identifier, e.g. 'hermes', 'generic'."""
-        ...
+def scrub_semantic(text: str, model_fn: Callable[[str], str]) -> ScrubResult:
+    prompt = PII_DETECTION_PROMPT.format(text=text)
+    raw = model_fn(prompt)
+    try:
+        detections = json.loads(raw)
+    except json.JSONDecodeError:
+        logger.warning("LLM scrubber returned non-JSON; skipping semantic scrub")
+        return ScrubResult(scrubbed_text=text)
 
-    @abstractmethod
-    def build_session_data(self, raw: dict[str, Any]) -> SessionData:
-        """Normalize tool-specific raw data into SessionData."""
-        ...
-
-    def register_hooks(self, agent: Any) -> None:
-        """Optional: wire into a live agent's event system."""
-        pass  # not required for file-based adapters
+    redactions = []
+    scrubbed = text
+    for item in detections:
+        if item.get("confidence") in ("high", "medium"):
+            tag = f"[REDACTED_{item['category'].upper()}]"
+            scrubbed = scrubbed.replace(item["text"], tag)
+            redactions.append(SemanticRedaction(
+                original_text=item["text"],
+                replacement_tag=tag,
+                confidence=item["confidence"],
+                category=item["category"],
+            ))
+    return ScrubResult(
+        scrubbed_text=scrubbed,
+        redactions=redactions,
+        stats={"total": len(redactions)},
+    )
 ```
 
-### Pattern 2: Registry with Explicit Registration (not entry_points)
+**model_fn contract:** The caller (collector or CLI) provides `model_fn`. For Ollama: `lambda prompt: ollama.generate(model="hermes3:8b-q4", prompt=prompt, format="json")["response"]`. This keeps the scrubber decoupled from any specific inference backend.
 
-For the current milestone, a simple dictionary registry is the right choice. Entry points are for distributable plugins across separate packages — overkill while adapters live inside the Kajiba package.
+**When to call:** After `scrubber.scrub_record()` (regex pass) and before `scorer.compute_quality_score()`. The LLM scrubber operates on individual string fields (turn content), not the full `KajibaRecord` at once — same pattern as the regex scrubber's `scrub_text()`.
 
-```python
-# src/kajiba/sources/__init__.py
-from kajiba.sources.hermes import HermesAdapter
-from kajiba.sources.generic import GenericAdapter
+**Confidence threshold policy:** Auto-redact `high` and `medium` confidence. Flag `low` confidence items in the `ScrubLog` for HITL review. Do NOT auto-redact low confidence (too many false positives with local 8B models).
 
-_REGISTRY: dict[str, type[SourceAdapter]] = {}
+### Pattern 4: Fine-tuning Export via Existing KajibaRecord Methods
 
-def register(name: str, adapter_cls: type[SourceAdapter]) -> None:
-    _REGISTRY[name] = adapter_cls
+No new export code is required for the fine-tuning experiment. `KajibaRecord.to_sharegpt()` and `KajibaRecord.to_dpo_candidate()` already exist and produce the correct formats.
 
-def get(name: str) -> SourceAdapter:
-    if name not in _REGISTRY:
-        raise KeyError(f"Unknown source: {name!r}. Available: {list(_REGISTRY)}")
-    return _REGISTRY[name]()
-
-# Built-in registrations at import time
-register("hermes", HermesAdapter)
-register("generic", GenericAdapter)
-```
-
-Future community plugins call `from kajiba.sources import register` and add themselves.
-
-### Pattern 3: Contribution Mode as a Strategy Object
-
-The `ContributionManager` selects behavior based on `mode` config, following the Strategy pattern. Do not use inheritance — modes differ only in the decision gate, not in data flow.
-
-```python
-# src/kajiba/contribution/manager.py
-class ContributionManager:
-    def __init__(self, mode: str, consent_level: str, auto_submit: bool):
-        self.mode = mode                  # "adhoc" | "continuous"
-        self.consent_level = consent_level
-        self.auto_submit = auto_submit
-        self._queue: list[KajibaRecord] = []
-
-    def accept(self, record: KajibaRecord, quality: QualityResult) -> bool:
-        """Returns True if the record should proceed to publish."""
-        stripped = ConsentEnforcer.apply(record, self.consent_level)
-        if self.mode == "continuous" and self.auto_submit:
-            return True                   # pass through immediately
-        # ad-hoc: enqueue and wait for user confirmation via CLI
-        self._queue.append(stripped)
-        return False
-
-    def flush_approved(self) -> list[KajibaRecord]:
-        """Return all records the user approved via `kajiba review`."""
-        approved, self._queue = self._queue, []
-        return approved
-```
-
-### Pattern 4: Append-Only Dataset Repository with Catalog Index
-
-The dataset repository is a plain Git repo. Records are never deleted or modified — only appended. The catalog is a generated index file, regenerated on every publish.
+The export workflow is purely operational (CLI commands + a shell script), not an architectural change:
 
 ```
-catalog.json structure:
-{
-  "schema_version": "1",
-  "generated_at": "2026-03-30T...",
-  "total_records": 1482,
-  "models": {
-    "hermes-3-8b": {
-      "record_count": 840,
-      "tiers": { "gold": 120, "silver": 400, "bronze": 320 },
-      "paths": {
-        "gold":   "data/by-model/hermes-3-8b/gold/",
-        "silver": "data/by-model/hermes-3-8b/silver/",
-        "bronze": "data/by-model/hermes-3-8b/bronze/"
-      }
-    }
-  }
-}
+# Step 1: Export approved records as JSONL
+kajiba export --format sharegpt ./fine_tune_data.jsonl
+
+# Step 2: Fine-tune with Unsloth (outside Kajiba — consumer-side)
+python train.py \
+    --model unsloth/Llama-3.2-3B-Instruct-bnb-4bit \
+    --dataset ./fine_tune_data.jsonl \
+    --r 16 --lora-alpha 32 --max-seq-len 2048
 ```
 
-Consumers discover available subsets by reading `catalog.json` before deciding what to clone/download. This avoids needing to traverse the directory tree.
+The only Kajiba-side change needed: the `kajiba export` CLI command needs a `--format sharegpt|dpo|raw` flag if it does not already have one. Confirm against `cli.py` before implementing.
 
 ---
 
 ## Data Flow
 
-### Contribution Flow (ad-hoc mode)
+### Session Collection Flow (v1.1 Plugin Path)
 
 ```
-AI Tool Session
+Hermes Agent session starts
      │
+     ▼ on_session_start(session_id, model, platform)
+~/.hermes/plugins/kajiba/hooks.py
+     │ maps to: collector.on_session_start(session_id, model_name, platform)
      ▼
-SourceAdapter.build_session_data(raw)      ← tool-specific normalization
-     │ SessionData
-     ▼
-KajibaCollector.build_record(session_data) ← existing schema construction
-     │ KajibaRecord
-     ▼
-scrubber.scrub_record(record)              ← existing PII removal
-     │ scrubbed KajibaRecord + ScrubLog
-     ▼
-scorer.compute_quality_score(record)       ← existing quality tier
-     │ QualityResult
-     ▼
-ContributionManager.accept(record, quality)
-     │ enqueued in review queue
-     ▼
-[user runs: kajiba review]
-     │ user approves/rejects each record
-     ▼
-ContributionManager.flush_approved()
-     │ approved KajibaRecord list
-     ▼
-ConsentEnforcer.apply(record, consent_level) ← field stripping
-     │ consent-stripped KajibaRecord
-     ▼
-Publisher.write_record(record, repo_path)  ← append JSONL file
-     │ written to data/by-model/{model-slug}/{tier}/
-     ▼
-CatalogBuilder.rebuild(repo_path)          ← regenerate catalog.json
+KajibaCollector._session_id set, hardware detected, ModelMetadata built
      │
+     ▼ pre_llm_call fires (optional: memory plugins inject context)
+     │ Kajiba does NOT subscribe to pre_llm_call — no action needed here
+     │
+     ▼ post_llm_call(session_id, user_message, assistant_response, ...)
+~/.hermes/plugins/kajiba/hooks.py
+     │ maps user_message → "human" turn, assistant_response → "gpt" turn
+     │ calls collector.on_turn_complete() twice (once per role)
      ▼
-git add + commit + push                    ← to dataset repository
+KajibaCollector._conversations list grows
+     │
+     ▼ post_tool_call(tool_name, args, result, task_id)
+~/.hermes/plugins/kajiba/hooks.py
+     │ appends ToolCall to last "gpt" turn's tool_calls list
+     ▼
+KajibaCollector._conversations updated with tool call
+     │
+     ▼ on_session_end(session_id, completed, interrupted, ...)
+~/.hermes/plugins/kajiba/hooks.py
+     │ maps to: collector.on_session_end(session_id)
+     ▼
+KajibaCollector._save_to_staging() → ~/.hermes/kajiba/staging/session_{id}.json
 ```
 
-### Contribution Flow (continuous mode)
-
-Same as above except `ContributionManager.accept()` returns `True` immediately — no review queue — and publish happens automatically after each session ends, subject to the configured consent level and quality tier threshold.
-
-### Consumer Download Flow
+### HITL Review Flow (post-collection)
 
 ```
-consumer: git clone kajiba-dataset/        ← full dataset, or
-consumer: reads catalog.json               ← discover what exists
-consumer: sparse-checkout data/by-model/hermes-3-8b/gold/
-consumer: loads *.jsonl files              ← standard format, loadable by
-                                              LLaMA-Factory, Axolotl, etc.
+~/.hermes/kajiba/staging/session_{id}.json
+     │
+     ▼ kajiba preview
+CLI loads record, runs scrubber.scrub_record() (regex pass)
+     │
+     ▼ if --llm-scrub flag:
+scrubber_llm.scrub_semantic(turn_content, model_fn) for each turn
+     │ merged redaction log
+     ▼
+Rich table: redaction summary, quality tier, flagged org domains
+     │
+     ▼ kajiba review → user approves/edits/rejects
+     │
+     ▼ kajiba submit
+Full privacy pipeline: scrub → anonymize → jitter → consent
+Record written to ~/.hermes/kajiba/outbox/record_{id}.jsonl
 ```
+
+### LLM Scrub Integration Into Privacy Pipeline
+
+```
+Existing pipeline (Layer B only):
+  raw record → scrub_record() → scrubbed record → scorer
+
+v1.1 pipeline (Layer B + Layer C):
+  raw record
+      → scrub_record()          ← regex, always runs
+      → scrub_semantic_record() ← LLM, runs when llm_pii_scrub=true in config
+      → scorer
+```
+
+`scrub_semantic_record()` is a new thin wrapper in `scrubber_llm.py` that iterates over `KajibaRecord` conversation turns and calls `scrub_semantic()` per turn. This mirrors the pattern in `scrubber.py`'s `scrub_record()` function. It appends any new redactions to the existing `ScrubLog`.
 
 ---
 
 ## Scaling Considerations
 
-| Concern | Now (MVP, <10K records) | Later (>100K records) |
-|---------|--------------------------|----------------------|
-| Storage | JSONL files in git, fine | Git LFS or migrate to Hugging Face Hub dataset repo |
-| Catalog | Full `catalog.json` rebuild on every push | Incremental update: only update changed model/tier entries |
-| Dedup | SHA-256 submission hash checked client-side | Server-side dedup check endpoint or shared bloom filter |
-| Contributor conflicts | Last-write-wins on PR merge | Each contributor writes to a namespaced subdirectory; catalog merge is non-conflicting |
-| Discovery | Single `catalog.json` | Add per-model `catalog_fragment.json` files; main catalog aggregates |
+This is a local-first, single-user pipeline. Scaling is not a concern for v1.1. The relevant considerations are latency and reliability:
 
-**Recommended now:** Keep everything in a plain Git repo with a flat JSONL structure. Git history gives version control for free. When the repo exceeds ~500MB (roughly 200K gold-tier records), evaluate Git LFS or migration to Hugging Face Hub.
+| Concern | Impact | Mitigation |
+|---------|--------|------------|
+| LLM scrub adds latency | ~2–5s per turn on 8B Q4 model | Gate behind config flag `llm_pii_scrub`; off by default |
+| Ollama not running | LLM scrub call fails | Catch `ConnectionError`; log warning; fall back to regex-only |
+| Long turns exceed model context | Truncation artifacts | Truncate input to 2000 chars (matches existing `tool_input[:2000]` pattern); log when truncated |
+| Model returns invalid JSON | Parse failure | Catch `JSONDecodeError`; return no-op `ScrubResult`; log warning (no exception raised) |
+| Plugin crashes | Hermes logs and skips | Already Hermes's default behavior for hook failures — no extra handling needed |
 
 ---
 
 ## Anti-Patterns
 
-### Anti-Pattern 1: Embedding Hermes Calls Directly in Collector
+### Anti-Pattern 1: Calling `register_hooks(agent)` Pattern on the Real Plugin API
 
-**What:** Keeping `collector.py` with Hermes-specific method signatures (`on_session_start(session_id, model_config)`) as the only entry point.
-**Why bad:** Every new source requires forking collector logic rather than adding an adapter. The Collector becomes a maintenance target rather than a stable processing unit.
-**Instead:** Collector accepts `SessionData` (a neutral dataclass). Adapters are responsible for constructing `SessionData` from their tool's native format.
+**What people do:** Try to adapt the old `hermes_integration.py`'s `register_hooks(agent)` style — where you call `agent.on("event", callback)` — to the real Hermes plugin system.
+**Why wrong:** The real Hermes plugin API does not expose an `agent` object with an `.on()` method. The plugin receives a `ctx` context object. There is no `agent.on()`. Keeping the old Protocol-based adapter means Kajiba will never actually connect to a real Hermes session.
+**Do instead:** Delete the old `HermesAgent` Protocol class and `register_hooks(agent)` function. Replace with a `register(ctx)` function that calls `ctx.register_hook()`. Keep `KajibaCollector` as the stateful data accumulator — it does not change structurally, only its input signatures need updating.
 
-### Anti-Pattern 2: Contribution Mode Logic Inside CLI Commands
+### Anti-Pattern 2: Wiring the User Turn from pre_llm_call Instead of post_llm_call
 
-**What:** Scattering `if auto_submit:` and `if consent_level == "anonymous":` conditionals across individual Click commands.
-**Why bad:** Mode behavior is duplicated across commands, diverges silently, and cannot be unit-tested without invoking Click's test runner.
-**Instead:** `ContributionManager` is the single authority on mode behavior. CLI commands call `manager.accept()` and `manager.flush_approved()`.
+**What people do:** Subscribe to `pre_llm_call` to capture the user message (since it's in the payload), avoiding a second hook subscription.
+**Why wrong:** `pre_llm_call` fires before the model responds. If you capture the user message there, you have no pairing with the assistant response. You end up with turns in the wrong order or missing the assistant side. Additionally, `pre_llm_call` can return a value (context injection) — returning accidentally could corrupt the agent's system prompt.
+**Do instead:** Subscribe only to `post_llm_call`. Its payload includes both `user_message` and `assistant_response`. Build two `ConversationTurn` objects from a single hook call.
 
-### Anti-Pattern 3: One JSONL File Per Record in Dataset Repo
+### Anti-Pattern 3: Calling scrub_semantic on the Full Record at Once
 
-**What:** Writing one `record_{sha}.jsonl` file per contribution, as the current outbox does.
-**Why bad:** A dataset repo with 50K records has 50K files. Git operations (clone, status, log) degrade significantly above ~10K files. Consumer tooling (LLaMA-Factory, Axolotl) expects shard files, not per-record files.
-**Instead:** Shard files within each `{model}/{tier}/` directory. A new shard file is opened when the previous exceeds a size threshold (e.g., 50MB or 10K records). Shards are named `shard-0001.jsonl`, `shard-0002.jsonl`.
+**What people do:** Pass the serialized JSON of the entire `KajibaRecord` to the LLM scrubber in one call.
+**Why wrong:** A full record serialized to JSON can be 10–50KB. Local 8B models lose coherence on long inputs; the PII detection accuracy degrades significantly beyond ~2000 tokens. The model also "hallucinates" PII in field names (e.g., flags "record_id" as a person name).
+**Do instead:** Call `scrub_semantic()` per turn content string, not per record. This matches the existing `scrub_text()` pattern in `scrubber.py` and keeps inputs within reliable model attention range.
 
-### Anti-Pattern 4: Mutable Dataset Records
+### Anti-Pattern 4: Storing the Ollama model_fn as a Module-Level Callable
 
-**What:** Allowing contributors to update or delete previously submitted records.
-**Why bad:** Breaks reproducibility for consumers who have already loaded the data. Makes `catalog.json` stale. Makes audit trails untrustworthy.
-**Instead:** Dataset is append-only. Records are never modified post-publish. If a record was submitted in error, it is added to a `revoked.json` list — consumers filter it out at load time. The original file is never deleted (preserves git history integrity).
+**What people do:** `import ollama; MODEL_FN = lambda p: ollama.generate(...)` at module level in `scrubber_llm.py`.
+**Why wrong:** This creates a hard dependency on `ollama` being installed and running at import time. The module becomes un-importable on machines without Ollama — breaking all tests and the regex-scrub-only path.
+**Do instead:** `scrub_semantic(text, model_fn)` accepts `model_fn` as an argument (already the existing stub signature). The caller (CLI or collector) constructs and passes `model_fn`. Gate the Ollama import inside the caller with a try/except. `scrubber_llm.py` itself imports nothing from Ollama.
 
-### Anti-Pattern 5: Consent Enforcement at Display Time Only
+### Anti-Pattern 5: Separate plugin.yaml and __init__.py Copies Inside src/kajiba/
 
-**What:** Stripping fields when rendering a CLI preview but writing the full record to the outbox.
-**Why bad:** If the submit/publish step happens without a preview step (e.g., continuous mode), full PII-adjacent data is published.
-**Instead:** `ConsentEnforcer.apply()` runs as an explicit pipeline stage before any write to outbox or dataset repo, regardless of mode.
-
-### Anti-Pattern 6: Rebuilding Full Catalog on Every Record
-
-**What:** Scanning the entire `data/` directory tree to rebuild `catalog.json` after each record publish.
-**Why bad:** With 10K+ records, this scan becomes slow. Contributors submitting many records at once will wait for repeated full scans.
-**Instead:** Publisher increments counts in-memory during a batch run and calls `CatalogBuilder.rebuild()` once at the end of the publish operation, not per-record.
+**What people do:** Keep the plugin files inside `src/kajiba/` and try to symlink or copy them to `~/.hermes/plugins/kajiba/` at install time.
+**Why wrong:** Creates two sources of truth. The `register(ctx)` function and `plugin.yaml` that Hermes reads must live at `~/.hermes/plugins/kajiba/`. Having them inside the Python package confuses both Hermes's plugin discovery and developers reading the codebase.
+**Do instead:** The plugin directory `~/.hermes/plugins/kajiba/` is a separate artifact from the Python package. `__init__.py` there imports from the installed `kajiba` package (`from kajiba.collector import KajibaCollector`). Development setup: `pip install -e .` installs the library; a `make install-plugin` target copies/symlinks the plugin directory.
 
 ---
 
 ## Integration Points
 
-### Inbound (data enters Kajiba)
+### New Integration: Hermes Plugin API
 
-| Integration | Protocol | How |
-|-------------|----------|-----|
-| Hermes Agent | Observer / event hooks | `HermesAdapter.register_hooks(agent)` subscribes to session lifecycle events |
-| Any AI tool via file drop | Manual / file-based | `GenericAdapter.build_session_data(json.load(file))` — user drops a JSON file, runs `kajiba submit --source generic --file session.json` |
-| Future: Cursor, Aider, Continue | Same `SourceAdapter` ABC | Each tool gets its own adapter module in `kajiba/sources/` |
+| Boundary | Protocol | Direction | Notes |
+|----------|----------|-----------|-------|
+| `~/.hermes/plugins/kajiba/__init__.py` → Hermes | `register(ctx)` function | Hermes calls Kajiba | Called once at Hermes startup |
+| Hermes → `hooks.py` handlers | `ctx.register_hook(event, fn)` | Hermes calls Kajiba | Per-session, per-turn events |
+| `hooks.py` → `collector.py` | Direct Python import | Kajiba internal | `from kajiba.collector import KajibaCollector` |
 
-### Outbound (data leaves Kajiba)
+**Confirmed hook names (Hermes v0.5.0+, HIGH confidence):**
+- `on_session_start` — fires when session begins; kwargs: `session_id`, `model`, `platform`
+- `post_llm_call` — fires after each LLM response; kwargs: `session_id`, `user_message`, `assistant_response`, `conversation_history`, `model`, `platform`
+- `post_tool_call` — fires after each tool call; kwargs: `tool_name`, `args`, `result`, `task_id`
+- `on_session_end` — fires when session ends; kwargs: `session_id`, `completed`, `interrupted`, `model`, `platform`
 
-| Integration | Protocol | How |
-|-------------|----------|-----|
-| Dataset repository | Git | `Publisher` writes JSONL files, runs `git add/commit/push` against a locally-cloned dataset repo path |
-| Consumer training frameworks (LLaMA-Factory, Axolotl) | JSONL file read | No integration needed — consumers read JSONL directly; `to_sharegpt()` export method already exists on `KajibaRecord` |
-| Future: Hugging Face Hub | HF datasets API | Publisher gains a `HuggingFacePublisher` variant — same interface, different backend |
+**Not using:**
+- `pre_llm_call` — not needed; we capture from `post_llm_call` which has both sides of the exchange
+- `pre_tool_call` — not needed; `post_tool_call` has the result which is what matters for training data
 
-### Configuration
+### Modified Integration: KajibaCollector ← scrubber_llm
 
-The existing `~/.hermes/config.yaml` is renamed or extended to `~/.kajiba/config.yaml` (source-agnostic path). New keys:
+| Boundary | Protocol | Notes |
+|----------|----------|-------|
+| `collector.export_record()` → `scrubber_llm.scrub_semantic_record()` | Direct call with `model_fn` kwarg | Only when `llm_pii_scrub=true` in config |
+| `cli.py preview/submit` → `scrubber_llm.scrub_semantic_record()` | Direct call with `model_fn` kwarg | Only when `--llm-scrub` flag passed |
 
-```yaml
-# existing
-consent_level: full
-auto_submit: false
-llm_pii_scrub: false
-scrub_strictness: standard
+### Unchanged Integrations
 
-# new
-contribution_mode: adhoc          # adhoc | continuous
-dataset_repo_path: ~/datasets/kajiba-data
-min_publish_tier: silver          # bronze | silver | gold
-source: hermes                    # which adapter to use by default
-```
+| Boundary | Status |
+|----------|--------|
+| `collector.py` → `scrubber.scrub_record()` | Unchanged |
+| `collector.py` → `scorer.compute_quality_score()` | Unchanged |
+| `cli.py` → `publisher.py` | Unchanged |
+| JSONL outbox → `kajiba export` | Unchanged |
+| `KajibaRecord.to_sharegpt()` | Unchanged — works for fine-tuning export as-is |
 
 ---
 
 ## Suggested Build Order
 
-This ordering reflects hard dependencies: later components require earlier ones to exist.
+Dependencies drive the ordering. Each item can be started only after all items it depends on are complete.
 
-1. **`sources/base.py` — SourceAdapter ABC + SessionData** (no dependencies)
-   Unblocks everything. All other new components depend on this interface.
+```
+1. plugin.yaml + __init__.py skeleton (plugin dir)
+   └── No dependencies. Establishes plugin directory.
+       Verifies Hermes discovers and loads the plugin without errors.
 
-2. **`sources/hermes.py` — HermesAdapter** (depends on: `base.py`, existing `hermes_integration.py`)
-   Migrates the existing Hermes integration to the new interface. Existing tests must still pass. This is the highest-risk step because it touches working code.
+2. collector.py: update on_session_start signature
+   └── Depends on: confirmed Hermes hook kwarg names (verified above).
+       Change: add model_name, platform kwargs; keep model_config for compat.
+       Risk: MEDIUM — touches working code with 356 tests.
 
-3. **Refactor `collector.py`** (depends on: `base.py`)
-   Change `KajibaCollector` to accept `SessionData` instead of raw Hermes dicts. All downstream components (scrubber, scorer) are unaffected — they still consume `KajibaRecord`.
+3. hooks.py (full hook handlers)
+   └── Depends on: (1) plugin dir, (2) updated collector.
+       Wire all four hooks: on_session_start, post_llm_call,
+       post_tool_call, on_session_end.
 
-4. **`sources/generic.py` — GenericAdapter** (depends on: `base.py`, refactored `collector.py`)
-   Validates that the source-agnostic path works with manually-constructed data.
+4. hermes_integration.py rewrite
+   └── Depends on: (2) updated collector signatures.
+       Replace Protocol stub with thin dispatcher used by hooks.py.
+       Keep register_hooks() as a deprecated no-op with a deprecation warning
+       so any downstream code that calls it doesn't hard-break.
 
-5. **`contribution/consent.py` — ConsentEnforcer** (depends on: `schema.py`)
-   Pure function: takes a `KajibaRecord` and consent level, returns a stripped copy. Can be built and tested in isolation.
+5. scrubber_llm.py implementation
+   └── No dependencies on (1)-(4). Can be built in parallel.
+       Implement scrub_semantic() + scrub_semantic_record().
+       Unit test against a mock model_fn that returns known JSON.
 
-6. **`contribution/manager.py` — ContributionManager** (depends on: `consent.py`, `scorer.py`)
-   Implements ad-hoc and continuous mode behavioral gates.
+6. cli.py: --llm-scrub flag on preview and submit
+   └── Depends on: (5) implemented scrubber_llm.
+       ~20 LOC change. Add Ollama import gating.
 
-7. **`publisher/catalog.py` — CatalogBuilder** (depends on: nothing but filesystem)
-   Builds `catalog.json` from a directory scan. Testable with fixture directories.
+7. End-to-end HITL session collection test
+   └── Depends on: (1)-(4) complete, real Hermes Agent running.
+       Collect a real session, verify staging file created.
+       This is the integration validation for the plugin rewrite.
 
-8. **`publisher/git_publisher.py` — Publisher** (depends on: `schema.py`, `catalog.py`)
-   Writes JSONL to dataset repo directory structure and invokes git.
+8. End-to-end LLM scrub test
+   └── Depends on: (5)-(6), Ollama running with Hermes 3 8B Q4.
+       Run preview --llm-scrub on a staging file with known content.
 
-9. **CLI extensions** (depends on: all above)
-   Add `publish`, `review`, `sources`, `sync` commands. Wire `ContributionManager` and `Publisher` into the existing command group.
+9. Fine-tuning data export validation
+   └── Depends on: (7) — at least one real session collected.
+       kajiba export --format sharegpt → verify JSONL schema matches
+       Unsloth's expected format.
+       No code changes expected at this step.
+```
 
-10. **Dataset repository scaffolding** (depends on: `Publisher`)
-    Initialize the `kajiba-dataset` git repo with `README.md`, `catalog.json`, directory skeleton, and `schemas/v1/`.
+**Highest risk item:** Step 2 (collector signature change). It touches `on_session_start` which is called by the existing 356-test suite. The change must be backwards-compatible (optional kwargs with defaults) or tests must be updated. Budget time for test updates.
+
+**Lowest risk item:** Step 5 (scrubber_llm implementation). The interface is already defined in the stub. Only the body changes. Tests can use a mock `model_fn` — no real Ollama required for unit tests.
+
+**Parallelizable:** Steps 1+5 can be started simultaneously with step 2. The plugin skeleton and the LLM scrubber have no mutual dependency.
 
 ---
 
 ## Sources
 
-- [HuggingFace — Structure your repository](https://huggingface.co/docs/datasets/en/repository_structure) — canonical reference for how to organize JSONL datasets in a Git repo with YAML-defined splits and configurations (MEDIUM confidence — official HuggingFace docs)
-- [LLaMA-Factory data/README.md](https://raw.githubusercontent.com/hiyouga/LLaMA-Factory/main/data/README.md) — real-world dataset catalog format using `dataset_info.json` with per-entry metadata for format, columns, and source (HIGH confidence — official project docs)
-- [DataFlow: LLM-Driven Framework](https://arxiv.org/html/2512.16676v1) — reference architecture for multi-source LLM data pipelines with operator categorization, extension ecosystem, and storage abstraction (MEDIUM confidence — peer-reviewed preprint)
-- [Python Packaging — Creating and discovering plugins](https://packaging.python.org/en/latest/guides/creating-and-discovering-plugins/) — official Python guidance on entry_points vs namespace packages for plugin discovery (HIGH confidence — official Python docs, accessed via search)
-- [Abstract Base Classes vs Protocols](https://jellis18.github.io/post/2022-01-11-abc-vs-protocol/) — practical comparison of when to use ABC vs Protocol for interface design in Python (MEDIUM confidence — community blog, well-sourced)
-- [DVC — Versioning Data and Models](https://doc.dvc.org/use-cases/versioning-data-and-models) — patterns for append-only dataset growth with git-tracked metadata (MEDIUM confidence — official DVC docs)
-- [Datasets Should Behave Like Git Repositories](https://towardsdatascience.com/datasets-should-behave-like-git-repositories-9acb83a0dae5/) — principles for treating dataset evolution with version-control discipline (LOW confidence — opinion article, principles are sound but not authoritative)
+- [Hermes Agent — Build a Hermes Plugin](https://hermes-agent.nousresearch.com/docs/guides/build-a-hermes-plugin/) — PRIMARY SOURCE for hook names, callback signatures, plugin.yaml format, ctx API. HIGH confidence — official NousResearch documentation verified 2026-04-02.
+- [NousResearch/hermes-agent RELEASE_v0.5.0.md](https://github.com/NousResearch/hermes-agent/blob/main/RELEASE_v0.5.0.md) — Confirms four lifecycle hooks activated in v0.5.0: pre/post_llm_call, on_session_start, on_session_end. HIGH confidence — official release notes.
+- [NousResearch/hermes-agent RELEASE_v0.6.0.md](https://github.com/NousResearch/hermes-agent/blob/main/RELEASE_v0.6.0.md) — v0.6.0 adds profiles, MCP server mode; no breaking plugin API changes identified. HIGH confidence — official release notes.
+- [Ollama Python library](https://github.com/ollama/ollama) — OpenAI-compatible API, `format="json"` parameter for structured output. HIGH confidence — official Ollama project.
+- [DZone — Local SLMs for PII Scrubbing](https://dzone.com/articles/the-ai-firewall-using-local-small-language-models) — Pattern of using local 3B-8B models for PII detection with structured JSON output. MEDIUM confidence — practitioner article, approach corroborated by multiple sources.
+- [Markaicode — Reliable Structured Output from Local LLMs](https://markaicode.com/ollama-structured-output-pipeline/) — format="json" + Pydantic validation + retry resolves >95% of structured output issues. MEDIUM confidence — community guide, consistent with Ollama official docs.
+- [Unsloth Fine-tuning Guide](https://unsloth.ai/docs/get-started/fine-tuning-llms-guide) — Llama 3.2 3B fits in 8GB VRAM with 4-bit QLoRA; ShareGPT format directly supported. HIGH confidence — official Unsloth documentation.
+
+---
+*Architecture research for: Kajiba v1.1 Hermes Plugin Integration + LLM PII Scrubbing*
+*Researched: 2026-04-02*

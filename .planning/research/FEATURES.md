@@ -1,353 +1,398 @@
 # Feature Research
 
-**Domain:** Community AI Training Data Pipeline
-**Researched:** 2026-03-30
-**Confidence:** MEDIUM-HIGH — Core platform features verified against BigCode/The Stack, HuggingFace Hub, MLCommons Croissant, Mozilla Foundation best practices, and Open Future governance frameworks. Specific UX/workflow patterns are MEDIUM (community norms, cross-validated across multiple sources). A few future differentiators are LOW (speculative extrapolation from trends).
+**Domain:** Hermes Agent Plugin Integration, LLM PII Scrubbing, HITL Data Collection, Fine-Tuning Pipeline Validation
+**Researched:** 2026-04-02
+**Confidence:** HIGH for Hermes plugin API (official docs verified); HIGH for GLiNER PII (official HuggingFace model card verified); MEDIUM for HITL patterns (cross-validated community sources); MEDIUM for QLoRA/Unsloth specifics (multiple practitioner guides, official Unsloth docs partially unavailable)
+
+---
+
+## Context: What Already Exists (v1.0)
+
+The following features are **already built and validated** in v1.0. They are listed to clarify scope — this document covers ONLY new v1.1 features and how they interact with what exists.
+
+| Existing Feature | Module | Status |
+|-----------------|--------|--------|
+| Pydantic v2 schema, full record/turn/tool-call models | `schema.py` | Shipped |
+| Regex PII scrubbing (7 categories, 40-char hex, org domains) | `scrubber.py` | Shipped |
+| Quality scoring (5 sub-scores, gold/silver/bronze tiers) | `scorer.py` | Shipped |
+| CLI (preview, submit, export, history, stats, config, rate, report, review, publish, delete, browse, download) | `cli.py` | Shipped |
+| Hermes integration via assumed Protocol/event API | `hermes_integration.py` | **Needs rewrite** |
+| Hardware profile auto-detection, timestamp jitter, anonymization | `collector.py`, `privacy.py` | Shipped |
+| PR-based publishing, sharded JSONL, catalog.json | `publisher.py` | Shipped |
+| LLM scrubber stub (raises NotImplementedError) | `scrubber_llm.py` | **Stub to implement** |
 
 ---
 
 ## Feature Landscape
 
-### Table Stakes
+### Table Stakes (v1.1 Must-Haves)
 
-Features whose absence causes potential contributors or consumers to distrust or abandon the platform. These are "must have or users leave."
-
----
-
-#### 1. Pre-submission PII preview with redaction diff
-**Why expected:** Contributors sharing real AI session data are not going to trust a black-box pipeline. Seeing exactly what was redacted — and what was not — before data leaves the machine is the minimum bar for informed consent. BigCode's community noted that opaque scrubbing was a top trust concern. Kajiba's existing `preview` command is the skeleton; it must surface the scrub diff clearly.
-**Complexity:** Low (skeleton exists — `preview` command + `ScrubLog` already there; UX polish needed)
-**Current state:** Partial. `preview` command exists but the scrub diff display is minimal; `ScrubLog` contains per-category counts only, not inline diffs.
+Features whose absence makes the v1.1 milestone goals unreachable. These are the minimum required to achieve "collect real Hermes session data, walk it through the pipeline, fine-tune a model."
 
 ---
 
-#### 2. Consent level selection with enforceable field stripping
-**Why expected:** Contributors expect to choose how much they share. "I just want to share the code conversation, not my hardware fingerprint" is a reasonable request. Without enforcement, consent levels are theater. GDPR frameworks, the Mozilla open dataset best practices, and BigCode's governance model all treat configurable data minimization as baseline. Kajiba already has `consent_level` in its schema — but does not enforce it.
-**Complexity:** Low-Medium (enforcement logic is a filter function; the schema fields and consent levels are defined; the main work is wiring `apply_consent_level()` into export/submit paths)
-**Current state:** Schema field exists; enforcement is entirely unimplemented (confirmed in CONCERNS.md).
+#### 1. Kajiba rewritten as a real Hermes plugin
+
+**Why expected:** The current `hermes_integration.py` was built against an assumed `agent.on(event, callback)` Protocol API. The real Hermes plugin system (v0.5.0+, confirmed in official docs) uses a completely different mechanism: a `~/.hermes/plugins/kajiba/` directory containing `plugin.yaml` + `__init__.py` with a `register(ctx)` function. Without this rewrite, Kajiba cannot collect any data from a live Hermes session.
+
+**What the real API looks like (HIGH confidence — verified against official Hermes docs):**
+
+- Plugin lives at `~/.hermes/plugins/kajiba/` (dropped directory, auto-discovered at startup)
+- `plugin.yaml` declares: `name`, `version`, `description`, `provides_tools` (list), `provides_hooks` (list)
+- `__init__.py` exports `register(ctx)` — called once at startup
+- `ctx.register_hook(event_name, callback)` — subscribes to lifecycle events
+- `ctx.register_tool(name, toolset, schema, handler, check_fn)` — registers tools
+- Tool handlers: `def handler(args: dict, **kwargs) -> str` — always return JSON string, never raise
+- If `register(ctx)` crashes, the plugin disables gracefully without crashing Hermes
+
+**Available hook events (HIGH confidence — verified in Hermes v0.5.0 release notes):**
+
+| Hook | Timing | Fire-and-forget? | Notes |
+|------|--------|-----------------|-------|
+| `on_session_start` | New session begins | Yes | Initialization |
+| `on_session_end` | Session concludes | Yes | Cleanup, trigger export |
+| `pre_llm_call` | Before LLM inference | No — can inject context | Returns `{"context": str}` to inject into ephemeral system prompt |
+| `post_llm_call` | After LLM response | Yes | Capture assistant turn, tool_calls |
+| `pre_tool_call` | Before tool execution | Yes | Pre-processing |
+| `post_tool_call` | After tool completion | Yes | Capture tool name, args, result, task_id |
+
+**Note on payload structure:** Official docs confirm the hook events and their purpose but do not publish a formal payload schema. The `post_tool_call` hook is confirmed to receive `tool_name`, `args`, `result`, `task_id`, and additional `**kwargs`. The `post_llm_call` hook carries the assistant message including content and tool_calls. Exact field names require empirical verification against live Hermes v0.6.0 — this is the first task of Phase 1.
+
+**Complexity:** Medium. The logic in `KajibaCollector` largely stays the same; what changes is the registration wiring and the directory structure. The collector methods (`on_session_start`, `on_turn_complete`, `on_session_end`) map directly to the hook events. The main risk is hook payload shape differences from the assumed API.
+
+**Dependency:** Everything else in v1.1 depends on this. No real data can be collected without it.
 
 ---
 
-#### 3. Metadata anonymization before export
-**Why expected:** Hardware profile + timestamp + precise RAM/VRAM combination can be a unique fingerprint even without any explicit PII. Rare GPU models (e.g., "NVIDIA A100 80GB SXM") narrow the contributor pool to dozens of people. Contributors who read their record output and see their exact GPU model + precise timestamp will not submit again. GPU generalization, timestamp jitter, and RAM/VRAM rounding to standard tiers are table stakes for a privacy-first pipeline.
-**Complexity:** Low-Medium (a pure function; no dependencies outside schema/scrubber)
-**Current state:** Entirely unimplemented (confirmed in CONCERNS.md as Layer D missing).
+#### 2. Turn capture from separate pre/post_llm_call and post_tool_call streams
+
+**Why expected:** The original `hermes_integration.py` assumed a single `turn_complete` event that bundled everything together. Hermes's real hook system fires separately: one hook for the LLM call (with the assistant response), another for each tool invocation. Kajiba must merge these into `ConversationTurn` + `ToolCall` objects that match the existing schema.
+
+**What this requires:**
+- `post_llm_call` → captures assistant role, content, tool_calls list, token counts, latency
+- `post_tool_call` → captures individual tool invocations (name, args, result, status)
+- `pre_llm_call` → can capture the user turn (the prompt going in)
+- Session-scoped state in the collector to accumulate turns across hook fires before assembly
+
+**Complexity:** Medium. The `KajibaCollector` in-memory state already accumulates turns in `_conversations`. The new challenge is assembling a complete `ConversationTurn` from multiple hook fires (user turn from `pre_llm_call`, assistant content from `post_llm_call`, tool results from `post_tool_call`) before committing the turn. Requires a "pending turn buffer" in the collector.
+
+**Dependency on existing:** `ConversationTurn`, `ToolCall` schema models are already defined and validated. `KajibaCollector` already has `on_turn_complete(turn_dict)`. The main work is adapting the input assembly, not the downstream processing.
 
 ---
 
-#### 4. Explicit opt-out / record deletion request mechanism
-**Why expected:** After BigCode's experience and growing GDPR awareness, any community data platform without a "remove my contribution" path will face community rejection. Consumers who discover they want data removed must have a documented process. Even if technical deletion from trained weights is hard, dataset-level removal is achievable and expected.
-**Complexity:** Medium (requires a record deletion index in the dataset repo; CLI command to flag a record ID for removal; a documented process; does not require retraining anything)
-**Current state:** Not implemented. No deletion path exists.
+#### 3. WSL2 + Hermes + Ollama development environment (documented, reproducible)
+
+**Why expected:** The pipeline validation goal requires a live Hermes Agent session collecting real data. Without a working dev environment that matches the target runtime (WSL2, GPU passthrough, Hermes v0.6.0, Ollama with Hermes 3 8B Q4), no real data can be collected and the fine-tuning experiment cannot run.
+
+**What this requires:**
+- WSL2 with NVIDIA GPU passthrough (CUDA via Windows driver stub — do NOT install Linux NVIDIA driver inside WSL2)
+- Ollama installed in WSL2 (auto-detects GPU via CUDA stub)
+- Hermes Agent v0.6.0 installed in WSL2
+- Kajiba plugin directory symlinked or copied to `~/.hermes/plugins/kajiba/`
+- Verified end-to-end: Hermes starts, Kajiba plugin loads, hooks fire, collector captures a turn
+
+**Hardware context (from PROJECT.md):** RTX 4070 8GB VRAM. Hermes 3 8B Q4 is ~4.5GB VRAM — fits with headroom. Llama 3.2 3B Q4 for fine-tuning is ~2GB VRAM.
+
+**Complexity:** Medium. WSL2 GPU passthrough is well-documented and well-understood in 2025 (insiderllm.com guide, official NVIDIA WSL docs). The main risk is version-specific Hermes plugin loading behavior. Requires careful documentation so the setup is reproducible.
+
+**Not a code feature per se** — but is a prerequisite gate for all other v1.1 features. Goes in Phase 1 of the roadmap.
 
 ---
 
-#### 5. Dataset card / README with provenance and usage documentation
-**Why expected:** HuggingFace, Kaggle, OpenML, and the MLCommons Croissant standard all treat dataset documentation as mandatory. Consumers downloading training subsets need to know: what is the license, what scrubbing was applied, what quality tiers are represented, what models contributed the data, what the known biases are. Without this, the dataset is unusable in a responsible workflow. The MLCommons Croissant standard (adopted by HuggingFace, Kaggle, Google Dataset Search) encodes this in machine-readable JSON-LD.
-**Complexity:** Low (mostly documentation; auto-generation from dataset stats is Medium)
-**Current state:** Not implemented. No dataset card or catalog metadata exists.
+#### 4. LLM-based semantic PII scrubbing (GLiNER-based)
+
+**Why expected:** The `scrubber_llm.py` stub has existed since the beginning. Real Hermes session data will contain personal names ("Fix the issue John reported"), company/project names ("Deploy to AcmeCorp's staging"), and geographic identifiers that regex cannot catch. Without semantic scrubbing, the pipeline cannot credibly claim it protects contributor privacy at the level needed for community trust.
+
+**Recommended approach: GLiNER (not generative LLM prompting)**
+
+Based on research, GLiNER is the correct choice over Ollama-based prompt-and-parse for this use case:
+
+| Criterion | GLiNER (recommended) | Ollama prompt-and-parse |
+|-----------|---------------------|------------------------|
+| Speed | ~75ms per text chunk on CPU | 1-5s per text chunk |
+| Accuracy (PII-specific) | Strict F1 0.87 (Nemotron-PII benchmark) | Varies by model, prompt |
+| Output format | Structured spans with confidence scores | Needs JSON parsing, error-prone |
+| Local deployment | Pure Python, `pip install gliner` | Requires Ollama running |
+| Dependencies | `gliner` package, ~570M model | External process dependency |
+| False positive control | `threshold` parameter (tune recall vs precision) | Prompt engineering |
+| Entity categories | 55+ PII types including person, company, project, location | Depends on prompt |
+
+**Specific models (HIGH confidence — HuggingFace model cards verified):**
+- `nvidia/gliner-pii` — 570M params, 55+ entity categories, Strict F1 0.87, recommended
+- `knowledgator/gliner-pii-small-v1.0` — lighter weight option if VRAM matters
+- Usage: `model.predict_entities(text, labels, threshold=0.5)` returns `[{text, label, start, end, score}]`
+
+**Integration approach:**
+- Replace `scrubber_llm.py`'s `NotImplementedError` with GLiNER-based implementation
+- `scrub_semantic(text, model_fn)` signature stays compatible; `model_fn` becomes optional (GLiNER handles inference internally)
+- Auto-redact entities with `score >= high_threshold` (0.7+), flag entities with `score >= low_threshold` (0.4+) for review
+- `SemanticRedaction` dataclass already defined in stub — keep it, populate from GLiNER output
+- Replace span text in original string, log to `ScrubLog`
+
+**New extra required:** `pip install kajiba[llm-scrub]` should install `gliner` (not `ollama` — GLiNER is self-contained)
+
+**Complexity:** Medium. GLiNER's Python API is simple. The main work is: confidence threshold tuning, integrating span-based replacement into the existing string scrubbing flow, adding model download/caching on first use, and wiring into the `scrub_record()` pipeline as Layer C.
+
+**Dependency on existing:** Runs after Layer B (regex scrubber) in `scrub_record()`. Uses existing `ScrubLog` fields. `SemanticRedaction` dataclass already defined.
 
 ---
 
-#### 6. Quality tier filtering for consumers (gold / silver / bronze / review_needed)
-**Why expected:** Consumers fine-tuning local models need to control the quality floor of the data they train on. Downloading everything and filtering manually is unworkable at scale. The existing quality tier system (gold/silver/bronze) exists in the scorer — but it must be surfaced in the dataset structure so consumers can download subsets by tier without custom scripts.
-**Complexity:** Low (quality tiers already computed; need to be stored in record and reflected in dataset directory structure)
-**Current state:** Quality tiers are computed but not stored in outbox records (confirmed performance bottleneck in CONCERNS.md); not reflected in any dataset organization structure.
+#### 5. HITL session collection with manual review at each pipeline step
+
+**Why expected:** The v1.1 goal is "pipeline validation" — meaning a human (the developer) explicitly reviews what the pipeline captures at each stage to verify correctness. This is not a permanent user-facing feature; it is a validation harness for the milestone. The stages are: collect → scrub → score → review → publish.
+
+**What this requires:**
+- After each Hermes session ends, `kajiba preview` shows the raw captured record before scrubbing
+- After scrubbing, `kajiba preview` shows the diff (already supported) — confirm scrub quality against real session data
+- After scoring, `kajiba review` (already implemented) shows tier assignment — confirm scoring accuracy
+- Manual `kajiba submit` decision (already ad-hoc mode) — gate before publish
+- After publish, verify the record appears in the catalog and is downloadable
+
+**What this is NOT:** A new workflow engine. The existing CLI commands already cover most of this. The "HITL" here is the developer running the commands manually and checking the output.
+
+**What might be missing:** A `kajiba capture --session <id>` command that shows the raw collector output (before scrubbing) for a specific session, to validate that hook capture worked correctly. This is the gap between what the existing `preview` command does (shows staged/scrubbed record) and what HITL validation needs (shows raw captured record pre-scrub for comparison).
+
+**Complexity:** Low-Medium. Mostly CLI UX polish — a `--raw` or `--pre-scrub` flag on `preview`, or a new `kajiba inspect` command that shows the raw collector output from staging before scrubbing is applied. The collector output already goes to staging; the gap is a view command for it.
 
 ---
 
-#### 7. Model metadata filtering for consumers (model family, quantization, context window)
-**Why expected:** A consumer fine-tuning Mistral-7B Q4_K_M on a 16GB GPU needs data generated by similar models in similar runtime contexts. Data from GPT-4 with 128K context is actively harmful to their use case. Filtering by model name, quantization type, VRAM tier, and context window size is the minimum viable catalog feature. The Open Trusted Data Initiative and Croissant both mandate machine-readable model/runtime context metadata.
-**Complexity:** Medium (requires model metadata stored in structured, queryable form in the dataset repo; a catalog index file)
-**Current state:** Model metadata is captured in `ModelMetadata` schema but is not indexed or surfaced for filtering.
+#### 6. End-to-end pipeline smoke test (collect → publish → download → fine-tune)
+
+**Why expected:** The milestone goal explicitly states "end-to-end pipeline validation." This means verifying that the complete chain works: collect real session data, scrub it, score it, publish it to GitHub, download it back, convert to training format, run one QLoRA epoch on Llama 3.2 3B.
+
+**This is not a persistent feature — it is a milestone gate.** However, the artifacts from this process feed back as:
+- Documentation of the setup (reproducible by others)
+- A small real-world dataset in the community repo
+- Evidence that `to_sharegpt()` and `to_dpo_candidate()` produce training-ready output
+
+**QLoRA fine-tune specifics (MEDIUM confidence — practitioner guides, not verified against official Unsloth docs directly):**
+- Recommended framework: Unsloth (30-70% faster than standard HuggingFace training on same GPU)
+- Model: Llama 3.2 3B Instruct Q4_K_M via Unsloth's pre-quantized weights
+- Format: ShareGPT (matches Kajiba's `to_sharegpt()` output); use `standardize_sharegpt()` in Unsloth if needed
+- Hardware: RTX 4070 8GB VRAM — 3B Q4 model fits with ~4GB to spare for activations/optimizer state
+- Minimum dataset size: Quality dominates over quantity for QLoRA. Even 50-100 high-quality real-world sessions can produce observable behavior change (original QLoRA paper; practitioners confirm). Pipeline validation does not require a large dataset.
+- Expected training time: 1-2 hours for a single epoch on 100 records on RTX 4070 (rough estimate based on similar hardware reports)
+
+**Complexity:** High for the first run (environment setup, format debugging, training configuration). Low complexity to repeat once the pipeline is working.
+
+**Dependency on existing:** `to_sharegpt()` and `to_dpo_candidate()` methods already exist on `KajibaRecord`. The JSONL export from `kajiba download` already produces the right format. The gap is running the training step, which is out of scope for Kajiba itself (consumers bring their own training tools) — but the milestone requires running it once to validate the output format.
 
 ---
 
-#### 8. License clarity (Apache 2.0 or CDLA Permissive 2.0)
-**Why expected:** Community datasets without explicit permissive licenses are unusable in most fine-tuning workflows. The Open Trusted Data Initiative mandates CDLA Permissive 2.0 for contributed data. Mozilla's best practices require recorded license per data point. Without license metadata, consumers cannot use the data in commercially-viable models or share derivatives. This is not a feature request — it is a prerequisite for adoption.
-**Complexity:** Low (metadata field; policy decision already made — Apache 2.0 in PROJECT.md)
-**Current state:** Apache 2.0 declared in project. Not attached to individual records or the dataset card.
+### Differentiators (v1.1 Additions)
+
+Features specific to v1.1 that go beyond what any other pipeline offers, even in basic form.
 
 ---
 
-#### 9. Deduplication with visible record ID
-**Why expected:** Contributors submitting the same session twice — accidentally or intentionally — will pollute the dataset and skew quality statistics. Consumers will encounter duplicate training examples which harm fine-tuning convergence. Content-addressable IDs and submission hash dedup are the established solution (already partially implemented via SHA-256 in Kajiba).
-**Complexity:** Low (already implemented; needs enforcement at the repo/submission layer)
-**Current state:** `compute_record_id()` and `compute_submission_hash()` exist; dedup enforcement on the dataset repo side is not implemented.
+#### 1. pre_llm_call context injection (optional Kajiba intelligence)
+
+**What it is:** The `pre_llm_call` hook is the only Hermes hook that can return a value — specifically `{"context": str}` — to inject text into the ephemeral system prompt for that turn. Kajiba can use this to inject session metadata or quality hints. For example: notifying the assistant that it is being recorded for a dataset, or injecting current session quality signals.
+
+**Value proposition:** No other data collection plugin would use this hook for collection purposes. Most plugins use it for memory injection (like Hindsight's integration). Kajiba could optionally use it to inform the model that it is in a "dataset collection session," potentially improving response quality and coherence (the model knows its responses will be evaluated).
+
+**Complexity:** Low. A one-line addition to the `register(ctx)` function. The implementation is trivial; the prompt engineering for the injection is the interesting part.
+
+**Caution:** Injecting context changes the session's behavior. This must be optional (off by default) so it does not confound the collected data. A session where the model was told "you are being recorded" is different from a natural session.
 
 ---
 
-#### 10. Transparent scrubbing log surfaced in record
-**Why expected:** Consumers need to know what was redacted in a record and with what confidence. A record that has had 50 regex redactions is less useful than one with zero. A record where the LLM scrubber flagged potential personal names is different from one it cleared. The `ScrubLog` already tracks counts per category — this must be included in the exported record so consumers can filter by scrub confidence.
-**Complexity:** Low (ScrubLog exists in schema; needs to be serialized into the outbox record)
-**Current state:** ScrubLog is computed but not persisted in the outbox record.
+#### 2. Plugin installable as a Python package entry point
+
+**What it is:** Hermes supports plugin distribution via `pyproject.toml` entry points under `[project.entry-points."hermes_agent.plugins"]`. This means `pip install kajiba` (with the Hermes plugin extra) can auto-register the Kajiba plugin without the user manually copying files to `~/.hermes/plugins/`.
+
+**Value proposition:** Reduces setup friction from "copy this directory" to "pip install kajiba[hermes]". This is the distribution model for a community plugin.
+
+**Complexity:** Low. Requires adding an entry point to `pyproject.toml` and ensuring the plugin's `register(ctx)` is importable. The directory-drop method still works for development.
+
+**Dependency:** Plugin directory structure must be finalized first. The entry point just points to the `register` function.
 
 ---
 
-### Differentiators
+### Anti-Features (v1.1 Scope Constraints)
 
-Features that set Kajiba apart from generic dataset hosting. Not universally expected, but create strong community loyalty and competitive advantage.
+#### 1. Generative LLM prompting for PII detection
 
----
+**Why avoid:** Using Ollama-prompt-and-parse for PII detection (calling `ollama.chat(model, pii_detection_prompt + text)` and parsing JSON output) is 20-50x slower than GLiNER, produces unstructured output that requires brittle JSON parsing, depends on an external process, and shows lower precision than a model trained specifically for span-tagging PII. The `model_fn: Callable` parameter in the existing `scrubber_llm.py` stub suggests this approach, but research shows GLiNER is strictly better for this use case.
 
-#### 1. Runtime context as first-class dataset dimension
-**What it is:** Every record carries structured, queryable runtime context: model name + version + parameter count + quantization type + context window + LoRA config + system prompt fingerprint + hardware tier + inference settings (temperature, top_p, etc.). No other community dataset captures this combination for coding AI sessions.
-**Value proposition:** Enables consumers to find data generated under conditions that match their own runtime — dramatically increasing fine-tuning relevance. A developer training a 7B Q4 model on 8GB VRAM can filter for exactly that profile.
-**Complexity:** Medium (schema fields exist; needs structured indexing and catalog query support)
-**Sources:** No existing community dataset for coding AI sessions indexes the full runtime stack this way. This is a genuine gap.
+**What to do instead:** GLiNER with `nvidia/gliner-pii` or `knowledgator/gliner-pii`. The `model_fn` parameter in the stub signature can either be removed or made optional with GLiNER as the default.
 
 ---
 
-#### 2. Two-pass PII scrubbing with LLM semantic layer
-**What it is:** Regex pass (Layer B, already partially built) + local LLM semantic pass (Layer C, stub) that catches personal names, company names, project names, and context-dependent identifiers that regex cannot detect. Auto-redact high-confidence semantic PII; flag medium-confidence for user review.
-**Value proposition:** "Tell John at Acme Corp to deploy Whisperforge" slips through regex. Semantic scrubbing is what separates a trustworthy community dataset from one that leaks contributors' professional identities. This is the primary privacy differentiator.
-**Complexity:** High (requires local LLM via Ollama/llama.cpp; prompt engineering; confidence scoring; UI for flagged items)
-**Dependencies:** Table stake #1 (preview/diff), Table stake #3 (metadata anonymization); requires local inference runtime
+#### 2. Full fine-tuning tooling inside Kajiba
+
+**Why avoid:** Kajiba is the pipeline only. Including training scripts creates framework-specific maintenance burden (Unsloth, Axolotl, LLaMA-Factory all evolve fast), scope explosion, and contradicts the core design. The milestone requires running one fine-tuning experiment for validation, but this is documented as a consumer-side operation, not a Kajiba feature.
+
+**What to do instead:** Provide training-ready JSONL exports. Document the Unsloth + ShareGPT workflow in a `docs/fine-tuning-guide.md`. The experiment lives outside the Kajiba codebase.
 
 ---
 
-#### 3. Ad-hoc vs. continuous contribution modes
-**What it is:** Ad-hoc mode: user reviews and approves every record before submission. Continuous mode: user sets parameters once; records meeting quality threshold are submitted automatically.
-**Value proposition:** Different users have radically different comfort levels. Power users who want to maximize contribution velocity use continuous mode. Privacy-cautious users use ad-hoc with full review. Both audiences are underserved by existing dataset tooling. The choice itself signals respect for contributor autonomy.
-**Complexity:** Medium (ad-hoc flow exists in the CLI skeleton; continuous mode requires a background daemon or session-end auto-submit; approval queue management)
-**Dependencies:** Table stake #2 (consent enforcement), Table stake #1 (preview)
+#### 3. Ollama as a hard dependency for core scrubbing
+
+**Why avoid:** If GLiNER-based scrubbing requires Ollama running, the `[llm-scrub]` extra becomes a system-level dependency (an external process) rather than a Python package dependency. This breaks the "works with pip install" guarantee and the "no external services for core" constraint.
+
+**What to do instead:** GLiNER runs entirely in Python (`pip install gliner`). It downloads its model weights on first use to a local cache directory. No external process required.
 
 ---
 
-#### 4. User annotation refinement post-auto-score
-**What it is:** After auto-scoring, the contributor can tag/adjust quality signals: mark turns as pain points, flag what worked, override quality tier reasoning, add free-text notes about the session context.
-**Value proposition:** Heuristic scoring misses subjective quality signals. A session with syntactically valid but semantically wrong tool calls scores silver but the contributor knows it was a failure. User annotations on top of auto-scores create a richer quality signal than either alone. This is what separates community-curated from machine-curated data.
-**Complexity:** Medium (CLI rate/report commands are collector methods only; need CLI surface for post-hoc annotation on staged records)
-**Current state:** Collector methods exist (`on_rate`, `on_report`); no standalone CLI commands (confirmed gap in CONCERNS.md).
+#### 4. Rewriting KajibaCollector's core logic
 
----
+**Why avoid:** The collector's data capture, assembly, and export logic is tested and working (356 tests passing). The v1.1 integration work is purely about the registration wiring and hook payload mapping, not about replacing the collector's internal logic.
 
-#### 5. Configurable scrub strictness levels
-**What it is:** Users can choose their scrub strictness: aggressive (maximum redaction, may sacrifice coherence), balanced (default), permissive (regex only, no LLM pass). Strictness level is recorded in the `ScrubLog` and included in the record.
-**Value proposition:** Different contributors have different privacy postures. Developers working on internal enterprise projects need aggressive scrubbing; developers on fully public OSS projects may prefer permissive to preserve technical content quality. Recording the strictness level lets consumers filter for higher-quality unredacted records.
-**Complexity:** Low-Medium (config key exists; needs to be wired through the scrubbing pipeline as a policy parameter)
-
----
-
-#### 6. Dataset catalog with CLI browsing and subset download
-**What it is:** A structured dataset catalog (index file + per-model subdirectories) that consumers can browse with `kajiba browse`, filter by model/tier/hardware/date, and download a filtered JSONL subset.
-**Value proposition:** Consumers should not need to clone the entire dataset repo and write custom scripts to get training-ready data. A first-class CLI consumer experience with filtering is table stakes for developer adoption, but rare in current community dataset tooling.
-**Complexity:** High (requires catalog index schema; dataset repo structure design; `kajiba browse` and `kajiba download` CLI commands; incremental download support)
-**Dependencies:** Table stakes #6 and #7 (tier and model filtering must be in catalog index)
-
----
-
-#### 7. Contribution statistics and community leaderboard
-**What it is:** Aggregate stats surfaced in CLI (`kajiba stats --global`) and in the dataset README: total records by tier, by model, by contributor count (anonymized), trend over time. Optionally a public leaderboard of contributor count (not identity).
-**Value proposition:** Community data projects live or die by visible momentum. Contributors want to know the project is active. The Kaggle progression system (Novice → Grandmaster) shows gamification of contribution drives engagement. Kajiba's version: anonymized contribution counts, tier distribution, dataset growth over time.
-**Complexity:** Medium (local stats already work; global stats require periodic aggregation in the dataset repo; leaderboard requires pseudonym/token system)
-
----
-
-#### 8. Model-agnostic adapter protocol
-**What it is:** A documented protocol (Python abstract base class or minimal interface spec) that any AI-assisted coding tool can implement to become a Kajiba data source — not just Hermes Agent.
-**Value proposition:** The current Hermes-only coupling caps the total addressable contributor pool. Model-agnostic collection multiplies community size. Continue.dev, Aider, Cursor, any tool using LLM APIs can integrate. This is the network effect play.
-**Complexity:** Medium (the HermesAgent Protocol class already uses structural typing; the main work is documentation, example adapters, and decoupling the hardcoded `~/.hermes/kajiba` path)
-**Dependencies:** Resolving the hardcoded path issue (CONCERNS.md fragile areas)
-
----
-
-### Anti-Features
-
-Features to deliberately NOT build. Including them would add complexity, scope creep, or undermine core trust.
-
----
-
-#### 1. Fine-tuning tooling
-**Why avoid:** Kajiba is the pipeline, not the trainer. Including fine-tuning scripts invites scope explosion, framework-specific maintenance burden (Unsloth, Axolotl, LLaMA-Factory all evolve fast), and distracts from the pipeline's core quality. Consumers bring their own frameworks.
-**What to do instead:** Provide training-ready JSONL exports in ShareGPT and Alpaca formats. Document how to load the output with popular frameworks. Link to Unsloth, LLaMA-Factory, and Axolotl in the README.
-
----
-
-#### 2. Hosted API or cloud service
-**Why avoid:** A hosted service requires infrastructure, authentication, rate limiting, SLAs, and legal liability for data hosted. It contradicts the local-first, privacy-first design philosophy. It also creates a central failure point and a monetization pressure that corrupts the community-commons governance model.
-**What to do instead:** Everything runs locally. Distribution through GitHub repo (then HuggingFace). The value of Kajiba is precisely that it is not a service.
-
----
-
-#### 3. Model evaluation or benchmarking
-**Why avoid:** Evaluation is a completely separate problem domain. Adding benchmarking creates scope confusion ("Is this a data pipeline or a model eval framework?"), introduces complex statistical methodology, and already has excellent dedicated tools (lm-evaluation-harness, HELM, Eleuther eval harness).
-**What to do instead:** Export records in DPO-candidate format so consumers can use them in evaluation frameworks. Leave the evaluation to those frameworks.
-
----
-
-#### 4. Automatic submission without user review (in ad-hoc mode)
-**Why avoid:** Contributors who submit data they haven't seen lose trust when they later discover what was shared. Even with excellent PII scrubbing, surprising contributors erodes the community. The ad-hoc mode must require explicit approval per record. Only continuous mode (an explicit opt-in) should submit without per-record review.
-**What to do instead:** Default to ad-hoc with mandatory preview. Make continuous mode an explicit configuration choice with clear consent language.
-
----
-
-#### 5. Personal identity tracking or contributor accounts
-**Why avoid:** A login system means storing identity, which creates GDPR obligations and a privacy attack surface. It also creates inclusion friction (users don't want another account). Pseudonymous contribution tokens (optional) are sufficient for the leaderboard differentiator.
-**What to do instead:** Use hardware-derived or user-set pseudonym tokens stored locally. Never associate identity with records in the shared dataset.
-
----
-
-#### 6. Real-time streaming or live telemetry
-**Why avoid:** Streaming data out of a coding session in real time creates privacy risk (data leaves before scrubbing completes), network dependency, and latency pressure. Batch processing at session end is safer, more reliable, and already the design.
-**What to do instead:** Batch process at session end. The session-end hook already exists.
-
----
-
-#### 7. Synthetic data generation
-**Why avoid:** Synthetic data pipelines (generating artificial coding sessions via LLM) are a fundamentally different product with different quality properties, different governance implications, and a different value proposition. Mixing synthetic and real data in the same pipeline without clear separation will confuse consumers and undermine the "real-world session data" core value.
-**What to do instead:** If synthetic data is ever desired, it should be a clearly separate dataset partition with explicit metadata flags. Not in scope for this pipeline.
+**What to do instead:** Keep `KajibaCollector` intact. Write a new `register(ctx)` in a proper plugin directory structure that calls the existing collector methods. The collector methods may need minor signature adjustments to match actual Hermes hook payloads, but the logic stays.
 
 ---
 
 ## Feature Dependencies
 
 ```
-Table stake #1 (PII preview/diff)
-  └── Differentiator #2 (LLM semantic scrubbing)
-      └── Differentiator #5 (scrub strictness levels)
+[WSL2 + Hermes + Ollama environment setup]
+    └──gates──> [Hermes plugin rewrite (register(ctx), plugin.yaml)]
+                    └──enables──> [Turn capture from pre/post_llm_call + post_tool_call]
+                                      └──enables──> [HITL session collection workflow]
+                                                        └──enables──> [LLM semantic PII scrubbing (GLiNER)]
+                                                                          └──enables──> [End-to-end pipeline validation]
+                                                                                            └──enables──> [QLoRA fine-tune experiment]
 
-Table stake #2 (consent enforcement)
-  └── Table stake #3 (metadata anonymization) [both in scrub/export path]
-  └── Differentiator #3 (ad-hoc vs continuous modes)
+[LLM semantic PII scrubbing (GLiNER)]
+    └──enhances──> [existing regex scrubber Layer B]
+    └──populates──> [existing ScrubLog schema]
+    └──requires──> [gliner extra in pyproject.toml]
 
-Table stake #6 (quality tier filtering for consumers)
-  └── Table stake #7 (model metadata filtering)
-  └── Differentiator #6 (CLI catalog browsing)
-      └── Differentiator #7 (contribution statistics)
+[Turn capture from separate hook streams]
+    └──requires──> [existing ConversationTurn + ToolCall schema models]
+    └──requires──> [KajibaCollector "pending turn buffer" for multi-hook assembly]
+    └──feeds into──> [existing export_record() → scrub_record() → compute_quality_score() chain]
 
-Table stake #5 (dataset card / provenance documentation)
-  └── Table stake #8 (license clarity per record)
-  └── Differentiator #6 (CLI catalog browsing)
-
-Table stake #9 (deduplication)
-  └── Must be enforced before Table stake #6 and #7 (catalog integrity)
-
-Differentiator #4 (user annotation refinement)
-  └── Table stake #1 (preview must exist for annotation to make sense)
-  └── Table stake #6 (annotations feed into quality tier)
-
-Differentiator #8 (model-agnostic adapter protocol)
-  └── Table stake #2, #3 (consent and anonymization must apply regardless of source agent)
-  └── Requires path decoupling (CONCERNS.md: hardcoded ~/.hermes/kajiba path)
+[Plugin installable via entry point]
+    └──requires──> [plugin directory structure finalized]
+    └──enhances──> [Hermes plugin rewrite]
 ```
+
+### Dependency Notes
+
+- **Environment setup gates everything:** No live Hermes session = no real data = pipeline validation impossible. This must be Phase 1.
+- **Plugin rewrite gates data collection:** Without `register(ctx)`, hooks never fire. Phase 1 alongside environment.
+- **Turn capture depends on payload shapes:** Hook payload field names must be confirmed empirically before the turn assembly logic can be written. This is a discovery task, not an assumption.
+- **GLiNER is independent of Hermes:** The semantic scrubber can be developed and tested with synthetic text or existing staged records. It does not require live Hermes sessions.
+- **HITL workflow depends on working plugin:** Manual review only makes sense once real session data is flowing through the pipeline.
+- **Fine-tuning experiment is the last step:** Requires real data collected, scrubbed, scored, published, and downloaded first.
 
 ---
 
-## MVP Definition
+## MVP Definition (v1.1)
 
-### Launch With (v1)
+### Phase 1: Environment + Plugin Foundation (Must complete first)
 
-These are the features without which the first public dataset push fails.
+- [ ] WSL2 + Hermes v0.6.0 + Ollama environment — working and documented
+- [ ] Kajiba plugin directory (`~/.hermes/plugins/kajiba/`) with `plugin.yaml` + `register(ctx)` — hooks registered
+- [ ] Empirically confirm hook payload field names for `post_llm_call` and `post_tool_call` against live Hermes
+- [ ] Verify at least one turn captured and stored in staging
 
-| Feature | Rationale | Source |
-|---------|-----------|--------|
-| Consent enforcement (table stake #2) | Silent consent violations are a launch-stopper | CONCERNS.md gap |
-| Metadata anonymization (table stake #3) | Hardware fingerprinting breaks contributor trust | CONCERNS.md gap |
-| Quality tier stored in outbox record (table stake #6, partial) | Required for dataset organization; currently re-computed every time | CONCERNS.md performance |
-| Dataset card auto-generated from stats (table stake #5) | Without this the dataset repo is unusable | Not implemented |
-| Model metadata in catalog index (table stake #7, partial) | Consumers need model-based filtering on day one | Not implemented |
-| License field per record (table stake #8) | Required for consumer legal use | Not implemented |
-| ScrubLog in outbox record (table stake #10) | Consumers need scrub transparency | Not implemented |
-| Record deletion index + CLI flag (table stake #4) | Needed before first public push; cannot add later without breaking trust | Not implemented |
-| Scrub regex gap fixes (40-char hex, org domain flagging) | Known PII leak vectors; must be closed before launch | CONCERNS.md |
+### Phase 2: Turn Capture + Semantic Scrubbing (Core new features)
 
-### Add After Validation (v1.x)
+- [ ] Turn assembly from separate hook streams — `ConversationTurn` objects assembled correctly
+- [ ] GLiNER-based `scrubber_llm.py` implementation — `scrub_semantic()` working with `nvidia/gliner-pii`
+- [ ] `gliner` dependency added to `pyproject.toml` under `[llm-scrub]` extra
+- [ ] Semantic scrubbing integrated into `scrub_record()` as Layer C after regex Layer B
 
-Features that improve the experience once the pipeline is live and basic trust is established.
+### Phase 3: HITL Validation + Pipeline Gate
 
-| Feature | Rationale |
-|---------|-----------|
-| CLI rate/report commands (differentiator #4) | Contributor experience improvement; not blocking launch |
-| Configurable scrub strictness (differentiator #5) | Config key exists; wire-up work |
-| Model-agnostic adapter protocol (differentiator #8) | Expands contributor pool; not required for initial GitHub dataset |
-| Ad-hoc vs continuous modes (differentiator #3) | Continuous mode is a comfort-level enhancement; ad-hoc already exists |
-| Dataset catalog CLI browsing (differentiator #6, partial) | `kajiba browse` and `kajiba download` commands |
-| Contribution statistics (differentiator #7, local) | `kajiba stats` with global dataset stats |
-| Path decoupling / KAJIBA_DATA_DIR env var | Needed before adapter protocol; low effort |
+- [ ] `kajiba preview --raw` or equivalent — shows pre-scrub captured record for verification
+- [ ] Manual walkthrough: collect → preview → scrub → score → review → submit
+- [ ] Verify `to_sharegpt()` output matches expected training format
 
-### Future Consideration (v2+)
+### Phase 4: Publish + Fine-Tune Experiment (Milestone gate)
 
-Features requiring significant architecture work or external dependencies not yet in scope.
+- [ ] Collected records published to GitHub dataset repo
+- [ ] Records downloadable via `kajiba download`
+- [ ] QLoRA fine-tune experiment run with Unsloth + Llama 3.2 3B on downloaded data
+- [ ] Training completes without error — any behavioral change is a bonus, not the goal
 
-| Feature | Rationale | Blocker |
-|---------|-----------|---------|
-| LLM semantic PII scrubbing (differentiator #2) | High privacy value; requires local inference runtime (Ollama/llama.cpp) | Dependency on external runtime; stub exists |
-| HuggingFace upload command | Already in PROJECT.md as deferred | Waiting for GitHub validation |
-| Full catalog CLI with subset download | Requires catalog index design to stabilize first | Catalog index schema must be validated |
-| Contribution leaderboard (differentiator #7, global) | Requires pseudonym token system design | Token system not designed |
-| Croissant JSON-LD dataset metadata | MLCommons standard for maximum discoverability | Overkill for GitHub-first phase |
+### Add After Validation (v1.1.x or v2)
+
+- [ ] Plugin installable via `pip install kajiba[hermes]` entry point
+- [ ] `pre_llm_call` context injection (optional, off by default)
+- [ ] HuggingFace dataset upload (`huggingface_hub` extra) — already in PROJECT.md as deferred
 
 ---
 
 ## Feature Prioritization Matrix
 
-| Feature | User Impact | Build Effort | Risk if Skipped | Priority |
-|---------|-------------|--------------|-----------------|----------|
-| Consent enforcement | HIGH | Low-Med | LAUNCH BLOCKER | P0 |
-| Metadata anonymization | HIGH | Low-Med | LAUNCH BLOCKER | P0 |
-| ScrubLog in outbox record | HIGH | Low | Quality loss | P0 |
-| Quality tier stored in record | Med | Low | Re-score perf + catalog broken | P0 |
-| Dataset card generation | HIGH | Med | Dataset unusable | P0 |
-| Record deletion index | HIGH | Med | Trust-breaking if absent at launch | P0 |
-| Regex scrubber gap fixes | HIGH | Low | PII leak at launch | P0 |
-| License per record | Med | Low | Consumer legal risk | P0 |
-| Model metadata catalog index | HIGH | Med | Consumer can't filter | P1 |
-| CLI rate/report commands | Med | Low | Annotation quality | P1 |
-| Scrub strictness config | Med | Low | Contributor flexibility | P1 |
-| Model-agnostic adapter | HIGH | Med | Locked to Hermes only | P1 |
-| Ad-hoc vs continuous modes | Med | Med | Power user friction | P1 |
-| Dataset catalog CLI browse | HIGH | High | Consumer DX only via raw files | P2 |
-| LLM semantic scrubbing | HIGH | High | Best privacy scrubbing | P2 |
-| Contribution statistics | Low | Med | Community momentum visibility | P2 |
-| HuggingFace upload | HIGH | Med | Broader distribution | P2 (post-GitHub) |
-| Leaderboard / tokens | Low | High | Community gamification | P3 |
-| Croissant JSON-LD metadata | Med | High | Google Dataset Search index | P3 |
+| Feature | User Value | Implementation Cost | Phase | Priority |
+|---------|------------|---------------------|-------|----------|
+| WSL2 + Hermes + Ollama environment | CRITICAL (gate) | Medium | 1 | P0 |
+| Hermes plugin rewrite (register(ctx), plugin.yaml) | CRITICAL (gate) | Medium | 1 | P0 |
+| Hook payload shape discovery | CRITICAL (gate) | Low (empirical) | 1 | P0 |
+| Turn capture from pre/post_llm_call + post_tool_call | HIGH | Medium | 2 | P0 |
+| GLiNER semantic PII scrubbing | HIGH | Medium | 2 | P0 |
+| HITL collection workflow (preview --raw) | MEDIUM | Low | 3 | P1 |
+| End-to-end pipeline smoke test | HIGH (milestone gate) | Low (given others) | 3-4 | P1 |
+| QLoRA fine-tune experiment | HIGH (milestone gate) | Low (consumer-side) | 4 | P1 |
+| Plugin entry point distribution | MEDIUM | Low | post-v1.1 | P2 |
+| pre_llm_call context injection | LOW | Low | post-v1.1 | P3 |
+
+**Priority key:** P0 = milestone blocked without it; P1 = milestone incomplete without it; P2 = quality improvement; P3 = future enhancement
 
 ---
 
 ## Competitor Feature Analysis
 
-### HuggingFace Hub (dataset hosting)
-**What they do well:** Dataset cards with rich YAML metadata, dataset viewer (in-browser data exploration), license filtering, task category filters, download stats, Croissant JSON-LD export, discussion threads per dataset, private/public toggle.
-**What they don't do:** Contributor-side PII scrubbing, runtime context metadata, consent level enforcement, session-level quality scoring, model-specific filtering (they have model metadata for model repos, not for the data records themselves).
-**Lesson for Kajiba:** HuggingFace is the distribution layer; Kajiba's value is everything that happens before data reaches that layer. Kajiba should aim to be HuggingFace-compatible (JSONL + dataset card), not to replicate it.
+### Other Hermes Plugins (42-evey/hermes-plugins)
 
-### BigCode / The Stack
-**What they do well:** Permissive license selection, "Am I in the Stack" opt-out tool, automated PII redaction (F1-score ~90%), formal governance card, tiered data access (public processed vs. restricted raw), quarterly removal updates.
-**What they don't do:** Real-time contributor-side review, consent levels, runtime context metadata, quality scoring by the contributor.
-**Lesson for Kajiba:** BigCode's opt-out model and governance card are the trust foundations Kajiba needs to replicate. The "Am I in the dataset" lookup is a v1.x feature worth adding.
+The 42-evey/hermes-plugins repo (23 community plugins) shows what real Hermes plugin development looks like. Key observations:
+- `evey-telemetry` and `evey-session-guard` are the closest analogs to Kajiba — they observe session data via hooks
+- Plugins use shared utilities (`evey_utils.py`) for retry logic and HTTP helpers
+- The pattern of using `post_llm_call` to capture user/assistant exchanges is established (Hindsight integration uses it this way)
+- **Lesson:** Kajiba's plugin implementation is following established patterns, not pioneering unknown territory
 
-### Kaggle Datasets
-**What they do well:** Contributor progression system (Novice → Grandmaster), voting, discussion, public download counts, notebook integration, usability tags.
-**What they don't do:** Privacy-first workflows, PII scrubbing, session-level quality scoring, runtime context.
-**Lesson for Kajiba:** Contribution stats and progression signals build community momentum. The quality is simpler here (Kajiba's auto-scoring + user annotation is more rigorous).
+### Hindsight Memory Integration
 
-### OpenML
-**What they do well:** Uniform dataset formatting, rich metadata for automated processing, 21,000+ datasets, API for programmatic access.
-**What they don't do:** LLM-specific metadata, runtime context, privacy scrubbing.
-**Lesson for Kajiba:** API-first access matters for consumers who want to automate dataset integration into training pipelines.
+The Hindsight integration uses `post_llm_call` to "auto-retain the user/assistant exchange." This is exactly what Kajiba needs for turn capture. The difference is Kajiba stores locally and applies PII scrubbing first.
 
-### ShareGPT / WizardLM / Alpaca community datasets
-**What they do well:** Standardized conversation formats that training frameworks consume directly.
-**What they don't do:** PII scrubbing, runtime context, quality scoring, consent management.
-**Lesson for Kajiba:** The to_sharegpt() and to_dpo_candidate() export methods in KajibaRecord are the right direction. Kajiba's output should be drop-in for any tool that accepts ShareGPT format.
+- **Lesson:** The `post_llm_call` capture pattern is confirmed working in production. Kajiba's assembly logic (merging with tool calls from `post_tool_call`) is more complex but the foundation is proven.
+
+### Microsoft Presidio
+
+Presidio is a full PII detection + anonymization framework. It now ships a `GLiNERRecognizer` that uses GLiNER internally. The full Presidio framework adds orchestration, service architecture, and DevOps overhead that Kajiba does not need.
+
+- **Lesson:** Use GLiNER directly, not Presidio. Presidio is overkill for Kajiba's single-model use case. The `gliner` package is a direct dependency; no service orchestration needed.
 
 ---
 
 ## Sources
 
-- [HuggingFace Dataset Cards Documentation](https://huggingface.co/docs/hub/en/datasets-cards) — HIGH confidence. Official HuggingFace metadata schema and card requirements.
-- [HuggingFace Datasets Overview](https://huggingface.co/docs/hub/en/datasets-overview) — HIGH confidence. Official feature documentation.
-- [MLCommons Croissant Metadata Format Announcement](https://mlcommons.org/2024/03/croissant_metadata_announce/) — HIGH confidence. Official MLCommons announcement; adopted by HuggingFace, Kaggle, Google Dataset Search.
-- [Croissant Format Specification](https://docs.mlcommons.org/croissant/docs/croissant-spec.html) — HIGH confidence. Official specification.
-- [Mozilla Foundation: Towards Best Practices for Open Datasets for LLM Training](https://www.mozillafoundation.org/en/research/library/towards-best-practices-for-open-datasets-for-llm-training/) — HIGH confidence. Practitioner-validated best practices document from 2024 dataset convening.
-- [BigCode Data Governance Case Study - The Turing Way](https://book.the-turing-way.org/project-design/data-security/data-governance/bigcode-casestudy/) — HIGH confidence. Authoritative case study of The Stack governance model.
-- [BigCode Governance Card](https://arxiv.org/html/2312.03872v1) — HIGH confidence. Formal governance documentation.
-- [Open Future: Commons-Based Data Set Governance for AI](https://openfuture.eu/publication/commons-based-data-set-governance-for-ai/) — MEDIUM confidence. Policy framework from established digital rights organization.
-- [Open Trusted Data Initiative Dataset Specification](https://the-ai-alliance.github.io/open-trusted-data-initiative/dataset-requirements/) — MEDIUM confidence. AI Alliance governance requirements; cross-validates HuggingFace metadata standards.
-- [LLM DataHub: Awesome Datasets for LLM Training](https://github.com/Zjh-819/LLMDataHub) — MEDIUM confidence. Community-curated list; reveals format conventions in practice.
-- [Unsloth Dataset Formats Guide](https://unsloth.ai/docs/get-started/fine-tuning-llms-guide/datasets-guide) — MEDIUM confidence. ShareGPT vs Alpaca format usage in fine-tuning workflows.
-- [Analyzing Dataset Annotation Quality Management (MIT Press / Computational Linguistics)](https://direct.mit.edu/coli/article/50/3/817/120233/Analyzing-Dataset-Annotation-Quality-Management-in) — MEDIUM confidence. Academic survey of annotation quality patterns.
-- [BigCode / The Stack v2 on HuggingFace](https://huggingface.co/datasets/bigcode/the-stack-v2) — HIGH confidence. Primary reference for community coding dataset patterns.
-- [OSI: Data Governance in Open Source AI](https://opensource.org/wp-content/uploads/2025/02/2025-OSI-DataGovernanceOSAI-final-v5.pdf) — MEDIUM confidence. Policy framework from Open Source Initiative.
+**Hermes Agent Plugin API:**
+- [Build a Hermes Plugin — official Hermes Agent docs](https://hermes-agent.nousresearch.com/docs/guides/build-a-hermes-plugin/) — HIGH confidence. Official documentation confirming plugin.yaml schema, register(ctx) API, hook events.
+- [Hermes Agent v0.5.0 Release Notes](https://github.com/NousResearch/hermes-agent/blob/main/RELEASE_v0.5.0.md) — HIGH confidence. Confirms pre_llm_call, post_llm_call, on_session_start, on_session_end hooks activated in v0.5.0.
+- [42-evey/hermes-plugins community plugins](https://github.com/42-evey/hermes-plugins) — MEDIUM confidence. Real-world plugin examples confirming plugin directory structure and hook usage patterns.
+- [Hindsight Hermes integration](https://hindsight.vectorize.io/sdks/integrations/hermes) — MEDIUM confidence. Confirms post_llm_call used for user/assistant exchange capture.
+
+**GLiNER PII Scrubbing:**
+- [nvidia/gliner-PII — HuggingFace model card](https://huggingface.co/nvidia/gliner-PII) — HIGH confidence. Official model card confirming 570M params, 55+ entity types, threshold=0.3/0.5, Python usage example.
+- [knowledgator/gliner-pii-base-v1.0 — HuggingFace](https://huggingface.co/knowledgator/gliner-pii-base-v1.0) — HIGH confidence. Alternative smaller model confirmed.
+- [Using GLiNER as external PII model — Microsoft Presidio docs](https://microsoft.github.io/presidio/samples/python/gliner/) — HIGH confidence. Official Presidio documentation confirming GLiNER integration pattern.
+- [The Next Generation of Privacy: Docling and GLiNER — DEV Community](https://dev.to/aairom/the-next-generation-of-privacy-using-docling-gliners-advanced-ner-to-masterfully-detect-and-75p) — MEDIUM confidence. Practitioner guide confirming GLiNER local deployment approach.
+
+**QLoRA Fine-Tuning:**
+- [QLoRA: Efficient Finetuning of Quantized LLMs (original paper)](https://arxiv.org/abs/2305.14314) — HIGH confidence. Dataset quality dominates quantity; small high-quality datasets produce state-of-the-art results.
+- [Fine-tuning Llama 3.2 3B — Analytics Vidhya](https://www.analyticsvidhya.com/blog/2024/12/fine-tuning-llama-3-2-3b-for-rag/) — MEDIUM confidence. Practical guide for Llama 3.2 3B fine-tuning.
+- [Fine-tune Llama 3.1 Ultra-Efficiently with Unsloth — HuggingFace blog](https://huggingface.co/blog/mlabonne/sft-llama3) — MEDIUM confidence. ShareGPT + Unsloth workflow documented.
+
+**WSL2 + GPU Setup:**
+- [WSL2 + Ollama on Windows: Complete Setup Guide — InsiderLLM](https://insiderllm.com/guides/wsl2-ollama-windows-setup-guide/) — MEDIUM confidence. Confirms GPU passthrough approach, critical warning about not installing Linux NVIDIA driver inside WSL2.
+- [CUDA on WSL User Guide — NVIDIA official docs](https://docs.nvidia.com/cuda/wsl-user-guide/index.html) — HIGH confidence. Official NVIDIA guidance on WSL2 CUDA.
+
+---
+*Feature research for: Kajiba v1.1 Hermes Pipeline Validation milestone*
+*Researched: 2026-04-02*
+*Supersedes: previous FEATURES.md which covered v1.0 features. The v1.0 feature landscape is preserved below in the archived section.*
+
+---
+
+## Archive: v1.0 Feature Landscape (Reference Only)
+
+The following content was the original FEATURES.md covering the v1.0 dataset pipeline features. Preserved for reference when working on phases that build on or modify these existing features.
+
+> See v1.0 features: PII preview/diff, consent enforcement, metadata anonymization, opt-out/deletion, dataset card, quality tier filtering, model metadata filtering, license clarity, deduplication, transparent scrubbing log, runtime context as dataset dimension, two-pass PII scrubbing, contribution modes, user annotation refinement, scrub strictness levels, dataset catalog CLI, contribution statistics, model-agnostic adapter protocol, and anti-features (fine-tuning tooling, hosted API, model evaluation, automatic submission without review, personal identity tracking, real-time streaming, synthetic data generation).
+> The feature dependency graph, MVP definition, and competitor analysis for v1.0 features remain valid for understanding the existing system.
