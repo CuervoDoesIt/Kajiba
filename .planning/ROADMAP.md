@@ -95,7 +95,11 @@ Plans:
   2. The catalog index includes model family, parameter count, quantization type, and context window for each record set, enabling informed subset selection
   3. Running `kajiba browse` shows available models, tiers, and hardware profiles with filter options
   4. Running `kajiba download --model llama3 --tier gold` fetches only the matching subset to a local directory
-**Plans**: TBD
+**Plans:** 2 plans
+
+Plans:
+- [ ] 05-01-PLAN.md — Extend generate_catalog() with model metadata enrichment, add GitHubOps read methods and filter_catalog() function
+- [ ] 05-02-PLAN.md — Add kajiba browse and kajiba download CLI commands with Rich rendering and progress bar
 
 ## Progress
 
@@ -108,4 +112,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 | 2. Data Quality & Transparency | 0/3 | Planning complete | - |
 | 3. Dataset Publishing | 0/2 | Planning complete | - |
 | 4. Contribution Modes | 0/3 | Planning complete | - |
-| 5. Consumer Experience | 0/TBD | Not started | - |
+| 5. Consumer Experience | 0/2 | Planning complete | - |
