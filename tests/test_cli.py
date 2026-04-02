@@ -1932,7 +1932,8 @@ class TestDownloadCommand:
         ])
         assert result.exit_code == 0
         assert "Downloaded" in result.output
-        assert str(custom_dir) in result.output
+        # Rich may wrap long paths across lines; check for dir name
+        assert "custom_output" in result.output
 
     def test_download_gh_not_found(
         self, runner: CliRunner, monkeypatch: pytest.MonkeyPatch,

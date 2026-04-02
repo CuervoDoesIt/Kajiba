@@ -1232,6 +1232,192 @@ def browse(model: Optional[str], tier: Optional[str], repo: Optional[str]) -> No
 
 
 # ---------------------------------------------------------------------------
+# Download helpers
+# ---------------------------------------------------------------------------
+
+
+def _collect_download_shards(
+    catalog: dict,
+    model: Optional[str] = None,
+    tier: Optional[str] = None,
+) -> list[dict]:
+    """Collect shard file paths and metadata from filtered catalog.
+
+    Args:
+        catalog: Full catalog dict.
+        model: Model filter (passed to filter_catalog).
+        tier: Tier filter (passed to filter_catalog).
+
+    Returns:
+        List of dicts with 'path', 'model', 'tier' keys.
+    """
+    filtered = filter_catalog(catalog, model=model, tier=tier)
+    shards: list[dict] = []
+    for slug, info in filtered.get("models", {}).items():
+        for tier_name, tier_info in info.get("tiers", {}).items():
+            for shard_name in tier_info.get("shards", []):
+                shards.append({
+                    "path": f"data/{slug}/{tier_name}/{shard_name}",
+                    "model": slug,
+                    "tier": tier_name,
+                })
+    return shards
+
+
+def _format_size(size_bytes: int) -> str:
+    """Format byte count as human-readable size string."""
+    if size_bytes < 1024:
+        return f"{size_bytes} B"
+    elif size_bytes < 1024 * 1024:
+        return f"{size_bytes / 1024:.1f} KB"
+    else:
+        return f"{size_bytes / (1024 * 1024):.1f} MB"
+
+
+def _download_shards(
+    gh_ops: GitHubOps,
+    shards: list[dict],
+    output_dir: Path,
+) -> tuple[int, int, int, int]:
+    """Download shard files with Rich progress tracking.
+
+    Skips files that already exist at the destination.
+
+    Args:
+        gh_ops: GitHubOps instance for file fetching.
+        shards: List of shard dicts with 'path', 'model', 'tier' keys.
+        output_dir: Base output directory.
+
+    Returns:
+        Tuple of (downloaded_count, skipped_count, total_records, total_bytes).
+    """
+    downloaded = 0
+    skipped = 0
+    total_bytes = 0
+    total_records = 0
+
+    progress = Progress(
+        SpinnerColumn(),
+        TextColumn("[bold blue]{task.description}"),
+        BarColumn(),
+        "[progress.percentage]{task.percentage:>3.0f}%",
+        DownloadColumn(),
+        TimeRemainingColumn(),
+    )
+
+    with progress:
+        task = progress.add_task("Downloading...", total=len(shards))
+        for shard_info in shards:
+            shard_path = shard_info["path"]
+            # Build destination using forward-slash split for cross-platform (Pitfall 7)
+            dest = output_dir / Path(*shard_path.split("/"))
+
+            # Skip if exists
+            if dest.exists():
+                console.print(
+                    f"  [dim]Skipped (already exists): {shard_path}[/dim]"
+                )
+                skipped += 1
+                progress.update(task, advance=1)
+                continue
+
+            result = gh_ops.get_file_contents(shard_path, raw=True)
+            if result.success:
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                dest.write_text(result.stdout, encoding="utf-8")
+                file_bytes = len(result.stdout.encode("utf-8"))
+                total_bytes += file_bytes
+                # Count non-empty lines as records
+                total_records += sum(
+                    1 for line in result.stdout.split("\n") if line.strip()
+                )
+                downloaded += 1
+            else:
+                console.print(
+                    f"  [red]Failed to download: {shard_path}[/red]"
+                )
+
+            progress.update(task, advance=1)
+
+    return downloaded, skipped, total_records, total_bytes
+
+
+@cli.command()
+@_filter_options
+@click.option("--output", "output_path", default=None, type=click.Path(),
+              help="Output directory. Default: ~/.hermes/kajiba/downloads/")
+@click.option("--repo", default=None, help="Dataset repo (owner/repo).")
+def download(
+    model: Optional[str],
+    tier: Optional[str],
+    output_path: Optional[str],
+    repo: Optional[str],
+) -> None:
+    """Download a filtered subset of the dataset.
+
+    Fetches matching JSONL shard files from the dataset repository
+    to a local directory. Use --model and --tier to filter.
+    """
+    # Resolve repo
+    dataset_repo = repo if repo else _load_config_value(
+        "dataset_repo", DEFAULT_DATASET_REPO,
+    )
+
+    # Fetch catalog
+    gh_ops = GitHubOps(upstream_repo=dataset_repo)
+    catalog = _fetch_catalog(gh_ops, dataset_repo)
+    if catalog is None:
+        raise SystemExit(1)
+
+    # Check empty catalog
+    if not catalog.get("models"):
+        console.print(
+            "[yellow]No records published yet.[/yellow] "
+            "Run `kajiba publish` to contribute."
+        )
+        return
+
+    # Collect matching shards
+    shards = _collect_download_shards(catalog, model=model, tier=tier)
+
+    if not shards:
+        _render_no_match(catalog, model, tier)
+        return
+
+    # Unfiltered confirmation (D-12)
+    if not model and not tier:
+        total_recs = catalog.get("total_records", 0)
+        total_size = _format_size(catalog.get("total_size_bytes", 0))
+        if not click.confirm(
+            f"This will download all {total_recs} record(s) ({total_size}). Continue?",
+            default=False,
+        ):
+            return
+
+    # Resolve output directory (D-06)
+    output_dir = Path(output_path) if output_path else DOWNLOADS_DIR
+
+    # Download shards with progress (D-07)
+    downloaded, skipped, total_records, total_bytes = _download_shards(
+        gh_ops, shards, output_dir,
+    )
+
+    # Completion summary
+    size_str = _format_size(total_bytes)
+    if downloaded > 0:
+        console.print(
+            f"[green]Downloaded {downloaded} shard(s), "
+            f"{total_records} record(s), {size_str}.[/green]"
+        )
+    if skipped > 0:
+        console.print(
+            f"[dim]Skipped {skipped} shard(s) (already exist).[/dim]"
+        )
+    if downloaded > 0:
+        console.print(f"[dim]Saved to {output_dir}[/dim]")
+
+
+# ---------------------------------------------------------------------------
 # Publishing commands
 # ---------------------------------------------------------------------------
 
