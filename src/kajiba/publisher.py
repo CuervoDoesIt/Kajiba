@@ -457,6 +457,9 @@ def generate_catalog(repo_root: Path) -> dict:
                 "tiers": {},
                 "total_records": 0,
                 "hardware_distribution": {},
+                "parameter_counts": [],
+                "quantizations": [],
+                "context_windows": [],
             }
 
             for tier_dir in sorted(model_dir.iterdir()):
@@ -524,6 +527,17 @@ def generate_catalog(repo_root: Path) -> dict:
                                     mn = m.get("model_name")
                                     if mn and model_info["display_name"] == model_slug:
                                         model_info["display_name"] = mn
+
+                                    # Model metadata enrichment (CONS-02)
+                                    pc = m.get("parameter_count")
+                                    if pc and pc not in model_info["parameter_counts"]:
+                                        model_info["parameter_counts"].append(pc)
+                                    qt = m.get("quantization")
+                                    if qt and qt not in model_info["quantizations"]:
+                                        model_info["quantizations"].append(qt)
+                                    cw = m.get("context_window")
+                                    if cw and cw not in model_info["context_windows"]:
+                                        model_info["context_windows"].append(cw)
 
                     except OSError:
                         logger.warning("Could not read shard %s", shard_file)
