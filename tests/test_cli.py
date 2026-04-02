@@ -1574,3 +1574,164 @@ class TestActivityNotification:
         result = runner.invoke(cli, ["review"])
         assert result.exit_code == 0
         assert "auto-submitted" not in result.output
+
+
+# ---------------------------------------------------------------------------
+# Browse command tests
+# ---------------------------------------------------------------------------
+
+
+def _load_enriched_catalog() -> str:
+    """Load the enriched_catalog.json fixture and return as a JSON string."""
+    fixture_path = Path(__file__).parent / "fixtures" / "enriched_catalog.json"
+    return fixture_path.read_text(encoding="utf-8")
+
+
+def _make_mock_gh_ops_for_browse(
+    catalog_json: str = "",
+    success: bool = True,
+    returncode: int = 0,
+    stderr: str = "",
+):
+    """Create a mock GitHubOps that returns catalog_json from get_file_contents."""
+    from unittest.mock import MagicMock
+    from kajiba.publisher import GhResult
+
+    mock_ops = MagicMock()
+    mock_ops.check_auth.return_value = GhResult(
+        success=True, stdout="", stderr="", returncode=0,
+    )
+    mock_ops.get_file_contents.return_value = GhResult(
+        success=success,
+        stdout=catalog_json if success else "",
+        stderr=stderr,
+        returncode=returncode,
+    )
+    return mock_ops
+
+
+class TestBrowseCommand:
+    """Test the kajiba browse command."""
+
+    def test_browse_summary_table(
+        self, runner: CliRunner, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """browse with no filters renders summary table with model names, tiers, totals (D-01)."""
+        catalog_json = _load_enriched_catalog()
+        mock_gh = _make_mock_gh_ops_for_browse(catalog_json=catalog_json)
+        monkeypatch.setattr("kajiba.cli.GitHubOps", lambda *a, **kw: mock_gh)
+
+        result = runner.invoke(cli, ["browse"])
+        assert result.exit_code == 0
+        assert "Kajiba Dataset Catalog" in result.output
+        assert "Llama 3" in result.output
+        assert "GPT-4o" in result.output
+        assert "2 model(s)" in result.output
+
+    def test_browse_model_drilldown(
+        self, runner: CliRunner, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """browse --model llama-3 renders metadata panel with params, quant, ctx (D-02)."""
+        catalog_json = _load_enriched_catalog()
+        mock_gh = _make_mock_gh_ops_for_browse(catalog_json=catalog_json)
+        monkeypatch.setattr("kajiba.cli.GitHubOps", lambda *a, **kw: mock_gh)
+
+        result = runner.invoke(cli, ["browse", "--model", "llama-3"])
+        assert result.exit_code == 0
+        assert "Model Metadata" in result.output
+        assert "8B" in result.output
+        assert "70B" in result.output
+        assert "Q4_K_M" in result.output
+        assert "Tier Breakdown" in result.output
+
+    def test_browse_tier_filter(
+        self, runner: CliRunner, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """browse --tier gold shows summary table narrowed to gold entries (D-03)."""
+        catalog_json = _load_enriched_catalog()
+        mock_gh = _make_mock_gh_ops_for_browse(catalog_json=catalog_json)
+        monkeypatch.setattr("kajiba.cli.GitHubOps", lambda *a, **kw: mock_gh)
+
+        result = runner.invoke(cli, ["browse", "--tier", "gold"])
+        assert result.exit_code == 0
+        assert "Kajiba Dataset Catalog" in result.output
+
+    def test_browse_model_and_tier_filter(
+        self, runner: CliRunner, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """browse --model llama-3 --tier gold renders drill-down for only gold (D-03+D-10)."""
+        catalog_json = _load_enriched_catalog()
+        mock_gh = _make_mock_gh_ops_for_browse(catalog_json=catalog_json)
+        monkeypatch.setattr("kajiba.cli.GitHubOps", lambda *a, **kw: mock_gh)
+
+        result = runner.invoke(cli, ["browse", "--model", "llama-3", "--tier", "gold"])
+        assert result.exit_code == 0
+        assert "Model Metadata" in result.output
+        assert "Tier Breakdown" in result.output
+
+    def test_browse_empty_catalog(
+        self, runner: CliRunner, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """browse on empty catalog shows 'No records published yet' (D-04)."""
+        empty_catalog = json.dumps({"models": {}, "total_records": 0, "total_size_bytes": 0})
+        mock_gh = _make_mock_gh_ops_for_browse(catalog_json=empty_catalog)
+        monkeypatch.setattr("kajiba.cli.GitHubOps", lambda *a, **kw: mock_gh)
+
+        result = runner.invoke(cli, ["browse"])
+        assert result.exit_code == 0
+        assert "No records published yet" in result.output
+        assert "kajiba publish" in result.output
+
+    def test_browse_catalog_fetch_failure(
+        self, runner: CliRunner, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """browse on catalog fetch failure shows error with auth hint (D-04)."""
+        mock_gh = _make_mock_gh_ops_for_browse(
+            success=False, returncode=1, stderr="HTTP 403: Resource not accessible",
+        )
+        monkeypatch.setattr("kajiba.cli.GitHubOps", lambda *a, **kw: mock_gh)
+
+        result = runner.invoke(cli, ["browse"])
+        assert result.exit_code == 1
+        assert "Could not fetch catalog" in result.output
+        assert "gh auth status" in result.output
+
+    def test_browse_no_match(
+        self, runner: CliRunner, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """browse --model nonexistent shows available models/tiers (D-11)."""
+        catalog_json = _load_enriched_catalog()
+        mock_gh = _make_mock_gh_ops_for_browse(catalog_json=catalog_json)
+        monkeypatch.setattr("kajiba.cli.GitHubOps", lambda *a, **kw: mock_gh)
+
+        result = runner.invoke(cli, ["browse", "--model", "nonexistent"])
+        assert result.exit_code == 0
+        assert "No records match" in result.output
+        assert "llama-3" in result.output or "gpt-4o" in result.output
+
+    def test_browse_missing_metadata(
+        self, runner: CliRunner, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """browse --model shows '---' for missing parameter_counts (D-08)."""
+        catalog_json = _load_enriched_catalog()
+        mock_gh = _make_mock_gh_ops_for_browse(catalog_json=catalog_json)
+        monkeypatch.setattr("kajiba.cli.GitHubOps", lambda *a, **kw: mock_gh)
+
+        # GPT-4o has empty parameter_counts and quantizations
+        result = runner.invoke(cli, ["browse", "--model", "gpt-4o"])
+        assert result.exit_code == 0
+        assert "---" in result.output
+
+    def test_browse_gh_not_found(
+        self, runner: CliRunner, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """browse when gh CLI not found (returncode -1) shows install URL (Pitfall 3)."""
+        mock_gh = _make_mock_gh_ops_for_browse(
+            success=False, returncode=-1, stderr="gh CLI not found",
+        )
+        monkeypatch.setattr("kajiba.cli.GitHubOps", lambda *a, **kw: mock_gh)
+
+        result = runner.invoke(cli, ["browse"])
+        assert result.exit_code == 1
+        assert "gh CLI not found" in result.output
+        assert "https://cli.github.com/" in result.output
