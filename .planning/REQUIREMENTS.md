@@ -62,8 +62,8 @@ Explicitly excluded. Documented to prevent scope creep.
 
 | Feature | Reason |
 |---------|--------|
-| Fine-tuning tooling in Kajiba | Pipeline only — consumers bring their own training frameworks |
-| Presidio/spaCy for PII | GLiNER is faster, more accurate, self-contained — Presidio is overkill |
+| Fine-tuning tooling in Kajiba | Pipeline only -- consumers bring their own training frameworks |
+| Presidio/spaCy for PII | GLiNER is faster, more accurate, self-contained -- Presidio is overkill |
 | Ollama as core dependency | GLiNER handles PII locally; Ollama only for inference/metadata capture |
 | Real-time streaming | Batch processing, not live telemetry |
 | Generative LLM prompting for PII | 20-50x slower and lower precision than GLiNER span-tagging |
@@ -76,32 +76,32 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PLUG-01 | — | Pending |
-| PLUG-02 | — | Pending |
-| PLUG-03 | — | Pending |
-| PLUG-04 | — | Pending |
-| PLUG-05 | — | Pending |
-| CAPT-01 | — | Pending |
-| CAPT-02 | — | Pending |
-| CAPT-03 | — | Pending |
-| CAPT-04 | — | Pending |
-| PRIV-01 | — | Pending |
-| PRIV-02 | — | Pending |
-| PRIV-03 | — | Pending |
-| PRIV-04 | — | Pending |
-| ENV-01 | — | Pending |
-| ENV-02 | — | Pending |
-| ENV-03 | — | Pending |
-| VAL-01 | — | Pending |
-| VAL-02 | — | Pending |
-| VAL-03 | — | Pending |
-| VAL-04 | — | Pending |
+| PLUG-01 | Phase 6 | Pending |
+| PLUG-02 | Phase 6 | Pending |
+| PLUG-03 | Phase 6 | Pending |
+| PLUG-04 | Phase 8 | Pending |
+| PLUG-05 | Phase 8 | Pending |
+| CAPT-01 | Phase 6 | Pending |
+| CAPT-02 | Phase 7 | Pending |
+| CAPT-03 | Phase 7 | Pending |
+| CAPT-04 | Phase 7 | Pending |
+| PRIV-01 | Phase 7 | Pending |
+| PRIV-02 | Phase 7 | Pending |
+| PRIV-03 | Phase 7 | Pending |
+| PRIV-04 | Phase 7 | Pending |
+| ENV-01 | Phase 6 | Pending |
+| ENV-02 | Phase 6 | Pending |
+| ENV-03 | Phase 6 | Pending |
+| VAL-01 | Phase 8 | Pending |
+| VAL-02 | Phase 8 | Pending |
+| VAL-03 | Phase 8 | Pending |
+| VAL-04 | Phase 9 | Pending |
 
 **Coverage:**
 - v1.1 requirements: 20 total
-- Mapped to phases: 0
-- Unmapped: 20
+- Mapped to phases: 20
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-04-02*
-*Last updated: 2026-04-02 after initial definition*
+*Last updated: 2026-04-02 after roadmap creation*
