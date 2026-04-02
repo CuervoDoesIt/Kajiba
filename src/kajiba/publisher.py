@@ -277,6 +277,26 @@ class GitHubOps:
         """
         return self._run_gh(["api", "user", "-q", ".login"])
 
+    def get_file_contents(self, path: str, raw: bool = False) -> GhResult:
+        """Fetch a file's contents from the upstream dataset repository.
+
+        Args:
+            path: File path within the repo (e.g. "catalog.json").
+            raw: If True, use raw Accept header to avoid 1MB JSON limit.
+
+        Returns:
+            GhResult with file contents in stdout.
+        """
+        if raw:
+            args = [
+                "api",
+                "-H", "Accept: application/vnd.github.raw+text",
+                f"repos/{self._upstream}/contents/{path}",
+            ]
+        else:
+            args = ["api", f"repos/{self._upstream}/contents/{path}"]
+        return self._run_gh(args)
+
 
 # ---------------------------------------------------------------------------
 # Pure functions — file layout and sharding
@@ -581,6 +601,56 @@ def generate_catalog(repo_root: Path) -> dict:
         "quality_distribution": quality_distribution,
         "deletions_count": deletions_count,
     }
+
+
+# ---------------------------------------------------------------------------
+# Catalog filtering
+# ---------------------------------------------------------------------------
+
+
+def filter_catalog(
+    catalog: dict,
+    model: Optional[str] = None,
+    tier: Optional[str] = None,
+) -> dict:
+    """Filter catalog to matching models and tiers.
+
+    Filters compose with AND semantics: both model and tier must match
+    when both are provided. Model matching is case-insensitive substring
+    against slug and display_name. Tier matching is exact.
+
+    Args:
+        catalog: Full catalog dict from catalog.json.
+        model: Model slug or name substring to match (case-insensitive).
+        tier: Tier name to match exactly.
+
+    Returns:
+        New catalog dict with same structure but only matching entries.
+        Non-model fields (schema_version, total_records, etc.) are preserved.
+    """
+    models = catalog.get("models", {})
+    filtered_models: dict = {}
+
+    for slug, info in models.items():
+        # Model filter: case-insensitive substring on slug or display_name
+        if model:
+            model_lower = model.lower()
+            slug_match = model_lower in slug.lower()
+            name_match = model_lower in info.get("display_name", "").lower()
+            if not slug_match and not name_match:
+                continue
+
+        # Tier filter: only include matching tier
+        if tier:
+            tiers = info.get("tiers", {})
+            if tier not in tiers:
+                continue
+            # Create a shallow copy with only the matching tier
+            info = {**info, "tiers": {tier: tiers[tier]}}
+
+        filtered_models[slug] = info
+
+    return {**catalog, "models": filtered_models}
 
 
 # ---------------------------------------------------------------------------
