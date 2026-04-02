@@ -33,9 +33,18 @@ from kajiba.publisher import (
     build_publish_pr_body,
     build_publish_pr_title,
     create_deletion_entry,
+    filter_catalog,
     generate_catalog,
     generate_readme,
     write_records_to_shards,
+)
+from rich.progress import (
+    BarColumn,
+    DownloadColumn,
+    Progress,
+    SpinnerColumn,
+    TextColumn,
+    TimeRemainingColumn,
 )
 from kajiba.schema import (
     OUTCOME_TAGS, PAIN_POINT_CATEGORIES, SCHEMA_VERSION,
@@ -55,6 +64,7 @@ console = Console()
 KAJIBA_BASE = Path.home() / ".hermes" / "kajiba"
 STAGING_DIR = KAJIBA_BASE / "staging"
 OUTBOX_DIR = KAJIBA_BASE / "outbox"
+DOWNLOADS_DIR = Path.home() / ".hermes" / "kajiba" / "downloads"
 
 
 def _ensure_dirs() -> None:
@@ -998,6 +1008,227 @@ def review() -> None:
         f"\n[bold]Review complete:[/bold] {approved} approved, "
         f"{rejected} rejected, {skipped} skipped"
     )
+
+
+# ---------------------------------------------------------------------------
+# Consumer commands: shared filter options
+# ---------------------------------------------------------------------------
+
+
+def _filter_options(func):
+    """Shared filter options for browse and download commands (D-03)."""
+    func = click.option(
+        "--tier", default=None,
+        type=click.Choice(["gold", "silver", "bronze", "review_needed"]),
+        help="Filter by quality tier.",
+    )(func)
+    func = click.option(
+        "--model", default=None,
+        help="Filter by model name (case-insensitive substring match).",
+    )(func)
+    return func
+
+
+def _fetch_catalog(gh_ops: GitHubOps, dataset_repo: str) -> Optional[dict]:
+    """Fetch and parse catalog.json from the dataset repo.
+
+    Handles error states per D-04: gh not found, auth failure, catalog
+    not found (404), network error. Prints appropriate Rich messages
+    and returns None on failure.
+
+    Args:
+        gh_ops: Initialized GitHubOps instance.
+        dataset_repo: Repository string for error messages.
+
+    Returns:
+        Parsed catalog dict, or None on any failure.
+    """
+    result = gh_ops.get_file_contents("catalog.json", raw=True)
+    if result.returncode == -1:
+        console.print(
+            "[red]Error:[/red] gh CLI not found. "
+            "Install from https://cli.github.com/"
+        )
+        return None
+    if not result.success:
+        if "404" in result.stderr or "Not Found" in result.stderr:
+            console.print(
+                "[yellow]No records published yet.[/yellow] "
+                "Run `kajiba publish` to contribute."
+            )
+        else:
+            console.print(
+                f"[red]Error:[/red] Could not fetch catalog from {dataset_repo}. "
+                f"{result.stderr.strip()}"
+            )
+            console.print(
+                "[dim]Check `gh auth status` for authentication.[/dim]"
+            )
+        return None
+    try:
+        return json.loads(result.stdout)
+    except json.JSONDecodeError:
+        console.print(
+            f"[red]Error:[/red] Invalid catalog.json from {dataset_repo}."
+        )
+        return None
+
+
+def _render_no_match(catalog: dict, model: Optional[str], tier: Optional[str]) -> None:
+    """Show no-match feedback with available options (D-11)."""
+    all_models = catalog.get("models", {})
+    filter_parts = []
+    if model:
+        filter_parts.append(f'--model "{model}"')
+    if tier:
+        filter_parts.append(f'--tier "{tier}"')
+    console.print(
+        f"[yellow]No records match {' '.join(filter_parts)}.[/yellow]"
+    )
+    if all_models:
+        model_names = sorted(all_models.keys())
+        console.print(f"Available models: {', '.join(model_names)}")
+    all_tiers: set[str] = set()
+    for m_info in all_models.values():
+        all_tiers.update(m_info.get("tiers", {}).keys())
+    if all_tiers:
+        console.print(f"Available tiers: {', '.join(sorted(all_tiers))}")
+
+
+def _render_browse_summary(catalog: dict) -> None:
+    """Render top-level browse summary table (D-01)."""
+    models = catalog.get("models", {})
+    table = Table(title="Kajiba Dataset Catalog")
+    table.add_column("Model", style="bold")
+    table.add_column("Gold", justify="right")
+    table.add_column("Silver", justify="right")
+    table.add_column("Bronze", justify="right")
+    table.add_column("Total", justify="right", style="bold")
+    table.add_column("Avg Score", justify="right")
+
+    total_records = 0
+    for slug, info in sorted(models.items()):
+        tiers = info.get("tiers", {})
+        gold = tiers.get("gold", {}).get("record_count", 0)
+        silver = tiers.get("silver", {}).get("record_count", 0)
+        bronze = tiers.get("bronze", {}).get("record_count", 0)
+        model_total = info.get("total_records", 0)
+        total_records += model_total
+
+        scores = []
+        for t_info in tiers.values():
+            avg = t_info.get("avg_quality_score", 0)
+            if avg > 0:
+                scores.append(avg)
+        avg_str = f"{sum(scores) / len(scores):.2f}" if scores else "---"
+
+        table.add_row(
+            info.get("display_name", slug),
+            str(gold) if gold else "---",
+            str(silver) if silver else "---",
+            str(bronze) if bronze else "---",
+            str(model_total),
+            avg_str,
+        )
+
+    console.print(table)
+    console.print(
+        f"[dim]{len(models)} model(s), {total_records} record(s) total. "
+        f"Use --model <name> for details.[/dim]"
+    )
+
+
+def _render_browse_model(model_slug: str, model_info: dict) -> None:
+    """Render drill-down view for a single model (D-02)."""
+    display = model_info.get("display_name", model_slug)
+    params = model_info.get("parameter_counts", [])
+    quants = model_info.get("quantizations", [])
+    ctx_wins = model_info.get("context_windows", [])
+
+    meta_lines = [f"[bold]Model:[/bold] {display}"]
+    meta_lines.append(
+        f"[bold]Parameters:[/bold] {', '.join(str(p) for p in params)}"
+        if params else "[bold]Parameters:[/bold] [dim]---[/dim]"
+    )
+    meta_lines.append(
+        f"[bold]Quantization:[/bold] {', '.join(str(q) for q in quants)}"
+        if quants else "[bold]Quantization:[/bold] [dim]---[/dim]"
+    )
+    meta_lines.append(
+        f"[bold]Context Window:[/bold] {', '.join(str(w) for w in ctx_wins)}"
+        if ctx_wins else "[bold]Context Window:[/bold] [dim]---[/dim]"
+    )
+    console.print(Panel("\n".join(meta_lines), title="Model Metadata"))
+
+    # Tier breakdown table
+    table = Table(title="Tier Breakdown")
+    table.add_column("Tier", style="bold")
+    table.add_column("Records", justify="right")
+    table.add_column("Avg Score", justify="right")
+    table.add_column("Size", justify="right")
+
+    for tier_name in ["gold", "silver", "bronze", "review_needed"]:
+        tier_info = model_info.get("tiers", {}).get(tier_name)
+        if tier_info:
+            size_mb = tier_info.get("total_size_bytes", 0) / (1024 * 1024)
+            table.add_row(
+                tier_name,
+                str(tier_info.get("record_count", 0)),
+                f"{tier_info.get('avg_quality_score', 0):.2f}",
+                f"{size_mb:.1f} MB",
+            )
+    console.print(table)
+
+    # Hardware distribution summary line
+    hw = model_info.get("hardware_distribution", {})
+    if hw:
+        hw_items = sorted(hw.items(), key=lambda x: x[1], reverse=True)[:5]
+        hw_str = ", ".join(f"{name} ({count})" for name, count in hw_items)
+        console.print(f"[dim]Hardware: {hw_str}[/dim]")
+
+
+@cli.command()
+@_filter_options
+@click.option("--repo", default=None, help="Dataset repo (owner/repo).")
+def browse(model: Optional[str], tier: Optional[str], repo: Optional[str]) -> None:
+    """Browse the dataset catalog.
+
+    Shows available models, quality tiers, and record counts.
+    Use --model <name> for detailed model metadata.
+    """
+    # Resolve repo
+    dataset_repo = repo if repo else _load_config_value(
+        "dataset_repo", DEFAULT_DATASET_REPO,
+    )
+
+    # Fetch catalog
+    gh_ops = GitHubOps(upstream_repo=dataset_repo)
+    catalog = _fetch_catalog(gh_ops, dataset_repo)
+    if catalog is None:
+        raise SystemExit(1)
+
+    # Check empty catalog
+    if not catalog.get("models"):
+        console.print(
+            "[yellow]No records published yet.[/yellow] "
+            "Run `kajiba publish` to contribute."
+        )
+        return
+
+    # Apply filters
+    filtered = filter_catalog(catalog, model=model, tier=tier)
+
+    # Check no matches
+    if not filtered.get("models"):
+        _render_no_match(catalog, model, tier)
+        return
+
+    # Drill-down if --model specified and exactly one model matches
+    if model and len(filtered["models"]) == 1:
+        slug = next(iter(filtered["models"]))
+        _render_browse_model(slug, filtered["models"][slug])
+    else:
+        _render_browse_summary(filtered)
 
 
 # ---------------------------------------------------------------------------
