@@ -24,6 +24,7 @@ from kajiba.publisher import (
     compute_record_path,
     compute_shard_key,
     create_deletion_entry,
+    filter_catalog,
     generate_catalog,
     generate_readme,
     normalize_model_name,
@@ -811,6 +812,131 @@ class TestGitHubOps:
         result = ops.get_username()
         assert result.success is True
         assert result.stdout == "testuser"
+
+
+# ---------------------------------------------------------------------------
+# TestGitHubOpsRead
+# ---------------------------------------------------------------------------
+
+
+class TestGitHubOpsRead:
+    """Tests for GitHubOps.get_file_contents read-only method."""
+
+    def _mock_run_gh(self, monkeypatch, ops: GitHubOps) -> list:
+        """Mock GitHubOps._run_gh and capture call args."""
+        calls = []
+
+        def fake_run_gh(args: list[str]) -> GhResult:
+            calls.append(args)
+            return GhResult(success=True, stdout='{"content": "data"}', stderr="", returncode=0)
+
+        monkeypatch.setattr(ops, "_run_gh", fake_run_gh)
+        return calls
+
+    def test_get_file_contents_raw_uses_accept_header(self, monkeypatch) -> None:
+        """get_file_contents(raw=True) passes Accept: application/vnd.github.raw+text header."""
+        ops = GitHubOps("CuervoDoesIt/kajiba-dataset")
+        calls = self._mock_run_gh(monkeypatch, ops)
+        ops.get_file_contents("catalog.json", raw=True)
+        assert len(calls) == 1
+        args = calls[0]
+        assert "api" in args
+        assert "-H" in args
+        assert "Accept: application/vnd.github.raw+text" in args
+        assert "repos/CuervoDoesIt/kajiba-dataset/contents/catalog.json" in args
+
+    def test_get_file_contents_no_raw_no_accept_header(self, monkeypatch) -> None:
+        """get_file_contents(raw=False) does not include Accept header."""
+        ops = GitHubOps("CuervoDoesIt/kajiba-dataset")
+        calls = self._mock_run_gh(monkeypatch, ops)
+        ops.get_file_contents("catalog.json", raw=False)
+        assert len(calls) == 1
+        args = calls[0]
+        assert "api" in args
+        assert "-H" not in args
+        assert "repos/CuervoDoesIt/kajiba-dataset/contents/catalog.json" in args
+
+    def test_get_file_contents_returns_gh_result(self, monkeypatch) -> None:
+        """get_file_contents returns the GhResult from _run_gh."""
+        ops = GitHubOps("CuervoDoesIt/kajiba-dataset")
+        self._mock_run_gh(monkeypatch, ops)
+        result = ops.get_file_contents("catalog.json")
+        assert isinstance(result, GhResult)
+        assert result.success is True
+
+
+# ---------------------------------------------------------------------------
+# TestFilterCatalog
+# ---------------------------------------------------------------------------
+
+
+class TestFilterCatalog:
+    """Tests for the filter_catalog pure function."""
+
+    def _make_catalog(self) -> dict:
+        """Load enriched_catalog.json fixture for filter tests."""
+        return _load_fixture("enriched_catalog.json")
+
+    def test_filter_by_model_substring(self) -> None:
+        """filter_catalog with model='llama' returns only models matching 'llama'."""
+        catalog = self._make_catalog()
+        result = filter_catalog(catalog, model="llama")
+        assert "llama-3" in result["models"]
+        assert "gpt-4o" not in result["models"]
+
+    def test_filter_by_tier(self) -> None:
+        """filter_catalog with tier='gold' returns models with gold tier only."""
+        catalog = self._make_catalog()
+        result = filter_catalog(catalog, tier="gold")
+        for slug, info in result["models"].items():
+            assert "gold" in info["tiers"]
+            assert len(info["tiers"]) == 1
+
+    def test_filter_by_model_and_tier(self) -> None:
+        """filter_catalog with model='llama' AND tier='gold' returns only matching model with only gold tier."""
+        catalog = self._make_catalog()
+        result = filter_catalog(catalog, model="llama", tier="gold")
+        assert "llama-3" in result["models"]
+        assert "gpt-4o" not in result["models"]
+        assert list(result["models"]["llama-3"]["tiers"].keys()) == ["gold"]
+
+    def test_no_filters_returns_full_catalog(self) -> None:
+        """filter_catalog with no filters returns the full catalog unchanged."""
+        catalog = self._make_catalog()
+        result = filter_catalog(catalog)
+        assert result["models"] == catalog["models"]
+
+    def test_model_matches_nothing_returns_empty(self) -> None:
+        """filter_catalog with model that matches nothing returns empty models dict."""
+        catalog = self._make_catalog()
+        result = filter_catalog(catalog, model="nonexistent-model")
+        assert result["models"] == {}
+
+    def test_tier_no_model_has_returns_empty(self) -> None:
+        """filter_catalog with tier that no model has returns empty models dict."""
+        catalog = self._make_catalog()
+        result = filter_catalog(catalog, tier="review_needed")
+        assert result["models"] == {}
+
+    def test_model_filter_case_insensitive(self) -> None:
+        """Model filter is case-insensitive (matches 'Llama' against 'llama-3' slug)."""
+        catalog = self._make_catalog()
+        result = filter_catalog(catalog, model="LLAMA")
+        assert "llama-3" in result["models"]
+
+    def test_model_filter_matches_display_name(self) -> None:
+        """Model filter matches on display_name as well as slug."""
+        catalog = self._make_catalog()
+        result = filter_catalog(catalog, model="GPT")
+        assert "gpt-4o" in result["models"]
+
+    def test_preserves_non_model_fields(self) -> None:
+        """filter_catalog preserves schema_version, total_records, etc."""
+        catalog = self._make_catalog()
+        result = filter_catalog(catalog, model="llama")
+        assert result["schema_version"] == catalog["schema_version"]
+        assert result["total_records"] == catalog["total_records"]
+        assert result["quality_distribution"] == catalog["quality_distribution"]
 
 
 # ---------------------------------------------------------------------------
