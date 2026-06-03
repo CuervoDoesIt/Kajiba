@@ -1,0 +1,22 @@
+{
+  "adversarial_trajectory.json": {
+    "record_id": "kajiba_c9a682a0f395",
+    "submission_hash": "sha256:5c6461622fb433aeaa5b3229a2c365c530e324d44a0d988040d2db2036210b4b"
+  },
+  "gold_trajectory.json": {
+    "record_id": "kajiba_40f6331f7ff1",
+    "submission_hash": "sha256:da289eeb670aae6408b9fc78ffab487de4df92e966103377e3954e06bd4f654c"
+  },
+  "minimal_trajectory.json": {
+    "record_id": "kajiba_c2eac32fcdc4",
+    "submission_hash": "sha256:52b1ed267d5bd84577839c5d4018c7fb46b1d75555480fd23e0aff5e91e87bfa"
+  },
+  "pii_trajectory.json": {
+    "record_id": "kajiba_6ce9ef1a3c39",
+    "submission_hash": "sha256:9e7f5ba0e75c9ab5cf1092f8603f6ec528d174f89b6487cd08d9f44e4f9b63df"
+  },
+  "silver_trajectory.json": {
+    "record_id": "kajiba_5fcc0553f6e8",
+    "submission_hash": "sha256:29fbd75602f6b8d8b688cf5c136147bae0ecae861cab9710e83177ebfe63181f"
+  }
+}
