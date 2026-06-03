@@ -283,29 +283,20 @@ class RecordBase(BaseModel):
     model_config = {"populate_by_name": True}
 
 
-class KajibaRecord(BaseModel):
+class KajibaRecord(RecordBase):
     """Top-level Kajiba record — one task attempt, fully described.
 
     This is the primary data unit in the Kajiba pipeline. Every record
     captures everything about one user-agent interaction from prompt
-    to completion.
+    to completion. Identity, versioning, and runtime-context fields are
+    inherited from RecordBase.
     """
 
-    schema_version: str = SCHEMA_VERSION
-    record_id: Optional[str] = None
     record_type: RecordTypeType = "task_trajectory"
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-    submission_hash: Optional[str] = None
-
     trajectory: Trajectory
-    model: Optional[ModelMetadata] = None
-    hardware: Optional[HardwareProfile] = None
     outcome: Optional[OutcomeSignals] = None
     pain_points: Optional[list[PainPoint]] = None
-    submission: Optional[SubmissionMetadata] = None
     quality: Optional[QualityMetadata] = None
-
-    model_config = {"populate_by_name": True}
 
     @model_validator(mode="after")
     def validate_turn_count(self) -> "KajibaRecord":
