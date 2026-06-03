@@ -118,7 +118,7 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 10-02-PLAN.md — Refactor schema.py: RecordBase + ExperimentRecord family + load_record (ESCH-01/02/03/05)
+- [x] 10-02-PLAN.md — Refactor schema.py: RecordBase + ExperimentRecord family + load_record (ESCH-01/02/03/05) — completed 2026-06-03 (golden hashes byte-identical, ESCH-04 confirmed)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
