@@ -67,7 +67,7 @@ Explicitly excluded. Documented to prevent scope creep.
 | Ollama as core dependency | GLiNER handles PII locally; Ollama only for inference/metadata capture |
 | Real-time streaming | Batch processing, not live telemetry |
 | Generative LLM prompting for PII | 20-50x slower and lower precision than GLiNER span-tagging |
-| Model evaluation/benchmarking | Out of scope entirely |
+| ~~Model evaluation/benchmarking~~ | **Reversed 2026-06-03 → moved to v1.2 "Experiment Logging" (dual-use).** Was "out of scope entirely"; now a first-class second purpose. See `.planning/seeds/v1.2-experiment-logging.md`. |
 | Hosted service / API | Everything runs locally on contributor's machine |
 
 ## Traceability
