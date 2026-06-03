@@ -44,13 +44,22 @@ Real-world AI session data, tagged with full runtime context (model identity, co
 - [ ] HITL session collection workflow with manual review at each pipeline step
 - [ ] End-to-end pipeline validation: collect → scrub → score → publish → download → fine-tune a local 3B model
 
+<!-- Parallel milestone: v1.2 Experiment Logging (Dual-Use) -->
+
+- [ ] `ExperimentRecord` type on a shared base + `record_kind` discriminator (back-compatible with existing records)
+- [ ] `kajiba experiment` CLI + programmatic deliberate logging into a private local store (no community publish)
+- [ ] Eval-specific scorer and experiment-aware scrub tuning (preserve model/hardware fields)
+- [ ] Reviewer-model critique attachment, queryable `lessons_learned`, and quality-drift detection
+- [ ] Live experiment capture via shared Hermes hooks (depends on v1.1 Phase 6–7)
+- [ ] Analysis-oriented export + Nemotron/Qwen/Gemma practice-project integration
+
 ### Out of Scope
 
 - Fine-tuning tooling — Kajiba is the pipeline only; consumers bring their own training frameworks
 - Hosted service / API — everything runs locally on the contributor's machine
 - HuggingFace integration — deferred to a future milestone after the pipeline is validated on GitHub
 - Real-time streaming — batch processing, not live telemetry
-- Model evaluation / benchmarking — out of scope entirely
+- ~~Model evaluation / benchmarking~~ — **reversed 2026-06-03**; now in scope as the parallel v1.2 Experiment Logging (dual-use) milestone
 
 ## Current Milestone: v1.1 Hermes Pipeline Validation
 
@@ -63,6 +72,22 @@ Real-world AI session data, tagged with full runtime context (model identity, co
 - HITL session collection with manual review at each pipeline step
 - LLM-based semantic PII scrubbing (using real session data to test against)
 - QLoRA fine-tune experiment with Llama 3.2 3B on collected Kajiba data
+
+## Parallel Milestone: v1.2 Experiment Logging (Dual-Use)
+
+**Runs alongside v1.1 — does not replace it.** v1.1 remains the active execution milestone; v1.2 phases (10–15) are appended to the same roadmap and execute by dependency, not strict order.
+
+**Goal:** Add a first-class, private experiment/eval-logging capability — capture local-model outputs, reviewer-model critiques, eval scoring, and quality drift — without disturbing the coding-session pipeline.
+
+**Target features:**
+- Separate `ExperimentRecord` on a base extracted from `KajibaRecord` + `record_kind` discriminator
+- `kajiba experiment` CLI + programmatic logging → private local store (no community publish path)
+- Eval-specific scorer + experiment-aware scrub tuning
+- Reviewer critique attachment, `lessons_learned`, drift detection
+- Live experiment capture via shared Hermes hooks (depends on v1.1 Phase 6–7)
+- Analysis export + Nemotron/Qwen/Gemma practice-project integration
+
+**Architecture stance:** *shared core, divergent tail* — reuse the schema base + scrub primitives; branch into an eval scorer, private store, and analysis export; skip community publish/HuggingFace entirely. See `.planning/seeds/v1.2-experiment-logging.md` and `.planning/notes/dual-use-direction-decisions.md`.
 
 ## Context
 
@@ -89,6 +114,9 @@ Real-world AI session data, tagged with full runtime context (model identity, co
 | PR-based publishing (not direct push) | Review layer prevents data poisoning, maintains contributor trust | ✓ Good — fork+branch+PR workflow with consent re-verification |
 | Consent re-verification at publish time | Belt-and-suspenders: even if submit missed it, publish catches it | ✓ Good — confirmed by Nyquist validation tests |
 | Privacy pipeline order: scrub → anonymize → jitter → consent | Each step depends on prior step's output being complete | ✓ Good — consistent across all 4 export paths |
+| Dual-use: add experiment/eval logging as parallel v1.2 milestone | Operational eval need + first-class mission commitment; reverses prior "model eval out of scope"; runs parallel to v1.1 since input/output diverge | — Pending (decided 2026-06-03 via /gsd-explore) |
+| Separate `ExperimentRecord` over a shared base (not extend `KajibaRecord`) | Coding-specific validators don't apply to experiments; avoids god-object and full duplication | — Pending |
+| Experiment data private/internal — no community publish | Eval data informs the user's own routing/fine-tune decisions; never enters the shared dataset | — Pending |
 
 ## Constraints
 
@@ -116,4 +144,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-02 after v1.1 milestone start*
+*Last updated: 2026-06-03 after v1.2 Experiment Logging milestone start (parallel to v1.1)*

@@ -4,8 +4,9 @@ milestone: v1.1
 milestone_name: Hermes Pipeline Validation
 status: planning
 stopped_at: Phase 6 context gathered
-last_updated: "2026-04-03T11:47:12.151Z"
-last_activity: 2026-04-02 -- Roadmap created for v1.1
+parallel_milestone: v1.2 Experiment Logging (Dual-Use) -- Phases 10-15
+last_updated: "2026-06-03T12:00:00.000Z"
+last_activity: 2026-06-03 -- v1.2 Experiment Logging milestone added (parallel to v1.1)
 progress:
   total_phases: 4
   completed_phases: 0
@@ -21,7 +22,8 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-02)
 
 **Core value:** Real-world AI session data, tagged with full runtime context, flowing into a community dataset that accelerates local model fine-tuning for everyone.
-**Current focus:** Phase 6 - Environment + Plugin Foundation
+**Current focus:** Phase 6 - Environment + Plugin Foundation (v1.1, active milestone)
+**Parallel milestone:** v1.2 Experiment Logging (Dual-Use), Phases 10-15 — recommended start: Phase 10 (schema, v1.1-independent). See `.planning/seeds/v1.2-experiment-logging.md`.
 
 ## Current Position
 
@@ -63,6 +65,7 @@ Progress: [░░░░░░░░░░] 0%
 - WSL2 required on Windows for Hermes Agent
 - Plugin rewrite is greenfield (current Protocol-based integration is wrong)
 - Scrubbing deferred to CLI step, never in hook callbacks (avoid blocking Hermes event loop)
+- Dual-use decided 2026-06-03 (`/gsd-explore`): experiment/eval logging → parallel v1.2 milestone (Phases 10-15), separate `ExperimentRecord` on shared base, private/no-publish, shared core + divergent tail. v1.1 left intact; Phases 6-7 are shared foundation for v1.2 live capture (Phase 14).
 
 ### Pending Todos
 

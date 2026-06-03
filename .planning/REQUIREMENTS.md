@@ -42,6 +42,43 @@ Requirements for Hermes Pipeline Validation milestone. Each maps to roadmap phas
 - [ ] **VAL-03**: Manual end-to-end walkthrough completed: collect real Hermes session → scrub → score → review → publish → download
 - [ ] **VAL-04**: QLoRA fine-tune of Llama 3.2 3B on collected Kajiba data completed, with documented training guide (`docs/fine-tuning-guide.md`)
 
+## v1.2 Requirements
+
+Requirements for the Experiment Logging (Dual-Use) milestone. Runs **in parallel** with v1.1 — phases numbered 10+. Most are v1.1-independent; live capture (ECAP) depends on v1.1 Phase 6–7. See `.planning/seeds/v1.2-experiment-logging.md`.
+
+### Experiment Schema
+
+- [ ] **ESCH-01**: Records carry a `record_kind` discriminator (`coding_session` | `model_experiment`) defaulting to `coding_session` when absent, so existing records stay valid
+- [ ] **ESCH-02**: A shared base model holds fields common to both kinds (model metadata, hardware profile, scrub log, record/submission IDs); `KajibaRecord` and `ExperimentRecord` both extend it
+- [ ] **ESCH-03**: An `ExperimentRecord` captures experiment metadata (id, type, local model, optional reviewer model, task category/description, timestamps) and outcome (local output, reviewer critique, eval score, drift flag, lessons_learned, recommended action)
+- [ ] **ESCH-04**: Existing staged/outbox `KajibaRecord` JSON loads unchanged after the refactor, with previously computed record/submission IDs unaffected
+
+### Experiment Logging & Storage
+
+- [ ] **ELOG-01**: User can deliberately record an eval run via a `kajiba experiment` CLI command group, without a live Hermes session
+- [ ] **ELOG-02**: A programmatic logging entry point lets an external script (the practice project) write `ExperimentRecord`s directly
+- [ ] **ELOG-03**: Experiment records persist in a private local namespace, separate from coding-session staging/outbox, and are excluded from any community publish path
+
+### Experiment Evaluation & Privacy
+
+- [ ] **EEVAL-01**: An eval-specific scorer produces quality signals suited to model-output evaluation, independent of the coding-trajectory scorer
+- [ ] **EEVAL-02**: Scrubbing on experiment records retains model-identity and hardware fields needed for analysis while still redacting personal/PII data
+
+### Experiment Review & Drift
+
+- [ ] **EREV-01**: User (or a reviewer model such as Grok) can attach a critique to an existing experiment record via `kajiba experiment review`
+- [ ] **EREV-02**: User can capture `lessons_learned` on a record in a queryable form (structured categories and/or free text)
+- [ ] **EREV-03**: Quality drift across repeated runs of the same model+task is computed and flagged on the record
+
+### Experiment Live Capture
+
+- [ ] **ECAP-01**: An eval run performed inside a live Hermes session is captured into an `ExperimentRecord` through the shared plugin hooks *(depends on v1.1 Phase 6–7)*
+
+### Experiment Export & Integration
+
+- [ ] **EEXP-01**: User can export experiment records in an analysis-oriented format (comparison/routing/drift), distinct from the community fine-tuning export
+- [ ] **EEXP-02**: The Nemotron/Qwen/Gemma practice-project workflow writes its eval runs directly into Kajiba experiment records end-to-end
+
 ## v2 Requirements
 
 Deferred to future release. Tracked but not in current roadmap.
@@ -96,12 +133,26 @@ Which phases cover which requirements. Updated during roadmap creation.
 | VAL-02 | Phase 8 | Pending |
 | VAL-03 | Phase 8 | Pending |
 | VAL-04 | Phase 9 | Pending |
+| ESCH-01 | Phase 10 | Pending |
+| ESCH-02 | Phase 10 | Pending |
+| ESCH-03 | Phase 10 | Pending |
+| ESCH-04 | Phase 10 | Pending |
+| ELOG-01 | Phase 11 | Pending |
+| ELOG-02 | Phase 11 | Pending |
+| ELOG-03 | Phase 11 | Pending |
+| EEVAL-01 | Phase 12 | Pending |
+| EEVAL-02 | Phase 12 | Pending |
+| EREV-01 | Phase 13 | Pending |
+| EREV-02 | Phase 13 | Pending |
+| EREV-03 | Phase 13 | Pending |
+| ECAP-01 | Phase 14 | Pending |
+| EEXP-01 | Phase 15 | Pending |
+| EEXP-02 | Phase 15 | Pending |
 
 **Coverage:**
-- v1.1 requirements: 20 total
-- Mapped to phases: 20
-- Unmapped: 0
+- v1.1 requirements: 20 total — mapped to phases: 20, unmapped: 0
+- v1.2 requirements: 15 total — mapped to phases: 15, unmapped: 0
 
 ---
 *Requirements defined: 2026-04-02*
-*Last updated: 2026-04-02 after roadmap creation*
+*Last updated: 2026-06-03 — added v1.2 Experiment Logging requirements (parallel milestone)*
