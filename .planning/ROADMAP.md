@@ -114,7 +114,7 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
 
 **Wave 1**
 
-- [ ] 10-01-PLAN.md — Capture pre-refactor golden ID baseline (ESCH-04 tripwire)
+- [x] 10-01-PLAN.md — Capture pre-refactor golden ID baseline (ESCH-04 tripwire) — completed 2026-06-03
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -208,7 +208,7 @@ Two parallel tracks share a foundation. Execute by dependency, not strict numeri
 | 7. Turn Capture + Semantic PII Scrubbing | v1.1 | 0/0 | Not started | - |
 | 8. HITL Validation + Pipeline Integration | v1.1 | 0/0 | Not started | - |
 | 9. Fine-Tune Experiment | v1.1 | 0/0 | Not started | - |
-| 10. Experiment Schema Foundation | v1.2 | 0/3 | Planned | - |
+| 10. Experiment Schema Foundation | v1.2 | 1/3 | In progress | - |
 | 11. Experiment Logging & Private Store | v1.2 | 0/0 | Not started | - |
 | 12. Eval Scoring & Scrub Tuning | v1.2 | 0/0 | Not started | - |
 | 13. Reviewer Critique & Drift | v1.2 | 0/0 | Not started | - |

@@ -136,7 +136,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ESCH-01 | Phase 10 | Pending |
 | ESCH-02 | Phase 10 | Pending |
 | ESCH-03 | Phase 10 | Pending |
-| ESCH-04 | Phase 10 | Pending |
+| ESCH-04 | Phase 10 | In progress (10-01 baseline captured; verified after 10-02/10-03 refactor) |
 | ELOG-01 | Phase 11 | Pending |
 | ELOG-02 | Phase 11 | Pending |
 | ELOG-03 | Phase 11 | Pending |

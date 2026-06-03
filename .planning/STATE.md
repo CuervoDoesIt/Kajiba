@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Hermes Pipeline Validation
 status: executing
-stopped_at: Phase 10 context gathered
-last_updated: "2026-06-03T23:42:23.217Z"
-last_activity: 2026-04-02 -- Roadmap created for v1.1
+stopped_at: Completed 10-01-PLAN.md
+last_updated: "2026-06-03T23:44:06.672Z"
+last_activity: 2026-06-03 -- Completed Phase 10 Plan 01 (golden baseline)
 progress:
   total_phases: 2
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  total_plans: 3
+  completed_plans: 1
+  percent: 33
 ---
 
 # Project State
@@ -21,17 +21,17 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-02)
 
 **Core value:** Real-world AI session data, tagged with full runtime context, flowing into a community dataset that accelerates local model fine-tuning for everyone.
-**Current focus:** Phase 6 - Environment + Plugin Foundation (v1.1, active milestone)
+**Current focus:** Phase 10 — experiment-schema-foundation
 **Parallel milestone:** v1.2 Experiment Logging (Dual-Use), Phases 10-15 — recommended start: Phase 10 (schema, v1.1-independent). See `.planning/seeds/v1.2-experiment-logging.md`.
 
 ## Current Position
 
-Phase: 6 of 9 (Environment + Plugin Foundation)
-Plan: 0 of TBD in current phase
-Status: Ready to execute
-Last activity: 2026-04-02 -- Roadmap created for v1.1
+Phase: 10 (experiment-schema-foundation) — EXECUTING
+Plan: 2 of 3
+Status: Executing Phase 10 (10-01 complete)
+Last activity: 2026-06-03 -- Completed Phase 10 Plan 01 (golden baseline)
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [███░░░░░░░] 33%
 
 ## Performance Metrics
 
@@ -65,6 +65,7 @@ Progress: [░░░░░░░░░░] 0%
 - Plugin rewrite is greenfield (current Protocol-based integration is wrong)
 - Scrubbing deferred to CLI step, never in hook callbacks (avoid blocking Hermes event loop)
 - Dual-use decided 2026-06-03 (`/gsd-explore`): experiment/eval logging → parallel v1.2 milestone (Phases 10-15), separate `ExperimentRecord` on shared base, private/no-publish, shared core + divergent tail. v1.1 left intact; Phases 6-7 are shared foundation for v1.2 live capture (Phase 14).
+- 10-01: ESCH-04 golden baseline (`tests/fixtures/golden_ids.json`) captured from pre-refactor schema over the 5 `*_trajectory.json` fixtures and committed BEFORE any schema edit; `enriched_catalog.json` excluded (no trajectory). Stored as committed JSON (not hardcoded constants); `minimal_trajectory.json` → `kajiba_c2eac32fcdc4`. `schema.py` untouched.
 
 ### Pending Todos
 
@@ -79,5 +80,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-06-03T23:25:37.716Z
-Stopped at: Phase 10 context gathered
-Resume file: .planning/phases/10-experiment-schema-foundation/10-CONTEXT.md
+Stopped at: Completed 10-01-PLAN.md (golden baseline)
+Resume file: .planning/phases/10-experiment-schema-foundation/10-02-PLAN.md
