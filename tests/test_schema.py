@@ -8,7 +8,6 @@ from pydantic import ValidationError
 
 from kajiba.schema import (
     OUTCOME_TAGS,
-    SCHEMA_VERSION,
     ConversationTurn,
     KajibaRecord,
     OutcomeSignals,
@@ -37,7 +36,10 @@ class TestValidRecords:
         """A fully-populated gold-tier record validates successfully."""
         data = _load_fixture("gold_trajectory.json")
         record = validate_record(data)
-        assert record.schema_version == SCHEMA_VERSION
+        # Legacy fixtures carry the stored schema_version verbatim; the live
+        # SCHEMA_VERSION constant is bumped to 0.2.0 (D-07) without rewriting
+        # existing records, so assert the fixture's stored value round-trips.
+        assert record.schema_version == data["schema_version"]
         assert record.record_type == "task_trajectory"
         assert record.trajectory.turn_count == 10
         assert record.trajectory.total_tool_calls == 4

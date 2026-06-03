@@ -8,7 +8,7 @@ import hashlib
 import json
 import logging
 from datetime import UTC, datetime
-from typing import Literal, Optional
+from typing import Literal, Optional, Union
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -401,6 +401,98 @@ class KajibaRecord(RecordBase):
 
 
 # ---------------------------------------------------------------------------
+# Experiment record family
+# ---------------------------------------------------------------------------
+
+
+class ExperimentMetadata(BaseModel):
+    """Identity metadata for a model-experiment record."""
+
+    experiment_id: str
+    experiment_type: ExperimentTypeType
+    local_model: ModelMetadata
+    reviewer_model: Optional[ModelMetadata] = None
+    task_category: str
+    task_description: str
+    started_at: datetime
+    completed_at: Optional[datetime] = None
+
+
+class ExperimentOutcome(BaseModel):
+    """Flat outcome signals for a model-experiment record."""
+
+    local_model_output: str
+    reviewer_critique: Optional[str] = None
+    eval_score: float = Field(ge=0.0, le=1.0)
+    drift_flag: bool = False
+    lessons_learned: list[str] = Field(default_factory=list)
+    recommended_action: Optional[RecommendedActionType] = None
+
+
+class ExperimentRecord(RecordBase):
+    """Top-level model-experiment record — one local-model evaluation attempt.
+
+    Used by the dual-use eval-logging milestone. Carries richer model and
+    hardware metadata than community records and is private/no-publish.
+    Inherits identity, versioning, and runtime-context fields from RecordBase.
+    """
+
+    record_kind: RecordKindType = "model_experiment"
+    experiment: ExperimentMetadata
+    outcome: ExperimentOutcome
+    trajectory: Optional[Trajectory] = None
+
+    def compute_record_id(self) -> str:
+        """Generate a deterministic SHA-256 hash from the experiment identity.
+
+        The record_id is content-addressable over the experiment-identity
+        payload: same experiment identity always produces the same ID.
+
+        Returns:
+            String in the format 'kajiba_exp_<first 12 hex chars>'.
+        """
+        content = json.dumps(
+            {
+                "experiment_id": self.experiment.experiment_id,
+                "task_description": self.experiment.task_description,
+                "local_model_name": self.experiment.local_model.model_name,
+                "local_model_output": self.outcome.local_model_output,
+                "started_at": self.experiment.started_at.isoformat(),
+            },
+            sort_keys=True,
+            ensure_ascii=True,
+        )
+        digest = hashlib.sha256(content.encode("utf-8")).hexdigest()
+        self.record_id = f"kajiba_exp_{digest[:12]}"
+        return self.record_id
+
+    def compute_submission_hash(self) -> str:
+        """Compute a content-addressable local-dedup key for the experiment.
+
+        Hashes the same experiment-identity payload as compute_record_id().
+        Purpose is local de-duplication only — experiment records never
+        publish to the community dataset.
+
+        Returns:
+            String in the format 'sha256:<hex digest>'.
+        """
+        content = json.dumps(
+            {
+                "experiment_id": self.experiment.experiment_id,
+                "task_description": self.experiment.task_description,
+                "local_model_name": self.experiment.local_model.model_name,
+                "local_model_output": self.outcome.local_model_output,
+                "started_at": self.experiment.started_at.isoformat(),
+            },
+            sort_keys=True,
+            ensure_ascii=True,
+        )
+        digest = hashlib.sha256(content.encode("utf-8")).hexdigest()
+        self.submission_hash = f"sha256:{digest}"
+        return self.submission_hash
+
+
+# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
@@ -417,4 +509,27 @@ def validate_record(data: dict) -> KajibaRecord:
     Raises:
         pydantic.ValidationError: If the data fails schema validation.
     """
+    return KajibaRecord.model_validate(data)
+
+
+def load_record(data: dict) -> Union[KajibaRecord, ExperimentRecord]:
+    """Dispatch raw JSON data to the correct record model by record_kind.
+
+    Reads ``record_kind`` and routes to the matching model. Legacy dicts
+    that omit ``record_kind`` default to ``coding_session`` (a KajibaRecord),
+    preserving back-compat without a discriminated union.
+
+    Args:
+        data: Dictionary of record data (e.g. from json.loads).
+
+    Returns:
+        An ExperimentRecord for ``model_experiment`` data, otherwise a
+        validated KajibaRecord.
+
+    Raises:
+        pydantic.ValidationError: If the data fails schema validation.
+    """
+    kind = data.get("record_kind", "coding_session")
+    if kind == "model_experiment":
+        return ExperimentRecord.model_validate(data)
     return KajibaRecord.model_validate(data)
