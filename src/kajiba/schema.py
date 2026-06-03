@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 # Constants
 # ---------------------------------------------------------------------------
 
-SCHEMA_VERSION = "0.1.0"
+SCHEMA_VERSION = "0.2.0"
 
 # Controlled vocabularies — both as tuples (iterable) and Literal unions (type-safe)
 
@@ -107,6 +107,15 @@ RecordTypeType = Literal["task_trajectory", "pain_point", "benchmark_run"]
 ProviderType = Literal["ollama", "vllm", "sglang", "llamacpp", "openrouter", "custom"]
 
 TurnRoleType = Literal["human", "gpt"]
+
+RECORD_KINDS = ("coding_session", "model_experiment")
+RecordKindType = Literal["coding_session", "model_experiment"]
+
+EXPERIMENT_TYPES = ("model_evaluation", "routing_test", "quality_drift", "prompt_ablation")
+ExperimentTypeType = Literal["model_evaluation", "routing_test", "quality_drift", "prompt_ablation"]
+
+RECOMMENDED_ACTIONS = ("use_as_is", "needs_fine_tune", "route_to_reviewer", "discard")
+RecommendedActionType = Literal["use_as_is", "needs_fine_tune", "route_to_reviewer", "discard"]
 
 # ---------------------------------------------------------------------------
 # Nested models
@@ -251,6 +260,27 @@ class SubmissionMetadata(BaseModel):
 # ---------------------------------------------------------------------------
 # Top-level record
 # ---------------------------------------------------------------------------
+
+
+class RecordBase(BaseModel):
+    """Shared base for every top-level Kajiba record kind.
+
+    Holds the identity, versioning, and runtime-context fields common to
+    both coding-session records (KajibaRecord) and model-experiment records
+    (ExperimentRecord). The record_kind discriminator defaults to
+    "coding_session" so legacy dicts that omit it remain valid.
+    """
+
+    schema_version: str = SCHEMA_VERSION
+    record_id: Optional[str] = None
+    submission_hash: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    record_kind: RecordKindType = "coding_session"
+    model: Optional[ModelMetadata] = None
+    hardware: Optional[HardwareProfile] = None
+    submission: Optional[SubmissionMetadata] = None
+
+    model_config = {"populate_by_name": True}
 
 
 class KajibaRecord(BaseModel):
