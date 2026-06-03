@@ -122,7 +122,7 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 10-03-PLAN.md — Back-compat + experiment test suites (ESCH-01..05)
+- [x] 10-03-PLAN.md — Back-compat + experiment test suites (ESCH-01..05) — completed 2026-06-03 (264 passed / 2 pre-existing skips; golden tripwire green for all 5 fixtures)
 
 ### Phase 11: Experiment Logging & Private Store
 
@@ -208,7 +208,7 @@ Two parallel tracks share a foundation. Execute by dependency, not strict numeri
 | 7. Turn Capture + Semantic PII Scrubbing | v1.1 | 0/0 | Not started | - |
 | 8. HITL Validation + Pipeline Integration | v1.1 | 0/0 | Not started | - |
 | 9. Fine-Tune Experiment | v1.1 | 0/0 | Not started | - |
-| 10. Experiment Schema Foundation | v1.2 | 1/3 | In progress | - |
+| 10. Experiment Schema Foundation | v1.2 | 3/3 | Complete | 2026-06-03 |
 | 11. Experiment Logging & Private Store | v1.2 | 0/0 | Not started | - |
 | 12. Eval Scoring & Scrub Tuning | v1.2 | 0/0 | Not started | - |
 | 13. Reviewer Critique & Drift | v1.2 | 0/0 | Not started | - |

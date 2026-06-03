@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Hermes Pipeline Validation
 status: executing
-stopped_at: Completed 10-02-PLAN.md
-last_updated: "2026-06-03T23:58:00.000Z"
-last_activity: 2026-06-03 -- Completed Phase 10 Plan 02 (experiment schema refactor)
+stopped_at: Completed 10-03-PLAN.md
+last_updated: "2026-06-04T00:10:00.000Z"
+last_activity: 2026-06-03 -- Completed Phase 10 Plan 03 (experiment schema test suite); Phase 10 complete
 progress:
   total_phases: 2
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 3
-  completed_plans: 2
-  percent: 67
+  completed_plans: 3
+  percent: 100
 ---
 
 # Project State
@@ -26,12 +26,12 @@ See: .planning/PROJECT.md (updated 2026-04-02)
 
 ## Current Position
 
-Phase: 10 (experiment-schema-foundation) — EXECUTING
-Plan: 3 of 3
-Status: Executing Phase 10 (10-01, 10-02 complete)
-Last activity: 2026-06-03 -- Completed Phase 10 Plan 02 (experiment schema refactor)
+Phase: 10 (experiment-schema-foundation) — COMPLETE
+Plan: 3 of 3 (all complete)
+Status: Phase 10 complete (10-01, 10-02, 10-03 done) — ready for verify-work / Phase 11
+Last activity: 2026-06-03 -- Completed Phase 10 Plan 03 (experiment schema test suite)
 
-Progress: [███████░░░] 67%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -67,6 +67,7 @@ Progress: [███████░░░] 67%
 - Dual-use decided 2026-06-03 (`/gsd-explore`): experiment/eval logging → parallel v1.2 milestone (Phases 10-15), separate `ExperimentRecord` on shared base, private/no-publish, shared core + divergent tail. v1.1 left intact; Phases 6-7 are shared foundation for v1.2 live capture (Phase 14).
 - 10-01: ESCH-04 golden baseline (`tests/fixtures/golden_ids.json`) captured from pre-refactor schema over the 5 `*_trajectory.json` fixtures and committed BEFORE any schema edit; `enriched_catalog.json` excluded (no trajectory). Stored as committed JSON (not hardcoded constants); `minimal_trajectory.json` → `kajiba_c2eac32fcdc4`. `schema.py` untouched.
 - 10-02: Extracted `RecordBase`; reparented `KajibaRecord(RecordBase)` with hash methods frozen — all 5 golden record_id/submission_hash byte-identical (ESCH-04 confirmed). Added `ExperimentRecord` family + `load_record()` manual factory (no discriminated union). `SCHEMA_VERSION` bumped 0.1.0→0.2.0. Experiment-id format LOCKED: `kajiba_exp_<12hex>` over experiment-identity payload with `started_at.isoformat()`. `validate_record`/`ConversationTurn` unchanged. ESCH-01/02/03/05 done.
+- 10-03: Authored `tests/test_schema_backcompat.py` (parametrized golden-ID tripwire over all 5 fixtures + legacy-load + record_kind default + base inheritance + load dispatch) and `tests/test_schema_experiment.py` (round-trip equality + vocab rejection + recommended_action=None + lessons_learned=[] + eval_score bounds). Schema untouched (`git diff --quiet src/kajiba/schema.py` exits 0). Full suite: 264 passed, 2 PRE-EXISTING skips (yaml soft-dep not installed in test_cli.py/test_config.py), 0 failures. All ESCH-01..05 now covered by passing automated tests. Phase 10 COMPLETE. (Note: 10-VALIDATION.md `wave_0_complete`/`nyquist_compliant` flip deferred to verify-work.)
 
 ### Pending Todos
 
@@ -80,6 +81,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-06-03T23:58:00.000Z
-Stopped at: Completed 10-02-PLAN.md (experiment schema refactor)
-Resume file: .planning/phases/10-experiment-schema-foundation/10-03-PLAN.md
+Last session: 2026-06-04T00:10:00.000Z
+Stopped at: Completed 10-03-PLAN.md (experiment schema test suite) — Phase 10 complete
+Resume file: None (Phase 10 done; next: verify-work or Phase 11)

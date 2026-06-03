@@ -51,7 +51,7 @@ Requirements for the Experiment Logging (Dual-Use) milestone. Runs **in parallel
 - [x] **ESCH-01**: Records carry a `record_kind` discriminator (`coding_session` | `model_experiment`) defaulting to `coding_session` when absent, so existing records stay valid
 - [x] **ESCH-02**: A shared base model holds fields common to both kinds (model metadata, hardware profile, scrub log, record/submission IDs); `KajibaRecord` and `ExperimentRecord` both extend it
 - [x] **ESCH-03**: An `ExperimentRecord` captures experiment metadata (id, type, local model, optional reviewer model, task category/description, timestamps) and outcome (local output, reviewer critique, eval score, drift flag, lessons_learned, recommended action)
-- [ ] **ESCH-04**: Existing staged/outbox `KajibaRecord` JSON loads unchanged after the refactor, with previously computed record/submission IDs unaffected
+- [x] **ESCH-04**: Existing staged/outbox `KajibaRecord` JSON loads unchanged after the refactor, with previously computed record/submission IDs unaffected
 
 ### Experiment Logging & Storage
 
@@ -136,7 +136,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ESCH-01 | Phase 10 | Complete (10-02) |
 | ESCH-02 | Phase 10 | Complete (10-02) |
 | ESCH-03 | Phase 10 | Complete (10-02) |
-| ESCH-04 | Phase 10 | In progress (10-01 baseline captured; verified after 10-02/10-03 refactor) |
+| ESCH-04 | Phase 10 | Complete (10-03 — golden tripwire green for all 5 fixtures) |
 | ELOG-01 | Phase 11 | Pending |
 | ELOG-02 | Phase 11 | Pending |
 | ELOG-03 | Phase 11 | Pending |
