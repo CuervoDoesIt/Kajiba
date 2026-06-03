@@ -44,109 +44,146 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
 ## Phase Details
 
 ### Phase 6: Environment + Plugin Foundation
+
 **Goal**: Hermes Agent discovers and loads Kajiba as a plugin, and hook events fire confirmed on a live session
 **Depends on**: Phase 5 (v1.0 complete)
 **Requirements**: ENV-01, ENV-02, ENV-03, PLUG-01, PLUG-02, PLUG-03, CAPT-01
 **Success Criteria** (what must be TRUE):
+
   1. Developer can follow a setup guide to get WSL2 + Hermes Agent v0.6.0 + Ollama running with GPU acceleration verified
   2. Hermes Agent discovers and loads the Kajiba plugin from the plugin directory on startup
   3. Running a Hermes session causes `on_session_start`, `post_llm_call`, `post_tool_call`, and `on_session_end` hooks to fire and log their kwargs
   4. All Kajiba file paths resolve correctly under HERMES_HOME profile isolation (not hardcoded `~/.hermes`)
   5. Developer can symlink the Kajiba plugin directory into Hermes for a rapid edit-reload development cycle
+
 **Plans**: TBD
 
 ### Phase 7: Turn Capture + Semantic PII Scrubbing
+
 **Goal**: Real Hermes session data is captured into KajibaRecord objects and scrubbed by both regex and semantic PII layers
 **Depends on**: Phase 6
 **Requirements**: CAPT-02, CAPT-03, CAPT-04, PRIV-01, PRIV-02, PRIV-03, PRIV-04
 **Success Criteria** (what must be TRUE):
+
   1. User and assistant turns from a live Hermes session are captured as ConversationTurn objects with correct role attribution
   2. Tool calls from `post_tool_call` events are attached to the correct assistant turn via the pending turn buffer
   3. Model metadata (parameter count, quantization, family, context length) is captured from Ollama and stored in ModelMetadata
   4. Running `kajiba preview` on a captured session shows GLiNER-detected personal names, company names, and project names redacted (not just regex patterns)
   5. Entities with confidence between 0.4 and 0.7 are flagged for human review rather than auto-redacted
+
 **Plans**: TBD
 
 ### Phase 8: HITL Validation + Pipeline Integration
+
 **Goal**: A developer can manually walk a real captured session through every pipeline step and verify correctness at each stage
 **Depends on**: Phase 7
 **Requirements**: VAL-01, VAL-02, VAL-03, PLUG-04, PLUG-05
 **Success Criteria** (what must be TRUE):
+
   1. Developer can view the raw pre-scrub captured record via `kajiba preview --raw` or `kajiba inspect` for comparison against the scrubbed version
   2. Staging records track their `pipeline_stage` (captured/scrubbed/reviewed/scored/approved) so a review session can be resumed without re-processing
   3. A real Hermes session has been collected, scrubbed, scored, reviewed, published, and downloaded successfully end-to-end
   4. Kajiba plugin is installable via `pip install kajiba[hermes]` without manual file copying
+
 **Plans**: TBD
 
 ### Phase 9: Fine-Tune Experiment
+
 **Goal**: Kajiba-collected and published data successfully fine-tunes a local 3B model, proving the full pipeline loop
 **Depends on**: Phase 8
 **Requirements**: VAL-04
 **Success Criteria** (what must be TRUE):
+
   1. Published Kajiba records are downloadable via `kajiba download` and convertible to training format via `to_sharegpt()`
   2. QLoRA fine-tune of Llama 3.2 3B completes on the collected data using RTX 4070 8GB without OOM
   3. A documented fine-tuning guide (`docs/fine-tuning-guide.md`) exists with reproducible steps for the full collect-to-train workflow
+
 **Plans**: TBD
 
 ### Phase 10: Experiment Schema Foundation
+
 **Goal**: A separate `ExperimentRecord` type exists on a shared base with a `record_kind` discriminator, and all existing records keep working
 **Depends on**: None — v1.1-independent (recommended starting point for the v1.2 track)
 **Requirements**: ESCH-01, ESCH-02, ESCH-03, ESCH-04
 **Success Criteria** (what must be TRUE):
+
   1. A `record_kind` field distinguishes coding-session and model-experiment records and defaults to `coding_session` for records that omit it
   2. `KajibaRecord` and `ExperimentRecord` share a common base model holding model metadata, hardware profile, scrub log, and IDs
   3. An `ExperimentRecord` can be constructed with experiment metadata and outcome fields and round-trips through JSON serialization/validation
-  4. All existing staged/outbox `KajibaRecord` JSON files load without error and produce identical record/submission IDs to before the refactor
-**Plans**: 3 plans
+  4. All existing staged/outbox `KajibaRecord` JSON files load without error and produce identical record/submission IDs to before the refactor**Plans**: 3 plans
+
+**Wave 1**
+
 - [ ] 10-01-PLAN.md — Capture pre-refactor golden ID baseline (ESCH-04 tripwire)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 10-02-PLAN.md — Refactor schema.py: RecordBase + ExperimentRecord family + load_record (ESCH-01/02/03/05)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 10-03-PLAN.md — Back-compat + experiment test suites (ESCH-01..05)
 
 ### Phase 11: Experiment Logging & Private Store
+
 **Goal**: A developer can log an eval run — by CLI or script — into a private local store separate from coding sessions
 **Depends on**: Phase 10
 **Requirements**: ELOG-01, ELOG-02, ELOG-03
 **Success Criteria** (what must be TRUE):
+
   1. Running a `kajiba experiment` CLI command records an experiment run as an `ExperimentRecord` without a live Hermes session
   2. An external script can create and persist an `ExperimentRecord` via a programmatic entry point
   3. Experiment records are written to a private namespace distinct from coding-session staging/outbox and never appear in publish/browse/download output
+
 **Plans**: TBD
 
 ### Phase 12: Eval Scoring & Scrub Tuning
+
 **Goal**: Experiment records are scored by eval-appropriate signals and scrubbed without losing model/hardware context
 **Depends on**: Phase 10 (can run in parallel with Phase 11)
 **Requirements**: EEVAL-01, EEVAL-02
 **Success Criteria** (what must be TRUE):
+
   1. An eval-specific scorer assigns a quality result to an `ExperimentRecord` using signals appropriate to model-output evaluation (not coding-trajectory coherence)
   2. Scrubbing an `ExperimentRecord` redacts personal/PII data while preserving the model-identity and hardware fields needed for analysis
+
 **Plans**: TBD
 
 ### Phase 13: Reviewer Critique & Drift
+
 **Goal**: Reviewer critiques, lessons learned, and quality drift can be attached to and computed for experiment records
 **Depends on**: Phase 11, Phase 12
 **Requirements**: EREV-01, EREV-02, EREV-03
 **Success Criteria** (what must be TRUE):
+
   1. A reviewer (human or model, e.g. Grok) can attach a critique to an existing experiment record via `kajiba experiment review`
   2. `lessons_learned` can be recorded in a queryable form (structured categories and/or free text) and read back
   3. Quality drift across repeated runs of the same model+task is computed and surfaced as a flag on the record
+
 **Plans**: TBD
 
 ### Phase 14: Live Experiment Capture
+
 **Goal**: An eval run inside a live Hermes session is captured automatically as an `ExperimentRecord`
 **Depends on**: Phase 10, **v1.1 Phase 6 & Phase 7** (shared plugin + turn capture) — cross-milestone dependency
 **Requirements**: ECAP-01
 **Success Criteria** (what must be TRUE):
+
   1. Running an evaluation inside a live Hermes session produces an `ExperimentRecord` via the shared plugin hooks
   2. A live-captured experiment record carries the same metadata/outcome structure as a deliberately-logged one
+
 **Plans**: TBD
 
 ### Phase 15: Analysis Export & Practice-Project Integration
+
 **Goal**: Experiment data is exportable for analysis and the practice project writes runs directly into Kajiba
 **Depends on**: Phase 11, Phase 13 (Phase 14 only for live-captured runs)
 **Requirements**: EEXP-01, EEXP-02
 **Success Criteria** (what must be TRUE):
+
   1. User can export experiment records in an analysis-oriented format distinct from the community fine-tuning export
   2. The Nemotron/Qwen/Gemma practice-project workflow writes its evaluation runs directly into Kajiba experiment records end-to-end
+
 **Plans**: TBD
 
 ## Progress
