@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Hermes Pipeline Validation
-status: executing
-stopped_at: Completed 10-03-PLAN.md
-last_updated: "2026-06-04T00:10:00.000Z"
-last_activity: 2026-06-03 -- Completed Phase 10 Plan 03 (experiment schema test suite); Phase 10 complete
+status: verifying
+stopped_at: Completed 10-03-PLAN.md (experiment schema test suite) — Phase 10 complete
+last_updated: "2026-06-03T23:56:49.509Z"
+last_activity: 2026-06-03
 progress:
   total_phases: 2
   completed_phases: 1
   total_plans: 3
   completed_plans: 3
-  percent: 100
+  percent: 50
 ---
 
 # Project State
@@ -26,10 +26,10 @@ See: .planning/PROJECT.md (updated 2026-04-02)
 
 ## Current Position
 
-Phase: 10 (experiment-schema-foundation) — COMPLETE
-Plan: 3 of 3 (all complete)
+Phase: 10
+Plan: Not started
 Status: Phase 10 complete (10-01, 10-02, 10-03 done) — ready for verify-work / Phase 11
-Last activity: 2026-06-03 -- Completed Phase 10 Plan 03 (experiment schema test suite)
+Last activity: 2026-06-03
 
 Progress: [██████████] 100%
 
@@ -37,7 +37,7 @@ Progress: [██████████] 100%
 
 **Velocity:**
 
-- Total plans completed: 13 (v1.0)
+- Total plans completed: 16 (v1.0)
 - Average duration: --
 - Total execution time: --
 
@@ -46,6 +46,7 @@ Progress: [██████████] 100%
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 1-5 (v1.0) | 13/13 | -- | -- |
+| 10 | 3 | - | - |
 
 **Recent Trend:**
 
