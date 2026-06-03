@@ -97,7 +97,10 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
   2. `KajibaRecord` and `ExperimentRecord` share a common base model holding model metadata, hardware profile, scrub log, and IDs
   3. An `ExperimentRecord` can be constructed with experiment metadata and outcome fields and round-trips through JSON serialization/validation
   4. All existing staged/outbox `KajibaRecord` JSON files load without error and produce identical record/submission IDs to before the refactor
-**Plans**: TBD
+**Plans**: 3 plans
+- [ ] 10-01-PLAN.md — Capture pre-refactor golden ID baseline (ESCH-04 tripwire)
+- [ ] 10-02-PLAN.md — Refactor schema.py: RecordBase + ExperimentRecord family + load_record (ESCH-01/02/03/05)
+- [ ] 10-03-PLAN.md — Back-compat + experiment test suites (ESCH-01..05)
 
 ### Phase 11: Experiment Logging & Private Store
 **Goal**: A developer can log an eval run — by CLI or script — into a private local store separate from coding sessions
@@ -168,7 +171,7 @@ Two parallel tracks share a foundation. Execute by dependency, not strict numeri
 | 7. Turn Capture + Semantic PII Scrubbing | v1.1 | 0/0 | Not started | - |
 | 8. HITL Validation + Pipeline Integration | v1.1 | 0/0 | Not started | - |
 | 9. Fine-Tune Experiment | v1.1 | 0/0 | Not started | - |
-| 10. Experiment Schema Foundation | v1.2 | 0/0 | Not started | - |
+| 10. Experiment Schema Foundation | v1.2 | 0/3 | Planned | - |
 | 11. Experiment Logging & Private Store | v1.2 | 0/0 | Not started | - |
 | 12. Eval Scoring & Scrub Tuning | v1.2 | 0/0 | Not started | - |
 | 13. Reviewer Critique & Drift | v1.2 | 0/0 | Not started | - |
