@@ -36,7 +36,7 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
 
 - [x] **Phase 10: Experiment Schema Foundation** - `ExperimentRecord` on a shared base + `record_kind` discriminator, back-compatible with existing records (completed 2026-06-03)
 - [x] **Phase 11: Experiment Logging & Private Store** - `kajiba experiment` CLI + programmatic logging into a private local namespace (completed 2026-06-04)
-- [ ] **Phase 12: Eval Scoring & Scrub Tuning** - eval-specific scorer and experiment-aware scrubbing
+- [x] **Phase 12: Eval Scoring & Scrub Tuning** - eval-specific scorer and experiment-aware scrubbing (completed 2026-06-04)
 - [ ] **Phase 13: Reviewer Critique & Drift** - critique attachment, queryable `lessons_learned`, quality-drift detection
 - [ ] **Phase 14: Live Experiment Capture** - capture eval runs from live Hermes sessions via shared hooks (depends on Phase 6–7)
 - [ ] **Phase 15: Analysis Export & Practice-Project Integration** - analysis export format + Nemotron/Qwen/Gemma workflow writes directly to experiment records
@@ -234,7 +234,7 @@ Two parallel tracks share a foundation. Execute by dependency, not strict numeri
 | 9. Fine-Tune Experiment | v1.1 | 0/0 | Not started | - |
 | 10. Experiment Schema Foundation | v1.2 | 3/3 | Complete    | 2026-06-03 |
 | 11. Experiment Logging & Private Store | v1.2 | 3/3 | Complete    | 2026-06-04 |
-| 12. Eval Scoring & Scrub Tuning | v1.2 | 1/4 | In Progress|  |
+| 12. Eval Scoring & Scrub Tuning | v1.2 | 4/4 | Complete    | 2026-06-04 |
 | 13. Reviewer Critique & Drift | v1.2 | 0/0 | Not started | - |
 | 14. Live Experiment Capture | v1.2 | 0/0 | Not started | - |
 | 15. Analysis Export & Practice-Project Integration | v1.2 | 0/0 | Not started | - |
