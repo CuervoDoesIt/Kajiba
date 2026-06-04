@@ -484,6 +484,15 @@ def submit() -> None:
         console.print("[yellow]No sessions found in staging directory.[/yellow]")
         return
 
+    # ELOG-03 defensive guard (T-11-09, Assumption A2): submit only reads
+    # STAGING via _load_latest_staging and only log_experiment writes
+    # experiments (to EXPERIMENTS_DIR), so this is structurally unreachable
+    # today — kept as a single guard against future paths, never dead branching.
+    if getattr(record, "record_kind", "coding_session") == "model_experiment":
+        raise click.ClickException(
+            "Experiment records are never submitted to the community path."
+        )
+
     scrubbed, scrub_log = scrub_record(record)
 
     # Collect flagged items from all conversation turns
@@ -1657,6 +1666,16 @@ def publish(repo: Optional[str], dry_run: bool) -> None:
     model_names: list[str] = []
     tier_names: list[str] = []
     for path, data in outbox_records:
+        # ELOG-03 active guard (D-13, Pitfall 1): refuse experiment records on
+        # the raw dict BEFORE validate_record, so an experiment is never fed
+        # into the KajibaRecord validator. Defense in depth on top of the
+        # structural OUTBOX_DIR/EXPERIMENTS_DIR separation from 11-01.
+        if data.get("record_kind") == "model_experiment":
+            logger.warning("Refusing to publish experiment record: %s", path)
+            console.print(
+                f"[yellow]  Skipping experiment record (never published): {path.name}[/yellow]"
+            )
+            continue
         try:
             record = validate_record(data)
             consent_level = "full"
