@@ -47,10 +47,11 @@ from rich.progress import (
     TimeRemainingColumn,
 )
 from kajiba.schema import (
-    OUTCOME_TAGS, PAIN_POINT_CATEGORIES, SCHEMA_VERSION,
-    KajibaRecord, OutcomeSignals, PainPoint, QualityMetadata,
-    SubmissionMetadata, validate_record,
+    EXPERIMENT_TYPES, OUTCOME_TAGS, PAIN_POINT_CATEGORIES, SCHEMA_VERSION,
+    ExperimentRecord, KajibaRecord, OutcomeSignals, PainPoint, QualityMetadata,
+    SubmissionMetadata, load_record, validate_record,
 )
+from kajiba.experiment_store import build_experiment_record, log_experiment
 from kajiba.scorer import compute_quality_score
 from kajiba.scrubber import flag_org_domains, scrub_record
 
@@ -783,6 +784,186 @@ def config_get(key: str) -> None:
             console.print(f"{key} = {value} [dim](default)[/dim]")
     else:
         console.print(f"{key} = {value}")
+
+
+# ---------------------------------------------------------------------------
+# Experiment logging (dual-use private store)
+# ---------------------------------------------------------------------------
+
+
+@cli.group()
+def experiment() -> None:
+    """Log and inspect private model-experiment runs."""
+
+
+@experiment.command("log")
+@click.option(
+    "--from",
+    "from_path",
+    type=click.Path(exists=True),
+    default=None,
+    help="Load a run from a JSON file (see tests/fixtures/experiment_run.example.json).",
+)
+@click.option(
+    "--score",
+    "eval_score",
+    type=click.FloatRange(0.0, 1.0),
+    default=None,
+    help="Evaluation score in [0.0, 1.0]; overrides/fills outcome.eval_score.",
+)
+@click.option(
+    "--type",
+    "experiment_type",
+    type=click.Choice(list(EXPERIMENT_TYPES)),
+    default=None,
+    help="Experiment type; overrides/fills experiment.experiment_type.",
+)
+@click.option(
+    "--task-category",
+    "task_category",
+    default=None,
+    help="Task category; overrides/fills experiment.task_category.",
+)
+@click.option(
+    "--local-model",
+    "model_json",
+    type=click.Path(exists=True),
+    default=None,
+    help="JSON file with the nested local_model ModelMetadata fields.",
+)
+def experiment_log(
+    from_path: Optional[str],
+    eval_score: Optional[float],
+    experiment_type: Optional[str],
+    task_category: Optional[str],
+    model_json: Optional[str],
+) -> None:
+    """Record a model-experiment run into the private experiment store.
+
+    Supports three input modes, all funneling through the single
+    ``experiment_store.log_experiment`` write path (D-08):
+
+    * ``--from FILE`` — load a run JSON, apply any scalar override flags to
+      the raw dict before validation (D-11), then validate via
+      :func:`~kajiba.schema.load_record` (D-10).
+    * Scalar flags only — build a record from ``--score``/``--type``/
+      ``--task-category`` (plus a model) via ``build_experiment_record``.
+    * No flags — interactive Rich prompts for the essential fields (D-12).
+    """
+    _ensure_dirs()
+
+    model_overrides: dict = {}
+    if model_json is not None:
+        model_overrides = json.loads(Path(model_json).read_text(encoding="utf-8"))
+
+    if from_path is not None:
+        # D-10 file-first shared format.
+        data = json.loads(Path(from_path).read_text(encoding="utf-8"))
+        # D-11: apply scalar overrides to the RAW dict BEFORE validation
+        # (these models have no validate_assignment, so mutate-then-validate).
+        if eval_score is not None:
+            data.setdefault("outcome", {})["eval_score"] = eval_score
+        if experiment_type is not None:
+            data.setdefault("experiment", {})["experiment_type"] = experiment_type
+        if task_category is not None:
+            data.setdefault("experiment", {})["task_category"] = task_category
+        if model_overrides:
+            exp = data.setdefault("experiment", {})
+            local = exp.setdefault("local_model", {})
+            local.update(model_overrides)
+        # Pitfall 1: load_record (not validate_record) routes to ExperimentRecord.
+        rec = load_record(data)
+        if not isinstance(rec, ExperimentRecord):
+            raise click.ClickException("--from file is not a model_experiment record.")
+
+    elif (
+        eval_score is not None
+        and experiment_type is not None
+        and task_category is not None
+    ):
+        # Scalar convenience path (D-11): build from flags.
+        model_name = model_overrides.get("model_name") or click.prompt(
+            "Local model name",
+        )
+        task_description = click.prompt("Task description")
+        local_model_output = click.prompt("Local model output")
+        rec = build_experiment_record(
+            experiment_id=click.prompt("Experiment ID"),
+            experiment_type=experiment_type,
+            task_category=task_category,
+            task_description=task_description,
+            local_model_name=model_name,
+            local_model_output=local_model_output,
+            eval_score=eval_score,
+        )
+
+    else:
+        # Interactive fallback (D-12): prompt only the minimal required fields,
+        # including the single required nested local_model.model_name (Pitfall 3).
+        experiment_id = click.prompt("Experiment ID")
+        task_category = click.prompt("Task category")
+        task_description = click.prompt("Task description")
+        prompted_score = click.prompt("Eval score (0.0-1.0)", type=click.FloatRange(0.0, 1.0))
+        prompted_type = click.prompt(
+            "Experiment type", type=click.Choice(list(EXPERIMENT_TYPES)),
+        )
+        model_name = model_overrides.get("model_name") or click.prompt("Local model name")
+        local_model_output = click.prompt("Local model output")
+        rec = build_experiment_record(
+            experiment_id=experiment_id,
+            experiment_type=prompted_type,
+            task_category=task_category,
+            task_description=task_description,
+            local_model_name=model_name,
+            local_model_output=local_model_output,
+            eval_score=prompted_score,
+        )
+
+    # D-08: the single shared write path — the CLI never writes the file itself.
+    path = log_experiment(rec, EXPERIMENTS_DIR)
+    console.print(
+        Panel(
+            f"[green]Experiment logged[/green]\n{path}",
+            title="kajiba experiment",
+        )
+    )
+
+
+@experiment.command("list")
+def experiment_list() -> None:
+    """List logged experiment runs from the private store (read-back)."""
+    EXPERIMENTS_DIR.mkdir(parents=True, exist_ok=True)
+    files = sorted(
+        EXPERIMENTS_DIR.glob("exp_*.json"),
+        key=lambda f: f.stat().st_mtime,
+        reverse=True,
+    )
+    if not files:
+        console.print("[yellow]No experiments logged.[/yellow]")
+        return
+
+    table = Table(title="Logged Experiments")
+    table.add_column("Record ID")
+    table.add_column("Type")
+    table.add_column("Task")
+    table.add_column("Score", justify="right")
+
+    for f in files:
+        try:
+            data = json.loads(f.read_text(encoding="utf-8"))
+        except Exception as exc:
+            logger.error("Failed to read experiment file %s: %s", f, exc)
+            continue
+        experiment_meta = data.get("experiment", {})
+        outcome = data.get("outcome", {})
+        table.add_row(
+            str(data.get("record_id", "")),
+            str(experiment_meta.get("experiment_type", "")),
+            str(experiment_meta.get("task_category", "")),
+            str(outcome.get("eval_score", "")),
+        )
+
+    console.print(table)
 
 
 @cli.command()
