@@ -11,7 +11,7 @@ Requirements for Hermes Pipeline Validation milestone. Each maps to roadmap phas
 
 - [ ] **PLUG-01**: Kajiba plugin scaffold created at `~/.hermes/plugins/kajiba/` with `plugin.yaml` manifest and `register(ctx)` entry point
 - [ ] **PLUG-02**: Plugin registers hooks for `on_session_start`, `post_llm_call`, `post_tool_call`, and `on_session_end` via `ctx.register_hook()`
-- [ ] **PLUG-03**: All `~/.hermes` paths replaced with HERMES_HOME-aware resolution for v0.6.0 profile isolation
+- [x] **PLUG-03**: All `~/.hermes` paths replaced with HERMES_HOME-aware resolution for v0.6.0 profile isolation
 - [ ] **PLUG-04**: Plugin installable via `pip install kajiba[hermes]` entry point (auto-registers without manual file copy)
 - [ ] **PLUG-05**: Optional `pre_llm_call` context injection into ephemeral system prompt (off by default, configurable)
 
@@ -115,7 +115,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 |-------------|-------|--------|
 | PLUG-01 | Phase 6 | Pending |
 | PLUG-02 | Phase 6 | Pending |
-| PLUG-03 | Phase 6 | Pending |
+| PLUG-03 | Phase 6 | Complete |
 | PLUG-04 | Phase 8 | Pending |
 | PLUG-05 | Phase 8 | Pending |
 | CAPT-01 | Phase 6 | Pending |

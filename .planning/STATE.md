@@ -4,8 +4,8 @@ milestone: v1.2
 milestone_name: Experiment Logging
 status: executing
 stopped_at: "Phase 13 complete & verified. Phase 14 (ECAP-01) deferred — blocked on v1.1 Phase 6 & 7 (unbuilt). Decision: build v1.1 Phase 6 (plugin foundation) first."
-last_updated: "2026-06-04T22:58:40.853Z"
-last_activity: 2026-06-04 -- Phase 06 execution started
+last_updated: "2026-06-04T23:08:11.000Z"
+last_activity: 2026-06-04 -- Phase 06 Plan 02 complete
 progress:
   total_phases: 10
   completed_phases: 4
@@ -28,9 +28,9 @@ See: .planning/PROJECT.md (updated 2026-04-02)
 ## Current Position
 
 Phase: 06 (environment-plugin-foundation) — EXECUTING
-Plan: 2 of 5
+Plan: 3 of 5
 Status: Ready to execute
-Last activity: 2026-06-04 -- Phase 06 execution started
+Last activity: 2026-06-04 -- Phase 06 Plan 02 complete (HERMES_HOME migration + collector adapt + hermes_integration deletion)
 
 Progress: [██████████] 100%
 
@@ -68,6 +68,7 @@ Progress: [██████████] 100%
 | Phase 13 P04 | 14m | 2 tasks | 2 files |
 | Phase 13 P05 | 14m | 2 tasks | 2 files |
 | Phase 06 P01 | 3m | 3 tasks | 3 files |
+| Phase 06 P02 | 13m | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -101,6 +102,8 @@ Progress: [██████████] 100%
 - 13-05 (TDD GREEN, EREV-03/02): Added `kajiba experiment drift` to cli.py — globs the store via new `_load_all_experiments` (per-file `try/except continue`, Pitfall 6), runs `compute_drift`, and idempotently SETs/CLEARs `outcome.drift_flag` through the single `_mutate_experiment` → `update_experiment` funnel (D-15; only records whose on-disk flag DIFFERS from the verdict are rewritten — no disk churn). `--threshold` overrides `DRIFT_THRESHOLD`; `--id` scopes the scan AND the writes to the target record's WHOLE `(model_name, task_category)` group (locked Open Question 2), leaving other groups untouched. Added the cli.py `from kajiba.experiment_drift import DRIFT_THRESHOLD, compute_drift` import (first use, owned here; 13-04 added only the `__init__.py` re-export). Enriched `experiment list` with `Lessons` (count) + `Drift` (⚠) columns read from the RAW dict with the per-file guard preserved. DEVIATION (Rule 1): switched `compute_drift` baseline from 13-03's whole-group MEAN to NEAREST-IN-GROUP-NEIGHBOR distance — the locked 13-01 CLI tests fail under mean/median because a `[0.90,0.90,0.40]` group's mean (0.733) flags the consistent 0.90 runs, and a balanced two-cluster group (four 0.90s + three ~0.40s) cannot clear via mean/median; nearest-neighbor (a run drifts only with NO peer within threshold, both directions D-14) satisfies all 7 unit + 2 CLI tests. Phase gate: full suite 322 passed / 2 pre-existing skips, 0 regressions; `git diff --quiet src/kajiba/schema.py` exit 0. Phase 13 COMPLETE — ready for /gsd-verify-work. Commits: feat 4742cee, feat 62194c5.
 - [Phase ?]: 06-01: Wave 0 RED scaffolds for Phase 6 — TestGetHermesHome (test_config.py), test_plugin.py (StubCtx + register/kwargs/debug), test_no_hermes_integration.py (D-07 static guard). All RED only on not-yet-built symbols (get_hermes_home, kajiba.plugin) or the not-yet-deleted module; full suite collects exit 0. PyYAML temporarily installed only to observe acceptance, then removed (importorskip untouched).
 
+- 06-02 (PLUG-03, D-07/08/09/10): Added `kajiba.config.get_hermes_home()` — the single HERMES_HOME resolver (reads os.environ every call, falls back to `~/.hermes`). Migrated all five modules (config/collector/cli/publisher/experiment_store) to route paths through it via the LOCKED constant-vs-lazy split: module-level KAJIBA_BASE/EXPERIMENTS_DIR/DOWNLOADS_DIR/CLONE_DIR stay constants (preserving ~30 monkeypatch sites), config.yaml read/write goes lazy in-body. experiment_store.EXPERIMENTS_DIR derives from get_hermes_home() (stays Click-free, NO cli import; parity test green because both use the same helper). collector.on_session_start now `(session_id, model_config=None, *, model_name=None, platform=None)` — legacy positional dict still works, omitted dict builds `{model_name, provider: platform}`, all-None builds `{}` (D-08). DELETED src/kajiba/hermes_integration.py (D-07); CLAUDE.md repointed to src/kajiba/plugin/ register(ctx). DEVIATION (Rule 1): dev machine's real HERMES_HOME leaked its profile config.yaml (`min_quality_tier: gold`) into pre-existing config tests that patched only Path.home — added `delenv("HERMES_HOME")` to the test_config.py fake_home fixture and an autouse fixture to test_cli.py TestConfigSubcommands (strengthens temp-home isolation, no assertion weakened). Baseline restored: 324 passed / 2 pre-existing yaml skips, 3 RED-by-design test_plugin.py (Plan 03 target), 0 regressions. Commits: feat ea5e958, feat 0026091, chore 5059003, fix f5acbf7.
+
 ### Pending Todos
 
 None.
@@ -113,6 +116,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-06-04T22:58:33.352Z
-Stopped at: Phase 13 complete & verified. Phase 14 (ECAP-01) deferred — blocked on v1.1 Phase 6 & 7 (unbuilt). Decision: build v1.1 Phase 6 (plugin foundation) first.
+Last session: 2026-06-04T23:08:11.000Z
+Stopped at: Completed 06-02-PLAN.md (HERMES_HOME migration + collector adapt + hermes_integration deletion). Next: 06-03 (kajiba.plugin package).
 Resume file: .planning/phases/06-environment-plugin-foundation/06-CONTEXT.md
