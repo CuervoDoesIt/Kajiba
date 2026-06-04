@@ -171,7 +171,7 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 12-04-PLAN.md — CLI wiring: experiment score/scrub subcommands + list Confidence column + __init__ re-exports + integration tests (EEVAL-01/02)
+- [x] 12-04-PLAN.md — CLI wiring: experiment score/scrub subcommands + list Confidence column + __init__ re-exports + integration tests (EEVAL-01/02) — 2 tasks, 289 passed/2 skipped, 0 regressions
 
 ### Phase 13: Reviewer Critique & Drift
 

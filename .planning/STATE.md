@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Hermes Pipeline Validation
 status: executing
-stopped_at: Completed 12-03-PLAN.md
-last_updated: "2026-06-04T12:30:00.000Z"
-last_activity: 2026-06-04 -- Completed 12-03 (experiment_scrub.py, EEVAL-02)
+stopped_at: Completed 12-04-PLAN.md
+last_updated: "2026-06-04T13:00:00.000Z"
+last_activity: 2026-06-04 -- Completed 12-04 (experiment score/scrub CLI, EEVAL-01/02 delivery)
 progress:
   total_phases: 4
   completed_phases: 2
   total_plans: 10
-  completed_plans: 9
-  percent: 90
+  completed_plans: 10
+  percent: 100
 ---
 
 # Project State
@@ -28,10 +28,10 @@ See: .planning/PROJECT.md (updated 2026-04-02)
 
 Phase: 12 (eval-scoring-scrub-tuning) — EXECUTING
 Plan: 4 of 4
-Status: Ready to execute
-Last activity: 2026-06-04 -- Completed 12-03 (experiment_scrub.py, EEVAL-02)
+Status: All plans complete — ready for /gsd-verify-work
+Last activity: 2026-06-04 -- Completed 12-04 (experiment score/scrub CLI, EEVAL-01/02 delivery)
 
-Progress: [█████████░] 90%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -58,6 +58,7 @@ Progress: [█████████░] 90%
 | Phase 12 P01 | 6m | 2 tasks | 5 files |
 | Phase 12 P02 | 6m | 1 task | 1 file |
 | Phase 12 P03 | 5m | 1 task | 1 file |
+| Phase 12 P04 | 10m | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -81,6 +82,8 @@ Progress: [█████████░] 90%
 
 - 12-03: Implemented `src/kajiba/experiment_scrub.py` (EEVAL-02) — `scrub_experiment(ExperimentRecord) -> (ExperimentRecord, ScrubLog)`, the divergent-tail share-boundary scrub. Reuses `scrub_text`/`SCRUB_PATTERNS` verbatim (no fork, D-09) on a FIELD ALLOWLIST: `experiment.task_description`, `outcome.local_model_output`, `outcome.reviewer_critique` (Optional-guarded, Pitfall 2), per-element `outcome.lessons_learned` (list shape preserved, Pitfall 1). Model/hardware/model_hash/reviewer_model/scalar-outcome fields preserved byte-identical (D-05/D-06); envelope-mirrors `scrub_record` (model_dump→mutate copy→model_validate, D-08 store-raw upheld). ScrubLog folds api_keys+hex_tokens, potential_names=0 (Open Q2 RESOLVED). NEVER imports/calls `kajiba.privacy` — portable no-coupling source scan green. Decision: docstring describes the privacy SKIP boundary in prose (no literal helper names) so the source scan passes. test_experiment_scrub.py 4/4 GREEN; full suite 284 passed / 2 pre-existing skips, 0 regressions. Commit: feat c166de6.
 
+- 12-04: Wired EEVAL-01/02 into the user-facing CLI + package surface (the only plan touching shared cli.py/__init__.py). New `_load_experiment(record_id)` store-load helper enforces T-12-10 (resolved-parent path-traversal guard, `path.resolve().parent == EXPERIMENTS_DIR.resolve()`) and T-12-11 (`load_record` + `isinstance(ExperimentRecord)` → clean ClickException, no traceback). `experiment score <id>` renders a compute-on-read confidence breakdown (per-check sub-scores + composite + complete/partial/thin band) plus a SEPARATE panel surfacing answer-quality `eval_score` distinctly from record confidence (Pitfall 4, D-03 never persists). `experiment scrub <id> [--out FILE]` previews a redaction-count table + scrubbed free text, or writes a scrubbed COPY to `--out` — NEVER overwrites the raw `exp_<id>.json` (D-08, T-12-12). `experiment list` gained a distinct "Confidence" column alongside the preserved "Score" (eval_score) column (T-12-13). Re-exported `compute_eval_confidence` + `scrub_experiment` from `kajiba/__init__.py` (A3). Decision: scrub PII assertion keys on the email (`[REDACTED_EMAIL]`) the shared scrubber reliably handles; discovered a pre-existing community-scrubber gap (`sk-[a-zA-Z0-9]{32,}` misses `sk-live-` hyphenated keys) — logged to `deferred-items.md`, NOT fixed (D-09 forbids forking the shared regex layer; out of scope for the integration plan). 5 new CLI tests (reuse `_isolate_store` verbatim, Pitfall 3); full suite 289 passed / 2 pre-existing skips, 0 regressions. Phase 12 all 4 plans complete. Commits: feat b70ba48, test 944527d.
+
 ### Pending Todos
 
 None.
@@ -93,6 +96,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-06-04T12:30:00.000Z
-Stopped at: Completed 12-03-PLAN.md
+Last session: 2026-06-04T13:00:00.000Z
+Stopped at: Completed 12-04-PLAN.md
 Resume file: None
