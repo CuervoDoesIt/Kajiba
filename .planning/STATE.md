@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Experiment Logging
 status: completed
-stopped_at: Completed 13-04-PLAN.md
-last_updated: "2026-06-04T21:30:00.000Z"
-last_activity: 2026-06-04 -- Completed 13-04-PLAN.md (experiment review + lessons GREEN)
+stopped_at: Completed 13-05-PLAN.md
+last_updated: "2026-06-04T21:45:00.000Z"
+last_activity: 2026-06-04 -- Completed 13-05-PLAN.md (experiment drift CLI + list enrichment GREEN; Phase 13 complete)
 progress:
   total_phases: 10
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 15
-  completed_plans: 14
-  percent: 31
+  completed_plans: 15
+  percent: 40
 ---
 
 # Project State
@@ -27,10 +27,10 @@ See: .planning/PROJECT.md (updated 2026-04-02)
 
 ## Current Position
 
-Phase: 13 (reviewer-critique-drift) — EXECUTING
-Plan: 5 of 5
-Status: Ready to execute (13-04 complete; 13-05 drift CLI remaining)
-Last activity: 2026-06-04 -- Completed 13-04-PLAN.md (experiment review + lessons GREEN)
+Phase: 13 (reviewer-critique-drift) — COMPLETE (ready for verification)
+Plan: 5 of 5 (all complete)
+Status: Ready for /gsd-verify-work (all 5 plans complete; full suite green, schema frozen)
+Last activity: 2026-06-04 -- Completed 13-05-PLAN.md (experiment drift CLI + list enrichment GREEN; Phase 13 complete)
 
 Progress: [██████████] 100%
 
@@ -65,6 +65,7 @@ Progress: [██████████] 100%
 | Phase 13 P02 | 12m | 1 task | 2 files |
 | Phase 13 P03 | 9m | 1 tasks | 1 files |
 | Phase 13 P04 | 14m | 2 tasks | 2 files |
+| Phase 13 P05 | 14m | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -95,6 +96,8 @@ Progress: [██████████] 100%
 - 13-04 (TDD GREEN, EREV-01/02 + WR-01/02/03): Added `kajiba experiment review` (--critique/--from/--reviewer-model/--action via click.Choice(RECOMMENDED_ACTIONS)) and `kajiba experiment lessons` (--add repeatable/--category; add/read/cross-record-query modes) to cli.py. New cli.py helpers: `_mutate_experiment` (CLI single write funnel → update_experiment, D-03/CR-01), `_parse_lesson` (first-colon str.partition, lowercased category, `uncategorized` fallback, colons-in-text preserved), `_read_critique_input` (--critique > --from .txt/.json > offline stdin paste). UNCATEGORIZED constant added. `__init__.py` re-exports update_experiment + compute_drift (cli.py compute_drift import deferred to 13-05). WR-03: json.loads wrapped → "Malformed JSON"; WR-01: partial scalar flags raise friendly error naming missing flags; WR-02: missing record_kind + incomplete fragments → friendly ClickException (no ValidationError leak). DEVIATION (Rule 1): plan specified setdefault("record_kind","model_experiment") for WR-02 but locked test_missing_record_kind_friendly asserts exit!=0 for a fragment missing record_kind — switched to an explicit pre-load guard raising a friendly error (test authoritative over plan idiom). 17 newly green → full suite 320 passed / 2 skipped, ONLY the 2 13-05 drift CLI tests remain RED by design, 0 regressions; schema.py untouched (git diff --quiet exit 0). Commits: feat 868099f, feat 3cae4c7.
 - [Phase ?]: 13-03 (TDD GREEN, EREV-03): Added src/kajiba/experiment_drift.py — pure Click-free stdlib compute_drift(records, threshold=DRIFT_THRESHOLD)->dict[str,bool] mirroring eval_scorer's shape but verdict PERSISTED by caller (D-02, vs compute-on-read). Groups by (local_model.model_name, task_category); flags both directions (D-14) beyond DRIFT_THRESHOLD=0.15 (flag-only, no config read); <2-run guard before any mean() call; verdict spans ALL record_ids for idempotent set/clear (D-15). DEVIATION (Rule 1): plan/RESEARCH specified leave-one-out baseline but it flagged non-outlier peers, contradicting locked 13-01 tests — switched to WHOLE-GROUP mean (A1/Discretion #4 delegate baseline choice). 7/7 drift tests GREEN; schema.py untouched; full suite 303 passed (+7 vs 296), 19 fails all confined to test_cli_experiment.py (13-04/05 CLI subcommands, RED by design), 0 regressions. Commit: feat 2bd3530.
 
+- 13-05 (TDD GREEN, EREV-03/02): Added `kajiba experiment drift` to cli.py — globs the store via new `_load_all_experiments` (per-file `try/except continue`, Pitfall 6), runs `compute_drift`, and idempotently SETs/CLEARs `outcome.drift_flag` through the single `_mutate_experiment` → `update_experiment` funnel (D-15; only records whose on-disk flag DIFFERS from the verdict are rewritten — no disk churn). `--threshold` overrides `DRIFT_THRESHOLD`; `--id` scopes the scan AND the writes to the target record's WHOLE `(model_name, task_category)` group (locked Open Question 2), leaving other groups untouched. Added the cli.py `from kajiba.experiment_drift import DRIFT_THRESHOLD, compute_drift` import (first use, owned here; 13-04 added only the `__init__.py` re-export). Enriched `experiment list` with `Lessons` (count) + `Drift` (⚠) columns read from the RAW dict with the per-file guard preserved. DEVIATION (Rule 1): switched `compute_drift` baseline from 13-03's whole-group MEAN to NEAREST-IN-GROUP-NEIGHBOR distance — the locked 13-01 CLI tests fail under mean/median because a `[0.90,0.90,0.40]` group's mean (0.733) flags the consistent 0.90 runs, and a balanced two-cluster group (four 0.90s + three ~0.40s) cannot clear via mean/median; nearest-neighbor (a run drifts only with NO peer within threshold, both directions D-14) satisfies all 7 unit + 2 CLI tests. Phase gate: full suite 322 passed / 2 pre-existing skips, 0 regressions; `git diff --quiet src/kajiba/schema.py` exit 0. Phase 13 COMPLETE — ready for /gsd-verify-work. Commits: feat 4742cee, feat 62194c5.
+
 ### Pending Todos
 
 None.
@@ -107,6 +110,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-06-04T21:30:00.000Z
+Last session: 2026-06-04T21:06:43.629Z
 Stopped at: Completed 13-04-PLAN.md
 Resume file: None
