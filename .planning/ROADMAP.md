@@ -142,7 +142,7 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 11-02-PLAN.md — kajiba experiment CLI group: log (--from/flags/interactive) + list (ELOG-01)
+- [x] 11-02-PLAN.md — kajiba experiment CLI group: log (--from/flags/interactive) + list (ELOG-01) — 2 tasks, 274 passed/2 skipped, 0 regressions
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
