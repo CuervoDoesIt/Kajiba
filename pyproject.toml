@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "kajiba"
-version = "0.1.0"
+version = "0.2.0"
 description = "Community data pipeline for open-source local model improvement — forging better training data from real-world usage"
 readme = "README.md"
 license = "Apache-2.0"
