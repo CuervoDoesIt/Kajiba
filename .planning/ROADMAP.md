@@ -35,7 +35,7 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
 **Milestone Goal:** Add a first-class, private experiment/eval-logging capability — capture local-model outputs, reviewer-model critiques, eval scoring, and quality drift — reusing Kajiba's schema/scrub core but with its own scorer, private store, and analysis export (no community publish). Runs in parallel with v1.1; only live capture (Phase 14) depends on v1.1 Phase 6–7.
 
 - [x] **Phase 10: Experiment Schema Foundation** - `ExperimentRecord` on a shared base + `record_kind` discriminator, back-compatible with existing records (completed 2026-06-03)
-- [ ] **Phase 11: Experiment Logging & Private Store** - `kajiba experiment` CLI + programmatic logging into a private local namespace
+- [x] **Phase 11: Experiment Logging & Private Store** - `kajiba experiment` CLI + programmatic logging into a private local namespace (completed 2026-06-04)
 - [ ] **Phase 12: Eval Scoring & Scrub Tuning** - eval-specific scorer and experiment-aware scrubbing
 - [ ] **Phase 13: Reviewer Critique & Drift** - critique attachment, queryable `lessons_learned`, quality-drift detection
 - [ ] **Phase 14: Live Experiment Capture** - capture eval runs from live Hermes sessions via shared hooks (depends on Phase 6–7)
@@ -220,7 +220,7 @@ Two parallel tracks share a foundation. Execute by dependency, not strict numeri
 | 8. HITL Validation + Pipeline Integration | v1.1 | 0/0 | Not started | - |
 | 9. Fine-Tune Experiment | v1.1 | 0/0 | Not started | - |
 | 10. Experiment Schema Foundation | v1.2 | 3/3 | Complete    | 2026-06-03 |
-| 11. Experiment Logging & Private Store | v1.2 | 3/3 | Awaiting verify-work | - |
+| 11. Experiment Logging & Private Store | v1.2 | 3/3 | Complete    | 2026-06-04 |
 | 12. Eval Scoring & Scrub Tuning | v1.2 | 0/0 | Not started | - |
 | 13. Reviewer Critique & Drift | v1.2 | 0/0 | Not started | - |
 | 14. Live Experiment Capture | v1.2 | 0/0 | Not started | - |
