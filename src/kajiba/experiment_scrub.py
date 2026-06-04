@@ -1,7 +1,7 @@
 """Experiment-aware PII scrub (EEVAL-02) — the divergent-tail share-boundary transform.
 
 This module is the deliberate inverse of the community pipeline's hardware
-anonymization. It redacts only the four caller-supplied free-text surfaces of an
+anonymization. It redacts only the five caller-supplied free-text surfaces of an
 ``ExperimentRecord`` while PRESERVING model identity and the full hardware profile
 EXACTLY — because those fields are what make an experiment analytically useful.
 
@@ -9,9 +9,13 @@ Design stance (D-05/D-06/D-07/D-09/D-10):
     - REUSES the shared ``scrub_text``/``SCRUB_PATTERNS`` engine verbatim; it never
       forks the regex layer (shared core).
     - Applies that engine to a FIELD ALLOWLIST, not a pattern denylist: only
-      ``experiment.task_description``, ``outcome.local_model_output``,
-      ``outcome.reviewer_critique`` (Optional), and each element of
-      ``outcome.lessons_learned`` are scrubbed.
+      ``experiment.task_category``, ``experiment.task_description``,
+      ``outcome.local_model_output``, ``outcome.reviewer_critique`` (Optional),
+      and each element of ``outcome.lessons_learned`` are scrubbed.
+    - PRESERVES ``experiment.experiment_id`` byte-identical: it is load-bearing
+      identity (drives the ``exp_<id>.json`` store filename, ``compute_record_id``,
+      and the dedup ``submission_hash``), so scrubbing it would break store-load
+      and dedup. It is exempt for the same reason as model/hardware identity.
     - DELIBERATELY BYPASSES the community privacy layer — it must NEVER import or
       call any hardware-anonymization / GPU-generalization / VRAM-tiering /
       consent-application helper. Model/hardware identity survives byte-identical.
@@ -37,10 +41,11 @@ logger = logging.getLogger(__name__)
 def scrub_experiment(record: ExperimentRecord) -> tuple[ExperimentRecord, ScrubLog]:
     """Scrub the free-text surfaces of an experiment, preserving model/hardware.
 
-    Routes only the four caller-supplied free-text fields through the shared
+    Routes only the five caller-supplied free-text fields through the shared
     ``scrub_text`` engine. Model identity (``local_model``, ``reviewer_model``,
-    ``model_hash``), the full ``HardwareProfile``, and all non-text outcome
-    fields (``eval_score``, ``drift_flag``, ``recommended_action``) are left
+    ``model_hash``), the full ``HardwareProfile``, ``experiment_id`` (load-bearing
+    identity — see module docstring), and all non-text outcome fields
+    (``eval_score``, ``drift_flag``, ``recommended_action``) are left
     byte-identical. Operates on a deep copy so the original record is never
     mutated.
 
@@ -65,10 +70,16 @@ def scrub_experiment(record: ExperimentRecord) -> tuple[ExperimentRecord, ScrubL
         flagged += len(result.flagged)
         return result.scrubbed_text
 
-    # --- ALLOWLIST ONLY (D-07) ---
+    # --- ALLOWLIST ONLY (D-07) — five free-text surfaces ---
+    # experiment.task_category, experiment.task_description,
+    # outcome.local_model_output, outcome.reviewer_critique (Optional), and each
+    # element of outcome.lessons_learned. experiment.experiment_id is preserved
+    # byte-identical (load-bearing identity — store filename, record_id hash,
+    # dedup submission_hash), exactly like model/hardware identity.
     experiment = data["experiment"]
     outcome = data["outcome"]
 
+    experiment["task_category"] = _apply(experiment["task_category"])
     experiment["task_description"] = _apply(experiment["task_description"])
     outcome["local_model_output"] = _apply(outcome["local_model_output"])
 
@@ -81,8 +92,9 @@ def scrub_experiment(record: ExperimentRecord) -> tuple[ExperimentRecord, ScrubL
         _apply(lesson) for lesson in outcome.get("lessons_learned", [])
     ]
 
-    # model / hardware / model_hash / scalar outcome fields are intentionally
-    # NOT touched here (D-05/D-06). No privacy.* call is ever made.
+    # model / hardware / model_hash / experiment_id / scalar outcome fields are
+    # intentionally NOT touched here (D-05/D-06). experiment_id in particular is
+    # load-bearing identity and must stay byte-stable. No privacy.* call is ever made.
 
     # Build the redaction-accounting log — mirror scrub_record's category fold
     # (api_keys + hex_tokens collapse into api_keys_redacted; no regex source

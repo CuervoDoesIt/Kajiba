@@ -14,7 +14,7 @@
     "reviewer_model": {
       "model_name": "gpt-4o"
     },
-    "task_category": "debugging",
+    "task_category": "debugging-for-jane.doe@example.com",
     "task_description": "Help me fix the auth bug. Contact me at jane.doe@example.com with the API key sk-live-AbCdEf1234567890XyZqrStUvWx if you need access.",
     "started_at": "2026-06-03T12:00:00Z",
     "completed_at": "2026-06-03T12:08:00Z"

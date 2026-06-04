@@ -41,18 +41,31 @@ def test_free_text_redacted() -> None:
     assert "jane.doe@example.com" not in lessons
 
 
+def test_task_category_redacted() -> None:
+    """PII placed in the free-text task_category is removed by the allowlist scrub (CR-01)."""
+    record = _load_pii_record()
+    # Sanity-check the fixture actually carries PII in task_category.
+    assert "jane.doe@example.com" in record.experiment.task_category
+    scrubbed, _scrub_log = scrub_experiment(record)
+    assert "jane.doe@example.com" not in scrubbed.experiment.task_category
+    assert "@" not in scrubbed.experiment.task_category
+
+
 def test_model_and_hardware_preserved() -> None:
-    """Model hash/name, hardware, and reviewer_model are byte-identical after scrubbing."""
+    """Model hash/name, hardware, reviewer_model, and experiment_id are byte-identical after scrubbing."""
     record = _load_pii_record()
     before_hash = record.experiment.local_model.model_hash
     before_name = record.experiment.local_model.model_name
     before_hardware = record.hardware.model_dump()
     before_reviewer = record.experiment.reviewer_model.model_dump()
+    before_experiment_id = record.experiment.experiment_id
     scrubbed, _scrub_log = scrub_experiment(record)
     assert scrubbed.experiment.local_model.model_hash == before_hash
     assert scrubbed.experiment.local_model.model_name == before_name
     assert scrubbed.hardware.model_dump() == before_hardware
     assert scrubbed.experiment.reviewer_model.model_dump() == before_reviewer
+    # experiment_id is load-bearing identity — must stay byte-identical (CR-01).
+    assert scrubbed.experiment.experiment_id == before_experiment_id
 
 
 def test_scrublog_and_outcome_fields() -> None:
