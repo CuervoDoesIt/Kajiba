@@ -1,0 +1,18 @@
+{
+  "schema_version": "0.2.0",
+  "record_kind": "model_experiment",
+  "experiment": {
+    "experiment_id": "exp_thin_001",
+    "experiment_type": "model_evaluation",
+    "local_model": {
+      "model_name": "Hermes-3-Llama-3.1-8B"
+    },
+    "task_category": "coding",
+    "task_description": "Write a function to reverse a string.",
+    "started_at": "2026-06-03T12:00:00Z"
+  },
+  "outcome": {
+    "local_model_output": "def reverse(s): return s[::-1]",
+    "eval_score": 0.5
+  }
+}

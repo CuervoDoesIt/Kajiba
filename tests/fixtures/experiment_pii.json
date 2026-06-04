@@ -1,0 +1,43 @@
+{
+  "schema_version": "0.2.0",
+  "record_kind": "model_experiment",
+  "experiment": {
+    "experiment_id": "exp_pii_001",
+    "experiment_type": "model_evaluation",
+    "local_model": {
+      "model_name": "Hermes-3-Llama-3.1-8B",
+      "quantization": "Q4_K_M",
+      "provider": "ollama",
+      "is_local": true,
+      "model_hash": "deadbeefcafe1234567890abcdef0011223344556677889900aabbccddeeff11"
+    },
+    "reviewer_model": {
+      "model_name": "gpt-4o"
+    },
+    "task_category": "debugging",
+    "task_description": "Help me fix the auth bug. Contact me at jane.doe@example.com with the API key sk-live-AbCdEf1234567890XyZqrStUvWx if you need access.",
+    "started_at": "2026-06-03T12:00:00Z",
+    "completed_at": "2026-06-03T12:08:00Z"
+  },
+  "hardware": {
+    "gpu_name": "NVIDIA GeForce RTX 4070",
+    "gpu_vram_gb": 8,
+    "gpu_count": 1,
+    "cpu_name": "AMD Ryzen 7 5800X",
+    "ram_gb": 32,
+    "os": "Windows 11",
+    "inference_backend": "ollama",
+    "cuda_version": "12.4"
+  },
+  "outcome": {
+    "local_model_output": "I traced the issue to your config. Reach out to admin@internal.corp and check the log at /home/jdoe/projects/kajiba/logs/auth.log for the stack trace.",
+    "reviewer_critique": "The model gave a reasonable debugging direction but leaked a file path and contact email.",
+    "eval_score": 0.61,
+    "drift_flag": false,
+    "lessons_learned": [
+      "The model echoed the user email jane.doe@example.com back into its lessons summary.",
+      "The model correctly identified the null-pointer root cause."
+    ],
+    "recommended_action": "route_to_reviewer"
+  }
+}

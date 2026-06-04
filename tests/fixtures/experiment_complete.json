@@ -1,0 +1,43 @@
+{
+  "schema_version": "0.2.0",
+  "record_kind": "model_experiment",
+  "experiment": {
+    "experiment_id": "exp_complete_001",
+    "experiment_type": "model_evaluation",
+    "local_model": {
+      "model_name": "Hermes-3-Llama-3.1-8B",
+      "quantization": "Q4_K_M",
+      "provider": "ollama",
+      "is_local": true,
+      "model_hash": "a1b2c3d4e5f60718293a4b5c6d7e8f90112233445566778899aabbccddeeff00"
+    },
+    "reviewer_model": {
+      "model_name": "gpt-4o"
+    },
+    "task_category": "coding",
+    "task_description": "Implement an iterative binary search over a sorted integer list and explain its complexity.",
+    "started_at": "2026-06-03T12:00:00Z",
+    "completed_at": "2026-06-03T12:05:00Z"
+  },
+  "hardware": {
+    "gpu_name": "NVIDIA GeForce RTX 4070",
+    "gpu_vram_gb": 8,
+    "gpu_count": 1,
+    "cpu_name": "AMD Ryzen 7 5800X",
+    "ram_gb": 32,
+    "os": "Windows 11",
+    "inference_backend": "ollama",
+    "cuda_version": "12.4"
+  },
+  "outcome": {
+    "local_model_output": "def bsearch(a, x):\n    lo, hi = 0, len(a) - 1\n    while lo <= hi:\n        mid = (lo + hi) // 2\n        if a[mid] == x:\n            return mid\n        if a[mid] < x:\n            lo = mid + 1\n        else:\n            hi = mid - 1\n    return -1",
+    "reviewer_critique": "Correct iterative implementation with proper midpoint computation; complexity explanation is accurate at O(log n).",
+    "eval_score": 0.88,
+    "drift_flag": false,
+    "lessons_learned": [
+      "Model handles the empty-list edge case correctly without prompting.",
+      "Complexity analysis was volunteered without being asked."
+    ],
+    "recommended_action": "use_as_is"
+  }
+}
