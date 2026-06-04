@@ -1,0 +1,68 @@
+{
+  "schema_version": "0.1.0",
+  "record_type": "task_trajectory",
+  "created_at": "2026-03-28T10:15:00Z",
+  "trajectory": {
+    "format": "sharegpt_extended",
+    "conversations": [
+      {
+        "from": "human",
+        "value": "Write a Python CSV parser function.",
+        "token_count": 8
+      },
+      {
+        "from": "gpt",
+        "value": "I'll write a CSV parser for you.",
+        "tool_calls": [
+          {
+            "tool_name": "file_system",
+            "tool_input": "write csv_parser.py",
+            "tool_output": "",
+            "tool_status": "success",
+            "latency_ms": 95
+          }
+        ],
+        "token_count": 30
+      },
+      {
+        "from": "human",
+        "value": "Test it with the sample data.",
+        "token_count": 7
+      },
+      {
+        "from": "gpt",
+        "value": "Let me run the parser against your sample data file now.",
+        "tool_calls": [
+          {
+            "tool_name": "terminal",
+            "tool_input": "python csv_parser.py data.csv",
+            "tool_output": "FileNotFoundError: No such file",
+            "tool_status": "failure",
+            "latency_ms": 250
+          }
+        ],
+        "token_count": 25
+      }
+    ],
+    "turn_count": 4,
+    "total_tool_calls": 2,
+    "successful_tool_calls": 1,
+    "failed_tool_calls": 1
+  },
+  "model": {
+    "model_name": "Hermes-3-Llama-3.1-8B",
+    "model_family": "llama"
+  },
+  "outcome": {
+    "user_rating": 3,
+    "outcome_tags": ["task_completed", "minor_hallucination"],
+    "user_comment": "Worked OK",
+    "task_category": "coding",
+    "difficulty_estimate": "easy"
+  },
+  "submission": {
+    "kajiba_plugin_version": "0.1.0",
+    "consent_level": "full",
+    "pii_scrub_version": "0.1.0"
+  }
+}

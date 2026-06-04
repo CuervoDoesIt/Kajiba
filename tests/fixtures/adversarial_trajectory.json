@@ -1,0 +1,47 @@
+{
+  "schema_version": "0.1.0",
+  "record_type": "task_trajectory",
+  "created_at": "2026-03-29T16:00:00Z",
+  "trajectory": {
+    "format": "sharegpt_extended",
+    "conversations": [
+      {
+        "from": "human",
+        "value": "Fix bug"
+      },
+      {
+        "from": "human",
+        "value": "",
+        "tool_calls": [
+          {
+            "tool_name": "terminal",
+            "tool_input": "ls",
+            "tool_output": "",
+            "tool_status": "success",
+            "latency_ms": 50
+          }
+        ],
+        "token_count": 2
+      },
+      {
+        "from": "gpt",
+        "value": "",
+        "token_count": 0
+      },
+      {
+        "from": "gpt",
+        "value": "Done",
+        "token_count": 1
+      }
+    ],
+    "turn_count": 4,
+    "total_tool_calls": 1,
+    "successful_tool_calls": 0,
+    "failed_tool_calls": 1
+  },
+  "outcome": {
+    "user_rating": 5,
+    "outcome_tags": ["task_failed", "hallucination"],
+    "task_category": "coding"
+  }
+}

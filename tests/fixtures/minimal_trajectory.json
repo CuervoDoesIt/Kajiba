@@ -1,0 +1,22 @@
+{
+  "schema_version": "0.1.0",
+  "record_type": "task_trajectory",
+  "created_at": "2026-03-29T12:00:00Z",
+  "trajectory": {
+    "format": "sharegpt_extended",
+    "conversations": [
+      {
+        "from": "human",
+        "value": "What is the capital of France?"
+      },
+      {
+        "from": "gpt",
+        "value": "The capital of France is Paris. It is the largest city in France and serves as the country's political, economic, and cultural center."
+      }
+    ],
+    "turn_count": 2,
+    "total_tool_calls": 0,
+    "successful_tool_calls": 0,
+    "failed_tool_calls": 0
+  }
+}

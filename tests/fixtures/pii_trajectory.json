@@ -1,0 +1,83 @@
+{
+  "schema_version": "0.1.0",
+  "record_type": "task_trajectory",
+  "created_at": "2026-03-27T08:30:00Z",
+  "trajectory": {
+    "format": "sharegpt_extended",
+    "conversations": [
+      {
+        "from": "human",
+        "value": "I need help setting up my project at /home/johnsmith/projects/secret-startup/. My email is john.smith@acmecorp.com and I need to configure the database."
+      },
+      {
+        "from": "gpt",
+        "value": "I'll help you set up the project. Let me check the configuration at /Users/johnsmith/projects/secret-startup/ first.",
+        "tool_calls": [
+          {
+            "tool_name": "terminal",
+            "tool_input": "cat /home/johnsmith/projects/secret-startup/.env",
+            "tool_output": "DATABASE_URL=postgres://admin:supersecretpassword@db.internal.acmecorp.com:5432/production\nAPI_KEY=sk-abcdefghijklmnopqrstuvwxyz1234567890\nAWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE\nGITHUB_TOKEN=ghp_abcdefghijklmnopqrstuvwxyz1234567890",
+            "tool_status": "success",
+            "latency_ms": 50
+          }
+        ],
+        "token_count": 150,
+        "generation_latency_ms": 1200
+      },
+      {
+        "from": "human",
+        "value": "The server at 192.168.1.100 needs to connect to redis://cache.internal:6379/0 and you can reach me at +1 (555) 123-4567 if there are issues."
+      },
+      {
+        "from": "gpt",
+        "value": "I see the configuration. Let me also check the SSH key at ~/.ssh/id_rsa and the certificate. Here's what I found:\n\n-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQEA0Z3VS5JJcds3xfn/ygWgF\nSOMEFAKEKEYDATATHATLOOKSLIKEAREALKEY\n-----END RSA PRIVATE KEY-----\n\nI'll set up the connection with token = \"my-secret-bearer-token\" and configure the ODBC connection: Server=db-prod.corp;Database=maindb;",
+        "tool_calls": [
+          {
+            "tool_name": "terminal",
+            "tool_input": "mysql://root:password@mysql.local:3306/appdb",
+            "tool_output": "Connected to mysql.local",
+            "tool_status": "success",
+            "latency_ms": 200
+          }
+        ],
+        "token_count": 200,
+        "generation_latency_ms": 2000
+      },
+      {
+        "from": "human",
+        "value": "Also check the config at C:\\Users\\jsmith\\AppData\\Local\\myapp\\config.json"
+      },
+      {
+        "from": "gpt",
+        "value": "I found the configuration file. The JWT token eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c is valid. I'll also need the GitLab token glpat-xxxxxxxxxxxxxxxxxxxx to access the repo. The SSH key ssh-rsa AAAA1234567890abcdefghijklmnopqrstuvwxyz user@host is registered. You can also use Bearer mytoken123.secret for API access.",
+        "token_count": 180,
+        "generation_latency_ms": 1800
+      }
+    ],
+    "turn_count": 6,
+    "total_tool_calls": 2,
+    "successful_tool_calls": 2,
+    "failed_tool_calls": 0
+  },
+  "outcome": {
+    "user_rating": 3,
+    "outcome_tags": ["task_completed"],
+    "user_comment": "Contact me at john.smith@acmecorp.com if there are problems with /home/johnsmith/projects/secret-startup/deploy.sh",
+    "task_category": "devops",
+    "difficulty_estimate": "medium"
+  },
+  "pain_points": [
+    {
+      "category": "safety_concern",
+      "severity": "high",
+      "description": "Model displayed contents of .env file containing credentials from /home/johnsmith/projects/secret-startup/.env",
+      "turn_index": 1,
+      "reproducible": true
+    }
+  ],
+  "submission": {
+    "kajiba_plugin_version": "0.1.0",
+    "consent_level": "full",
+    "pii_scrub_version": "0.1.0"
+  }
+}
