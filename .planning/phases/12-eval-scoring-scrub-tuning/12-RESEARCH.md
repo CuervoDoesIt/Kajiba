@@ -465,24 +465,26 @@ def _render_confidence(result) -> Table:
 
 **If this table is empty:** N/A — four assumed (all discretion items, none compliance/security-critical).
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Should `experiment scrub` write back to the store or only stdout/return?**
    - What we know: D-08 says scrub fires at the share/export boundary (Phase 15) or via the
      explicit command; store-raw is the at-rest invariant.
    - What's unclear: Whether `kajiba experiment scrub <id>` should overwrite/emit a scrubbed
      copy or just preview the redactions for the user.
-   - Recommendation: Default to **preview/emit-to-stdout (or `--out FILE`)**, never overwrite the
+   - RESOLVED: Default to **preview/emit-to-stdout (or `--out FILE`)**, never overwrite the
      raw store file, to preserve the store-raw invariant (D-08) and keep the real output for
-     Phase 13's reviewer. Let Phase 15 own the actual export-write.
+     Phase 13's reviewer. Let Phase 15 own the actual export-write. Implemented in Plan 04
+     (`experiment scrub` with `--out`; test asserts on-disk bytes unchanged).
 
 2. **`potential_names_redacted` has no source pattern.**
    - What we know: `ScrubLog.potential_names_redacted` exists (schema line 226) but `SCRUB_PATTERNS`
      has no "names" category and `scrub_text` never sets it (name detection is the GLiNER
      `scrubber_llm` path, PRIV-01, not in scope here).
-   - Recommendation: Leave `potential_names_redacted=0` in the experiment `ScrubLog` (consistent
+   - RESOLVED: Leave `potential_names_redacted=0` in the experiment `ScrubLog` (consistent
      with `scrub_record`, which also omits it). Document that semantic name redaction is the
-     Phase-7 GLiNER layer, out of scope for Phase 12's regex reuse.
+     Phase-7 GLiNER layer, out of scope for Phase 12's regex reuse. Implemented in Plan 03
+     (`scrub_experiment` ScrubLog construction leaves `potential_names_redacted=0`).
 
 ## Environment Availability
 
