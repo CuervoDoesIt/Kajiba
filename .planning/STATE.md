@@ -4,13 +4,13 @@ milestone: v1.1
 milestone_name: Hermes Pipeline Validation
 status: executing
 stopped_at: Phase 12 context gathered
-last_updated: "2026-06-04T10:56:50.467Z"
-last_activity: 2026-06-04 -- Phase 12 planning complete
+last_updated: "2026-06-04T11:08:03.503Z"
+last_activity: 2026-06-04 -- Phase 12 execution started
 progress:
   total_phases: 4
   completed_phases: 2
-  total_plans: 6
-  completed_plans: 6
+  total_plans: 10
+  completed_plans: 7
   percent: 50
 ---
 
@@ -21,15 +21,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-02)
 
 **Core value:** Real-world AI session data, tagged with full runtime context, flowing into a community dataset that accelerates local model fine-tuning for everyone.
-**Current focus:** Phase 11 — experiment-logging-private-store
+**Current focus:** Phase 12 — eval-scoring-scrub-tuning
 **Parallel milestone:** v1.2 Experiment Logging (Dual-Use), Phases 10-15 — recommended start: Phase 10 (schema, v1.1-independent). See `.planning/seeds/v1.2-experiment-logging.md`.
 
 ## Current Position
 
-Phase: 11
-Plan: Not started
+Phase: 12 (eval-scoring-scrub-tuning) — EXECUTING
+Plan: 2 of 4
 Status: Ready to execute
-Last activity: 2026-06-04 -- Phase 12 planning complete
+Last activity: 2026-06-04 -- Phase 12 execution started
 
 Progress: [██████████] 100%
 
@@ -55,6 +55,7 @@ Progress: [██████████] 100%
 - Trend: Starting new milestone
 
 *Updated after each plan completion*
+| Phase 12 P01 | 6m | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -73,6 +74,7 @@ Progress: [██████████] 100%
 - 11-02: Added the `kajiba experiment` CLI surface (ELOG-01). New `experiment` Click group with `log` + `list`. `experiment log` has three input modes — `--from FILE` (load JSON, apply scalar overrides to the raw dict BEFORE validation per D-11, validate via `load_record` NOT `validate_record` per Pitfall 1, reject non-`model_experiment` with `click.ClickException`), scalar flags (`--score`/`--type`/`--task-category`/`--local-model` → `build_experiment_record`), and an interactive Rich fallback (prompts experiment_id/task_category/task_description/eval_score/experiment_type/local_model.model_name/local_model_output — minimal nested field only, Pitfall 3). All three modes funnel through `log_experiment(rec, EXPERIMENTS_DIR)` (D-08, CLI never writes the file). `experiment list` globs `exp_*.json` into a Rich table read-back. Decision: interactive prompt order locked to match the scripted-input test; list uses lightweight `json.loads` (data already validated at log time). Full suite 274 passed / 2 pre-existing skips, 0 regressions. Commits: test f7c7b91, feat 4b2dc5f.
 - 11-03: Closed the active half of ELOG-03 (publish exclusion guard + D-14 regression). `publish` Step 4 loop now skips any outbox record whose raw-dict `record_kind == "model_experiment"` BEFORE `validate_record` (Pitfall 1 / T-11-10), printing `Skipping experiment record (never published): <name>` and `continue` — defense in depth over the structural `OUTBOX_DIR`/`EXPERIMENTS_DIR` split from 11-01 (T-11-08, D-13). `submit` gained a defensive `model_experiment` `click.ClickException` (T-11-09, Assumption A2 — structurally unreachable today, single guard not dead branching). New `tests/test_experiment_exclusion.py`: `test_publish_skips_experiment` (misplaced experiment in outbox skipped, network-free via a `GitHubOps` stub whose `check_auth` passes so the guard loop is reached but no PR opens) + `test_experiment_absent_from_community_paths` (D-14: real `log_experiment` write proven absent from outbox glob, byte-identical on disk, never in publish output). Full suite 276 passed / 2 pre-existing yaml-soft-dep skips, 0 regressions. ELOG-03 fully satisfied. Phase 11 ready for /gsd-verify-work (phase header owned by orchestrator). Commits: test c43d63f, feat 5610028.
 - 10-03: Authored `tests/test_schema_backcompat.py` (parametrized golden-ID tripwire over all 5 fixtures + legacy-load + record_kind default + base inheritance + load dispatch) and `tests/test_schema_experiment.py` (round-trip equality + vocab rejection + recommended_action=None + lessons_learned=[] + eval_score bounds). Schema untouched (`git diff --quiet src/kajiba/schema.py` exits 0). Full suite: 264 passed, 2 PRE-EXISTING skips (yaml soft-dep not installed in test_cli.py/test_config.py), 0 failures. All ESCH-01..05 now covered by passing automated tests. Phase 10 COMPLETE. (Note: 10-VALIDATION.md `wave_0_complete`/`nyquist_compliant` flip deferred to verify-work.)
+- [Phase ?]: 12-01: Wave 0 test foundation — 3 experiment fixtures (complete/thin/pii) + 2 RED scaffolds (8 contract tests). thin fixture required-fields-only so Plan 02 thin-band contract holds; pii fixture has real 64-hex model_hash + GPU name as byte-identical preservation targets. ScrubLog imported from kajiba.schema. RED confirmed (missing kajiba.eval_scorer/experiment_scrub only); pre-existing suite 276 passed, 0 regressions. Commits: 3a75662, e102686.
 
 ### Pending Todos
 
@@ -86,6 +88,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-06-04T09:36:13.934Z
+Last session: 2026-06-04T11:07:41.457Z
 Stopped at: Phase 12 context gathered
 Resume file: .planning/phases/12-eval-scoring-scrub-tuning/12-CONTEXT.md

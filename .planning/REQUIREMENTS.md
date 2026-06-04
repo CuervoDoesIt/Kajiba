@@ -61,8 +61,8 @@ Requirements for the Experiment Logging (Dual-Use) milestone. Runs **in parallel
 
 ### Experiment Evaluation & Privacy
 
-- [ ] **EEVAL-01**: An eval-specific scorer produces quality signals suited to model-output evaluation, independent of the coding-trajectory scorer
-- [ ] **EEVAL-02**: Scrubbing on experiment records retains model-identity and hardware fields needed for analysis while still redacting personal/PII data
+- [x] **EEVAL-01**: An eval-specific scorer produces quality signals suited to model-output evaluation, independent of the coding-trajectory scorer
+- [x] **EEVAL-02**: Scrubbing on experiment records retains model-identity and hardware fields needed for analysis while still redacting personal/PII data
 
 ### Experiment Review & Drift
 
@@ -140,8 +140,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ELOG-01 | Phase 11 | Complete (11-02) |
 | ELOG-02 | Phase 11 | Complete (11-01) |
 | ELOG-03 | Phase 11 | Complete |
-| EEVAL-01 | Phase 12 | Pending |
-| EEVAL-02 | Phase 12 | Pending |
+| EEVAL-01 | Phase 12 | Complete |
+| EEVAL-02 | Phase 12 | Complete |
 | EREV-01 | Phase 13 | Pending |
 | EREV-02 | Phase 13 | Pending |
 | EREV-03 | Phase 13 | Pending |
@@ -150,6 +150,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | EEXP-02 | Phase 15 | Pending |
 
 **Coverage:**
+
 - v1.1 requirements: 20 total — mapped to phases: 20, unmapped: 0
 - v1.2 requirements: 15 total — mapped to phases: 15, unmapped: 0
 

@@ -162,7 +162,7 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
 
 **Wave 1**
 
-- [ ] 12-01-PLAN.md — Wave 0 test foundation: 3 experiment fixtures (complete/thin/pii) + RED scaffolds for eval scorer & experiment scrub (EEVAL-01/02)
+- [x] 12-01-PLAN.md — Wave 0 test foundation: 3 experiment fixtures (complete/thin/pii) + RED scaffolds for eval scorer & experiment scrub (EEVAL-01/02)
 
 **Wave 2** *(blocked on Wave 1 completion; 12-02 ∥ 12-03 parallel — no file overlap)*
 
@@ -234,7 +234,7 @@ Two parallel tracks share a foundation. Execute by dependency, not strict numeri
 | 9. Fine-Tune Experiment | v1.1 | 0/0 | Not started | - |
 | 10. Experiment Schema Foundation | v1.2 | 3/3 | Complete    | 2026-06-03 |
 | 11. Experiment Logging & Private Store | v1.2 | 3/3 | Complete    | 2026-06-04 |
-| 12. Eval Scoring & Scrub Tuning | v1.2 | 0/4 | Planned | - |
+| 12. Eval Scoring & Scrub Tuning | v1.2 | 1/4 | In Progress|  |
 | 13. Reviewer Critique & Drift | v1.2 | 0/0 | Not started | - |
 | 14. Live Experiment Capture | v1.2 | 0/0 | Not started | - |
 | 15. Analysis Export & Practice-Project Integration | v1.2 | 0/0 | Not started | - |
