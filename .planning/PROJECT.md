@@ -35,6 +35,7 @@ Real-world AI session data, tagged with full runtime context (model identity, co
 - ✓ Browsable dataset catalog — `kajiba browse` with model drill-down and `kajiba download` with filtered subsets — v1.0
 - ✓ `ExperimentRecord` type on a shared `RecordBase` + `record_kind` discriminator and `load_record()` factory, back-compatible with existing records (byte-identical record/submission IDs, SCHEMA_VERSION 0.2.0) — v1.2 Phase 10
 - ✓ `kajiba experiment` CLI (`log` --from/flags/interactive + `list`) and programmatic `log_experiment`/`build_experiment_record` entry points writing to a private `~/.hermes/kajiba/experiments/` store, structurally separated from staging/outbox and actively excluded from publish/submit (D-13 write guard + raw-dict `record_kind` publish skip) — v1.2 Phase 11 (ELOG-01/02/03)
+- ✓ Eval-specific completeness/confidence scorer (`eval_scorer.compute_eval_confidence`, `complete`/`partial`/`thin` bands distinct from gold/silver/bronze, experiment-only guard) + experiment-aware PII scrub (`experiment_scrub.scrub_experiment` — five free-text surfaces redacted via the shared engine while model identity & full hardware stay byte-identical) + `kajiba experiment score`/`scrub` CLI and Confidence column — v1.2 Phase 12 (EEVAL-01/02)
 
 ### Active
 
@@ -49,7 +50,7 @@ Real-world AI session data, tagged with full runtime context (model identity, co
 <!-- Parallel milestone: v1.2 Experiment Logging (Dual-Use) -->
 
 - [x] `kajiba experiment` CLI + programmatic deliberate logging into a private local store (no community publish) — validated in Phase 11
-- [ ] Eval-specific scorer and experiment-aware scrub tuning (preserve model/hardware fields)
+- [x] Eval-specific scorer and experiment-aware scrub tuning (preserve model/hardware fields) — validated in Phase 12 (EEVAL-01/02)
 - [ ] Reviewer-model critique attachment, queryable `lessons_learned`, and quality-drift detection
 - [ ] Live experiment capture via shared Hermes hooks (depends on v1.1 Phase 6–7)
 - [ ] Analysis-oriented export + Nemotron/Qwen/Gemma practice-project integration
@@ -145,4 +146,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-04 after Phase 11 (Experiment Logging & Private Store) complete — `kajiba experiment` CLI + programmatic logging into a private, publish-excluded local store (ELOG-01/02/03)*
+*Last updated: 2026-06-04 after Phase 12 (Eval Scoring & Scrub Tuning) complete — eval-native confidence scorer + experiment-aware PII scrub (model/hardware preserved byte-identical) + `kajiba experiment score`/`scrub` CLI (EEVAL-01/02)*
