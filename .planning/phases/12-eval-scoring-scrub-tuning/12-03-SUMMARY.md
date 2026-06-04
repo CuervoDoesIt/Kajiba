@@ -26,6 +26,7 @@ key-files:
   modified: []
 decisions:
   - "Docstring describes the privacy SKIP boundary in prose (no literal helper names) so the portable no-coupling source scan passes while the intent stays documented."
+requirements-completed: [EEVAL-02]
 metrics:
   duration: ~5m
   completed: 2026-06-04
