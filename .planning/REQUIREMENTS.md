@@ -31,9 +31,9 @@ Requirements for Hermes Pipeline Validation milestone. Each maps to roadmap phas
 
 ### Environment
 
-- [ ] **ENV-01**: Documented WSL2 + NVIDIA GPU passthrough + Hermes Agent v0.6.0 + Ollama setup guide with verification steps
-- [ ] **ENV-02**: Documented Ollama configuration (num_ctx override, Hermes 3 8B model pull, Hermes custom endpoint setup)
-- [ ] **ENV-03**: Dev symlink script/instructions linking Kajiba plugin directory into `~/.hermes/plugins/` for development workflow
+- [x] **ENV-01**: Documented WSL2 + NVIDIA GPU passthrough + Hermes Agent v0.6.0 + Ollama setup guide with verification steps
+- [x] **ENV-02**: Documented Ollama configuration (num_ctx override, Hermes 3 8B model pull, Hermes custom endpoint setup)
+- [x] **ENV-03**: Dev symlink script/instructions linking Kajiba plugin directory into `~/.hermes/plugins/` for development workflow
 
 ### Validation
 
@@ -126,9 +126,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PRIV-02 | Phase 7 | Pending |
 | PRIV-03 | Phase 7 | Pending |
 | PRIV-04 | Phase 7 | Pending |
-| ENV-01 | Phase 6 | Pending |
-| ENV-02 | Phase 6 | Pending |
-| ENV-03 | Phase 6 | Pending |
+| ENV-01 | Phase 6 | Complete |
+| ENV-02 | Phase 6 | Complete |
+| ENV-03 | Phase 6 | Complete |
 | VAL-01 | Phase 8 | Pending |
 | VAL-02 | Phase 8 | Pending |
 | VAL-03 | Phase 8 | Pending |

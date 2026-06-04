@@ -4,13 +4,13 @@ milestone: v1.2
 milestone_name: Experiment Logging
 status: executing
 stopped_at: "Completed 06-02-PLAN.md (HERMES_HOME migration + collector adapt + hermes_integration deletion). Next: 06-03 (kajiba.plugin package)."
-last_updated: "2026-06-04T23:15:03.888Z"
+last_updated: "2026-06-04T23:19:49.228Z"
 last_activity: 2026-06-04 -- Phase 06 Plan 02 complete (HERMES_HOME migration + collector adapt + hermes_integration deletion)
 progress:
   total_phases: 10
   completed_phases: 4
   total_plans: 20
-  completed_plans: 18
+  completed_plans: 19
   percent: 40
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-04-02)
 ## Current Position
 
 Phase: 06 (environment-plugin-foundation) — EXECUTING
-Plan: 4 of 5
+Plan: 5 of 5
 Status: Ready to execute
 Last activity: 2026-06-04 -- Phase 06 Plan 02 complete (HERMES_HOME migration + collector adapt + hermes_integration deletion)
 
@@ -70,6 +70,7 @@ Progress: [██████████] 100%
 | Phase 06 P01 | 3m | 3 tasks | 3 files |
 | Phase 06 P02 | 13m | 3 tasks | 8 files |
 | Phase 06 P03 | 6m | 2 tasks | 3 files |
+| Phase 06 P04 | 2m | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -105,6 +106,7 @@ Progress: [██████████] 100%
 
 - 06-02 (PLUG-03, D-07/08/09/10): Added `kajiba.config.get_hermes_home()` — the single HERMES_HOME resolver (reads os.environ every call, falls back to `~/.hermes`). Migrated all five modules (config/collector/cli/publisher/experiment_store) to route paths through it via the LOCKED constant-vs-lazy split: module-level KAJIBA_BASE/EXPERIMENTS_DIR/DOWNLOADS_DIR/CLONE_DIR stay constants (preserving ~30 monkeypatch sites), config.yaml read/write goes lazy in-body. experiment_store.EXPERIMENTS_DIR derives from get_hermes_home() (stays Click-free, NO cli import; parity test green because both use the same helper). collector.on_session_start now `(session_id, model_config=None, *, model_name=None, platform=None)` — legacy positional dict still works, omitted dict builds `{model_name, provider: platform}`, all-None builds `{}` (D-08). DELETED src/kajiba/hermes_integration.py (D-07); CLAUDE.md repointed to src/kajiba/plugin/ register(ctx). DEVIATION (Rule 1): dev machine's real HERMES_HOME leaked its profile config.yaml (`min_quality_tier: gold`) into pre-existing config tests that patched only Path.home — added `delenv("HERMES_HOME")` to the test_config.py fake_home fixture and an autouse fixture to test_cli.py TestConfigSubcommands (strengthens temp-home isolation, no assertion weakened). Baseline restored: 324 passed / 2 pre-existing yaml skips, 3 RED-by-design test_plugin.py (Plan 03 target), 0 regressions. Commits: feat ea5e958, feat 0026091, chore 5059003, fix f5acbf7.
 - [Phase ?]: 06-03 (PLUG-01/02, CAPT-01 code half): Built greenfield src/kajiba/plugin/ package replacing deleted hermes_integration.py. register(ctx) wires four hooks via ctx.register_hook fault-tolerantly; **kwargs-tolerant handlers (MP-2) dispatch to unchanged KajibaCollector; KAJIBA_DEBUG=1 logs kwarg name/type/repr[:120] (T-06-07) as Plan 05's live-discovery mechanism. Turn hooks debug-log only (Phase 7 boundary). plugin.yaml fields [ASSUMED] until Plan 05. 3 Plan 01 RED plugin tests GREEN; full suite 327 passed / 2 pre-existing skips, 0 regressions. Commits: c4b26d8, 60adf3b.
+- [Phase ?]: 06-04: Wrote docs/hermes-setup.md — checkpoint-gated WSL2/GPU/Ollama/Hermes v0.6.0/plugin setup guide (ENV-01/02/03, D-03/D-04). Five per-stage verification checkpoints; 3-command symlink dev workflow (ln -s src/kajiba/plugin into ~/.hermes/plugins/kajiba) with copy fallback; troubleshooting for MP-8 CUDA stub overwrite, MP-5 num_ctx truncation, MP-9 Ollama WSL2 binding; KAJIBA_DEBUG PII-in-logs security note (T-06-09). Commit: docs 875246f.
 
 ### Pending Todos
 
@@ -118,6 +120,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-06-04T23:14:29.247Z
+Last session: 2026-06-04T23:19:32.050Z
 Stopped at: Completed 06-02-PLAN.md (HERMES_HOME migration + collector adapt + hermes_integration deletion). Next: 06-03 (kajiba.plugin package).
 Resume file: .planning/phases/06-environment-plugin-foundation/06-CONTEXT.md
