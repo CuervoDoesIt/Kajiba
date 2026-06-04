@@ -64,6 +64,7 @@ console = Console()
 KAJIBA_BASE = Path.home() / ".hermes" / "kajiba"
 STAGING_DIR = KAJIBA_BASE / "staging"
 OUTBOX_DIR = KAJIBA_BASE / "outbox"
+EXPERIMENTS_DIR = KAJIBA_BASE / "experiments"
 DOWNLOADS_DIR = Path.home() / ".hermes" / "kajiba" / "downloads"
 
 
@@ -72,6 +73,7 @@ def _ensure_dirs() -> None:
     KAJIBA_BASE.mkdir(parents=True, exist_ok=True)
     STAGING_DIR.mkdir(parents=True, exist_ok=True)
     OUTBOX_DIR.mkdir(parents=True, exist_ok=True)
+    EXPERIMENTS_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def _load_latest_staging() -> Optional[KajibaRecord]:
