@@ -138,7 +138,7 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
 **Plans**: 3 plans
 **Wave 1**
 
-- [ ] 11-01-PLAN.md — Experiment store foundation: log_experiment/build_experiment_record, EXPERIMENTS_DIR + re-exports (ELOG-02, ELOG-03 structural)
+- [x] 11-01-PLAN.md — Experiment store foundation: log_experiment/build_experiment_record, EXPERIMENTS_DIR + re-exports (ELOG-02, ELOG-03 structural) — 3 tasks, 270 passed/2 skipped, 0 regressions
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
