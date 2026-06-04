@@ -59,6 +59,7 @@ from kajiba.experiment_store import (
     build_experiment_record, log_experiment, update_experiment,
 )
 from kajiba.eval_scorer import compute_eval_confidence
+from kajiba.experiment_drift import DRIFT_THRESHOLD, compute_drift
 from kajiba.experiment_scrub import scrub_experiment
 from kajiba.scorer import compute_quality_score
 from kajiba.scrubber import flag_org_domains, scrub_record
@@ -1464,6 +1465,128 @@ def experiment_lessons(
             if cat == wanted:
                 table.add_row(rec_id, cat, text)
     console.print(table)
+
+
+def _load_all_experiments() -> list[ExperimentRecord]:
+    """Load every valid experiment record from the private store.
+
+    Globs ``exp_*.json`` and validates each via :func:`~kajiba.schema.load_record`,
+    keeping only :class:`~kajiba.schema.ExperimentRecord` instances. A single
+    malformed or non-experiment file is skipped (per-file ``try/except`` guard,
+    Pitfall 6) so one bad file never aborts a store-wide scan.
+
+    Returns:
+        The list of valid experiment records currently in the store.
+    """
+    EXPERIMENTS_DIR.mkdir(parents=True, exist_ok=True)
+    records: list[ExperimentRecord] = []
+    for f in sorted(EXPERIMENTS_DIR.glob("exp_*.json")):
+        try:
+            data = json.loads(f.read_text(encoding="utf-8"))
+            rec = load_record(data)
+        except Exception as exc:
+            logger.error("Failed to load experiment file %s: %s", f, exc)
+            continue
+        if isinstance(rec, ExperimentRecord):
+            records.append(rec)
+    return records
+
+
+@experiment.command("drift")
+@click.option(
+    "--id",
+    "record_id",
+    default=None,
+    help="Scope the scan to this record's (model, task) group and write/clear "
+    "the WHOLE group's flags (locked Open Question 2).",
+)
+@click.option(
+    "--threshold",
+    type=float,
+    default=None,
+    help="Override the default DRIFT_THRESHOLD (0.15); both directions (D-14).",
+)
+def experiment_drift(record_id: Optional[str], threshold: Optional[float]) -> None:
+    """Compute longitudinal quality drift and persist ``drift_flag`` (EREV-03).
+
+    Scans the experiment store (or one record's whole group when ``--id`` is
+    given), groups runs by ``(local_model.model_name, task_category)``, and
+    computes the drift verdict via
+    :func:`~kajiba.experiment_drift.compute_drift` (13-03). Every record whose
+    on-disk ``outcome.drift_flag`` differs from the verdict is rewritten through
+    the single write funnel :func:`_mutate_experiment` → ``update_experiment``
+    (D-03) — the command SETS and CLEARS flags idempotently so the store always
+    reflects current reality (D-15). Records already matching the verdict are not
+    rewritten (no needless disk churn).
+
+    With ``--id`` (locked Open Question 2), the scan and the writes span the
+    WHOLE group the record belongs to (the baseline requires the whole group, and
+    persisting the whole group keeps the verdict self-consistent); records in
+    other groups are untouched.
+
+    Args:
+        record_id: Optional record id; scopes the scan and writes to its group.
+        threshold: Optional absolute-deviation override for ``DRIFT_THRESHOLD``.
+    """
+    _ensure_dirs()
+    effective_threshold = threshold if threshold is not None else DRIFT_THRESHOLD
+
+    records = _load_all_experiments()
+
+    if record_id is not None:
+        # LOCKED Open Question 2: restrict to the target record's WHOLE group so
+        # the baseline is correct AND the persisted verdict is self-consistent.
+        target = _load_experiment(record_id)
+        group_key = (
+            target.experiment.local_model.model_name,
+            target.experiment.task_category,
+        )
+        records = [
+            r
+            for r in records
+            if (r.experiment.local_model.model_name, r.experiment.task_category)
+            == group_key
+        ]
+
+    verdict = compute_drift(records, effective_threshold)
+
+    table = Table(title="Drift scan")
+    table.add_column("Record ID")
+    table.add_column("Model")
+    table.add_column("Task")
+    table.add_column("Score", justify="right")
+    table.add_column("Drift")
+
+    changed = 0
+    for rec in records:
+        flagged = verdict[rec.record_id]
+        current = rec.outcome.drift_flag
+        if current != flagged:
+            # Route the change through the single write path (set AND clear, D-15).
+            def _apply_drift(r: ExperimentRecord, value: bool = flagged) -> None:
+                r.outcome.drift_flag = value
+
+            _mutate_experiment(rec.record_id, _apply_drift)
+            changed += 1
+            state = "flagged" if flagged else "cleared"
+        else:
+            state = "flagged" if flagged else "unchanged"
+        table.add_row(
+            rec.record_id,
+            rec.experiment.local_model.model_name,
+            rec.experiment.task_category,
+            str(rec.outcome.eval_score),
+            state,
+        )
+
+    console.print(table)
+    console.print(
+        Panel(
+            f"[green]Drift scan complete[/green]\n"
+            f"{changed} record(s) updated; threshold {effective_threshold}.",
+            title="kajiba experiment drift",
+        )
+    )
 
 
 @cli.command()
