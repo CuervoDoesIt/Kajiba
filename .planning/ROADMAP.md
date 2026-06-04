@@ -192,7 +192,7 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
 
 **Wave 2** *(blocked on 13-01; 13-02 ∥ 13-03 parallel — no file overlap)*
 
-- [ ] 13-02-PLAN.md — update_experiment() in-place overwrite write path + tightened D-13 guard (CR-01, WR-04)
+- [x] 13-02-PLAN.md — update_experiment() in-place overwrite write path + tightened D-13 guard (CR-01, WR-04)
 - [ ] 13-03-PLAN.md — experiment_drift.py: compute_drift + DRIFT_THRESHOLD pure compute (EREV-03)
 
 **Wave 3** *(blocked on 13-02 + 13-03)*

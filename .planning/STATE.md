@@ -4,8 +4,8 @@ milestone: v1.2
 milestone_name: Experiment Logging
 status: executing
 stopped_at: Phase 13 context gathered
-last_updated: "2026-06-04T20:52:17.486Z"
-last_activity: 2026-06-04 -- Phase 13 execution started
+last_updated: "2026-06-04T21:10:00.000Z"
+last_activity: 2026-06-04 -- Completed 13-02-PLAN.md (update_experiment GREEN)
 progress:
   total_phases: 10
   completed_phases: 3
@@ -28,9 +28,9 @@ See: .planning/PROJECT.md (updated 2026-04-02)
 ## Current Position
 
 Phase: 13 (reviewer-critique-drift) — EXECUTING
-Plan: 2 of 5
-Status: Ready to execute
-Last activity: 2026-06-04 -- Phase 13 execution started
+Plan: 3 of 5
+Status: Ready to execute (13-02 complete)
+Last activity: 2026-06-04 -- Completed 13-02-PLAN.md (update_experiment GREEN)
 
 Progress: [██████████] 100%
 
@@ -62,6 +62,7 @@ Progress: [██████████] 100%
 | Phase 12 P03 | 5m | 1 task | 1 file |
 | Phase 12 P04 | 10m | 2 tasks | 3 files |
 | Phase 13 P01 | 18m | 3 tasks | 3 files |
+| Phase 13 P02 | 12m | 1 task | 2 files |
 
 ## Accumulated Context
 
@@ -88,6 +89,8 @@ Progress: [██████████] 100%
 - 12-04: Wired EEVAL-01/02 into the user-facing CLI + package surface (the only plan touching shared cli.py/__init__.py). New `_load_experiment(record_id)` store-load helper enforces T-12-10 (resolved-parent path-traversal guard, `path.resolve().parent == EXPERIMENTS_DIR.resolve()`) and T-12-11 (`load_record` + `isinstance(ExperimentRecord)` → clean ClickException, no traceback). `experiment score <id>` renders a compute-on-read confidence breakdown (per-check sub-scores + composite + complete/partial/thin band) plus a SEPARATE panel surfacing answer-quality `eval_score` distinctly from record confidence (Pitfall 4, D-03 never persists). `experiment scrub <id> [--out FILE]` previews a redaction-count table + scrubbed free text, or writes a scrubbed COPY to `--out` — NEVER overwrites the raw `exp_<id>.json` (D-08, T-12-12). `experiment list` gained a distinct "Confidence" column alongside the preserved "Score" (eval_score) column (T-12-13). Re-exported `compute_eval_confidence` + `scrub_experiment` from `kajiba/__init__.py` (A3). Decision: scrub PII assertion keys on the email (`[REDACTED_EMAIL]`) the shared scrubber reliably handles; discovered a pre-existing community-scrubber gap (`sk-[a-zA-Z0-9]{32,}` misses `sk-live-` hyphenated keys) — logged to `deferred-items.md`, NOT fixed (D-09 forbids forking the shared regex layer; out of scope for the integration plan). 5 new CLI tests (reuse `_isolate_store` verbatim, Pitfall 3); full suite 289 passed / 2 pre-existing skips, 0 regressions. Phase 12 all 4 plans complete. Commits: feat b70ba48, test 944527d.
 - [Phase ?]: 13-01: Landed all Wave 0 RED scaffolds for Phase 13. update_experiment locked to EQUAL guard (accept store_dir==expected_base; reject otherwise; default base = experiment_store.EXPERIMENTS_DIR at call time). 3 pre-existing log_experiment tests migrated to expected_base=store (RED now via TypeError, GREEN post-13-02). New test_experiment_drift.py (7 pure compute_drift tests). CLI review/lessons/drift + _parse_lesson + WR-01/02/03 RED; _isolate_store also isolates experiment_store.EXPERIMENTS_DIR (raising=False until 13-02). EXPERIMENTS_DIR parity test guards literal drift. schema.py untouched; pre-existing suite green, 0 regressions.
 
+- 13-02 (TDD GREEN, EREV-01/02/03): Added `update_experiment(record, store_dir, *, expected_base=None) -> Path` to experiment_store.py — the in-place overwrite write path (CR-01 closed, D-03). It OMITS log_experiment's `dest.exists()` early-return so corrections always overwrite, re-validates after mutation (`ExperimentRecord.model_validate(model_dump(...))`, Pitfall 3 — models lack validate_assignment), computes identity via frozen Phase 10 methods (identity excludes outcome → filename byte-stable, D-01), and writes atomically (mkstemp + os.replace + BaseException cleanup, verbatim from log_experiment). Added `EXPERIMENTS_DIR = Path.home()/".hermes"/"kajiba"/"experiments"` module constant (stdlib Path only, NO cli import — Click-free; mirrors cli.py:70; parity test guards drift). WR-04: replaced the old leaf-name guard (`resolved.name != "experiments"`) with the EQUAL predicate (`store_dir.resolve() == expected_base.resolve()`) on BOTH log_experiment (now with keyword-only `expected_base` param) and update_experiment; `expected_base` defaults None → resolved to EXPERIMENTS_DIR IN-BODY at call time (monkeypatchable, never def-time bound). DECISION: log_experiment keeps dedup-skip for identical re-logs; CR-01 closed by routing corrections through update_experiment (D-03/A5). DEVIATION (Rule 1): pre-existing test_experiment_exclusion `_isolate_dirs` broke under the tightened guard (patched only cli.EXPERIMENTS_DIR, not experiment_store.EXPERIMENTS_DIR) — added the store-module monkeypatch, matching 13-01's `_isolate_store` pattern. test_experiment_store.py 11/11 GREEN (4 new update + 3 migrated log + parity + refuses-outbox + base); schema.py untouched (git diff --quiet exit 0); full suite 296 passed / 2 pre-existing skips, 0 regressions (remaining reds are 13-03 drift module + 13-04/05 CLI subcommands, RED by design). Commit: feat 299c5ec.
+
 ### Pending Todos
 
 None.
@@ -100,6 +103,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-06-04T20:52:12.813Z
-Stopped at: Phase 13 context gathered
-Resume file: .planning/phases/13-reviewer-critique-drift/13-CONTEXT.md
+Last session: 2026-06-04T21:10:00.000Z
+Stopped at: Completed 13-02-PLAN.md
+Resume file: None
