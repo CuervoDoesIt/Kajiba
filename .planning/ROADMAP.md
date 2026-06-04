@@ -60,7 +60,7 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
 
 **Wave 1**
 
-- [ ] 06-01-PLAN.md — Wave 0 test scaffolds: get_hermes_home cases, test_plugin (stub ctx/register/kwargs/debug), static hermes_integration guard (PLUG-03/PLUG-02/CAPT-01)
+- [x] 06-01-PLAN.md — Wave 0 test scaffolds: get_hermes_home cases, test_plugin (stub ctx/register/kwargs/debug), static hermes_integration guard (PLUG-03/PLUG-02/CAPT-01)
 
 **Wave 2** *(blocked on 06-01)*
 
@@ -265,7 +265,7 @@ Two parallel tracks share a foundation. Execute by dependency, not strict numeri
 | 3. Dataset Publishing | v1.0 | 2/2 | Complete | 2026-03-31 |
 | 4. Contribution Modes | v1.0 | 3/3 | Complete | 2026-04-01 |
 | 5. Consumer Experience | v1.0 | 2/2 | Complete | 2026-04-02 |
-| 6. Environment + Plugin Foundation | v1.1 | 0/0 | Not started | - |
+| 6. Environment + Plugin Foundation | v1.1 | 1/5 | In Progress|  |
 | 7. Turn Capture + Semantic PII Scrubbing | v1.1 | 0/0 | Not started | - |
 | 8. HITL Validation + Pipeline Integration | v1.1 | 0/0 | Not started | - |
 | 9. Fine-Tune Experiment | v1.1 | 0/0 | Not started | - |

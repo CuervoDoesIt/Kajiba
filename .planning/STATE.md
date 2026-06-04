@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Experiment Logging
-status: verifying
+status: executing
 stopped_at: "Phase 13 complete & verified. Phase 14 (ECAP-01) deferred — blocked on v1.1 Phase 6 & 7 (unbuilt). Decision: build v1.1 Phase 6 (plugin foundation) first."
-last_updated: "2026-06-04T22:48:32.672Z"
-last_activity: 2026-06-04 -- Phase 06 planning complete
+last_updated: "2026-06-04T22:58:40.853Z"
+last_activity: 2026-06-04 -- Phase 06 execution started
 progress:
   total_phases: 10
   completed_phases: 4
-  total_plans: 15
-  completed_plans: 15
+  total_plans: 20
+  completed_plans: 16
   percent: 40
 ---
 
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-02)
 
 **Core value:** Real-world AI session data, tagged with full runtime context, flowing into a community dataset that accelerates local model fine-tuning for everyone.
-**Current focus:** Phase 13 — reviewer-critique-drift
+**Current focus:** Phase 06 — environment-plugin-foundation
 **Active milestone:** v1.2 Experiment Logging (Dual-Use), Phases 10-15 — Phases 10-12 complete (audited 2026-06-04, see `.planning/v1.2-MILESTONE-AUDIT.md`); next up Phase 13.
 **Parallel milestone:** v1.1 Hermes Pipeline Validation, Phases 6-9 — not yet started (Phase 6 discussed only). Shared foundation Phases 6-7 also gate v1.2 Phase 14 live capture.
 
 ## Current Position
 
-Phase: 14
-Plan: Not started
-Status: Ready for /gsd-verify-work (all 5 plans complete; full suite green, schema frozen)
-Last activity: 2026-06-04 -- Phase 06 planning complete
+Phase: 06 (environment-plugin-foundation) — EXECUTING
+Plan: 2 of 5
+Status: Ready to execute
+Last activity: 2026-06-04 -- Phase 06 execution started
 
 Progress: [██████████] 100%
 
@@ -67,6 +67,7 @@ Progress: [██████████] 100%
 | Phase 13 P03 | 9m | 1 tasks | 1 files |
 | Phase 13 P04 | 14m | 2 tasks | 2 files |
 | Phase 13 P05 | 14m | 2 tasks | 2 files |
+| Phase 06 P01 | 3m | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -98,6 +99,7 @@ Progress: [██████████] 100%
 - [Phase ?]: 13-03 (TDD GREEN, EREV-03): Added src/kajiba/experiment_drift.py — pure Click-free stdlib compute_drift(records, threshold=DRIFT_THRESHOLD)->dict[str,bool] mirroring eval_scorer's shape but verdict PERSISTED by caller (D-02, vs compute-on-read). Groups by (local_model.model_name, task_category); flags both directions (D-14) beyond DRIFT_THRESHOLD=0.15 (flag-only, no config read); <2-run guard before any mean() call; verdict spans ALL record_ids for idempotent set/clear (D-15). DEVIATION (Rule 1): plan/RESEARCH specified leave-one-out baseline but it flagged non-outlier peers, contradicting locked 13-01 tests — switched to WHOLE-GROUP mean (A1/Discretion #4 delegate baseline choice). 7/7 drift tests GREEN; schema.py untouched; full suite 303 passed (+7 vs 296), 19 fails all confined to test_cli_experiment.py (13-04/05 CLI subcommands, RED by design), 0 regressions. Commit: feat 2bd3530.
 
 - 13-05 (TDD GREEN, EREV-03/02): Added `kajiba experiment drift` to cli.py — globs the store via new `_load_all_experiments` (per-file `try/except continue`, Pitfall 6), runs `compute_drift`, and idempotently SETs/CLEARs `outcome.drift_flag` through the single `_mutate_experiment` → `update_experiment` funnel (D-15; only records whose on-disk flag DIFFERS from the verdict are rewritten — no disk churn). `--threshold` overrides `DRIFT_THRESHOLD`; `--id` scopes the scan AND the writes to the target record's WHOLE `(model_name, task_category)` group (locked Open Question 2), leaving other groups untouched. Added the cli.py `from kajiba.experiment_drift import DRIFT_THRESHOLD, compute_drift` import (first use, owned here; 13-04 added only the `__init__.py` re-export). Enriched `experiment list` with `Lessons` (count) + `Drift` (⚠) columns read from the RAW dict with the per-file guard preserved. DEVIATION (Rule 1): switched `compute_drift` baseline from 13-03's whole-group MEAN to NEAREST-IN-GROUP-NEIGHBOR distance — the locked 13-01 CLI tests fail under mean/median because a `[0.90,0.90,0.40]` group's mean (0.733) flags the consistent 0.90 runs, and a balanced two-cluster group (four 0.90s + three ~0.40s) cannot clear via mean/median; nearest-neighbor (a run drifts only with NO peer within threshold, both directions D-14) satisfies all 7 unit + 2 CLI tests. Phase gate: full suite 322 passed / 2 pre-existing skips, 0 regressions; `git diff --quiet src/kajiba/schema.py` exit 0. Phase 13 COMPLETE — ready for /gsd-verify-work. Commits: feat 4742cee, feat 62194c5.
+- [Phase ?]: 06-01: Wave 0 RED scaffolds for Phase 6 — TestGetHermesHome (test_config.py), test_plugin.py (StubCtx + register/kwargs/debug), test_no_hermes_integration.py (D-07 static guard). All RED only on not-yet-built symbols (get_hermes_home, kajiba.plugin) or the not-yet-deleted module; full suite collects exit 0. PyYAML temporarily installed only to observe acceptance, then removed (importorskip untouched).
 
 ### Pending Todos
 
@@ -111,6 +113,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-06-04T22:34:06.015Z
+Last session: 2026-06-04T22:58:33.352Z
 Stopped at: Phase 13 complete & verified. Phase 14 (ECAP-01) deferred — blocked on v1.1 Phase 6 & 7 (unbuilt). Decision: build v1.1 Phase 6 (plugin foundation) first.
 Resume file: .planning/phases/06-environment-plugin-foundation/06-CONTEXT.md
