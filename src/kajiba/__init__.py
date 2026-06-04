@@ -2,6 +2,11 @@
 
 __version__ = "0.2.0"
 
-from kajiba.experiment_store import build_experiment_record, log_experiment
+from kajiba.experiment_store import (
+    build_experiment_record,
+    log_experiment,
+    update_experiment,
+)
+from kajiba.experiment_drift import compute_drift
 from kajiba.eval_scorer import compute_eval_confidence
 from kajiba.experiment_scrub import scrub_experiment

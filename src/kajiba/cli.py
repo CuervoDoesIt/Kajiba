@@ -6,9 +6,10 @@ Kajiba session data.
 
 import json
 import logging
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 import click
 from rich.console import Console
@@ -46,12 +47,17 @@ from rich.progress import (
     TextColumn,
     TimeRemainingColumn,
 )
+from pydantic import ValidationError
+
 from kajiba.schema import (
-    EXPERIMENT_TYPES, OUTCOME_TAGS, PAIN_POINT_CATEGORIES, SCHEMA_VERSION,
-    ExperimentRecord, KajibaRecord, OutcomeSignals, PainPoint, QualityMetadata,
-    SubmissionMetadata, load_record, validate_record,
+    EXPERIMENT_TYPES, OUTCOME_TAGS, PAIN_POINT_CATEGORIES, RECOMMENDED_ACTIONS,
+    SCHEMA_VERSION, ExperimentRecord, KajibaRecord, ModelMetadata,
+    OutcomeSignals, PainPoint, QualityMetadata, SubmissionMetadata,
+    load_record, validate_record,
 )
-from kajiba.experiment_store import build_experiment_record, log_experiment
+from kajiba.experiment_store import (
+    build_experiment_record, log_experiment, update_experiment,
+)
 from kajiba.eval_scorer import compute_eval_confidence
 from kajiba.experiment_scrub import scrub_experiment
 from kajiba.scorer import compute_quality_score
@@ -69,6 +75,9 @@ STAGING_DIR = KAJIBA_BASE / "staging"
 OUTBOX_DIR = KAJIBA_BASE / "outbox"
 EXPERIMENTS_DIR = KAJIBA_BASE / "experiments"
 DOWNLOADS_DIR = Path.home() / ".hermes" / "kajiba" / "downloads"
+
+# Fallback category for a lesson recorded without an explicit ``category:`` prefix.
+UNCATEGORIZED = "uncategorized"
 
 
 def _ensure_dirs() -> None:
@@ -126,6 +135,97 @@ def _load_experiment(record_id: str) -> ExperimentRecord:
         )
 
     return rec
+
+
+def _mutate_experiment(
+    record_id: str,
+    mutate: Callable[[ExperimentRecord], None],
+) -> Path:
+    """Load an experiment, apply an in-place mutation, and persist it.
+
+    This is the CLI-side single write funnel (D-03, CR-01): every outcome or
+    experiment-metadata edit loads the record via the path-safe
+    :func:`_load_experiment`, applies ``mutate`` in place, and writes it back
+    through :func:`~kajiba.experiment_store.update_experiment` — the CLI never
+    opens an ``exp_*.json`` file for writing itself. The record identity
+    excludes outcome fields, so the on-disk filename stays byte-stable across
+    re-reviews (D-01).
+
+    Args:
+        record_id: The bare record id of the experiment to mutate.
+        mutate: A callback that edits the loaded ExperimentRecord in place.
+
+    Returns:
+        The Path of the written experiment file.
+    """
+    record = _load_experiment(record_id)
+    mutate(record)
+    return update_experiment(record, EXPERIMENTS_DIR)
+
+
+def _parse_lesson(lesson: str) -> tuple[str, str]:
+    """Split a stored lesson string into ``(category, text)``.
+
+    The category is the substring before the FIRST colon (lowercased); the
+    remainder — with any subsequent colons preserved — is the lesson text. A
+    lesson with no colon is returned under the ``UNCATEGORIZED`` category
+    (D-08, D-10). Uses :meth:`str.partition` (not :meth:`str.split`) so colons
+    inside the text (e.g. URLs) survive.
+
+    Args:
+        lesson: A stored lesson string, optionally ``"category: text"``.
+
+    Returns:
+        A ``(category, text)`` tuple with both parts stripped.
+    """
+    if ":" in lesson:
+        cat, _, text = lesson.partition(":")
+        return cat.strip().lower(), text.strip()
+    return UNCATEGORIZED, lesson.strip()
+
+
+def _read_critique_input(
+    critique: Optional[str],
+    from_path: Optional[str],
+) -> str:
+    """Resolve reviewer critique text from flag, file, or interactive paste.
+
+    Precedence (D-04): ``--critique`` wins; then ``--from FILE`` (a ``.json``
+    fragment yields its ``reviewer_critique`` field, anything else is read
+    raw); otherwise an offline multi-line paste is read from stdin. All modes
+    work without network access.
+
+    Args:
+        critique: Inline critique text from ``--critique`` (or None).
+        from_path: Path to a ``.txt``/``.json`` critique file (or None).
+
+    Returns:
+        The resolved critique text.
+
+    Raises:
+        click.ClickException: If a ``.json`` ``--from`` file is malformed.
+    """
+    if critique is not None:
+        return critique
+
+    if from_path is not None:
+        text = Path(from_path).read_text(encoding="utf-8")
+        if Path(from_path).suffix == ".json":
+            try:
+                obj = json.loads(text)
+            except json.JSONDecodeError as exc:
+                raise click.ClickException(f"Malformed JSON in {from_path}: {exc}")
+            if isinstance(obj, dict):
+                return obj.get("reviewer_critique", text)
+            return str(obj)
+        return text
+
+    # Interactive offline paste: read until EOF (Ctrl-D / Ctrl-Z+Enter).
+    console.print(
+        "[dim]Paste the critique, then press Ctrl-D (Unix) or "
+        "Ctrl-Z then Enter (Windows) to finish:[/dim]"
+    )
+    return sys.stdin.read().strip()
 
 
 def _load_latest_staging() -> Optional[KajibaRecord]:
