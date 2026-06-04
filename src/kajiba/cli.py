@@ -1014,11 +1014,19 @@ def experiment_log(
 
     model_overrides: dict = {}
     if model_json is not None:
-        model_overrides = json.loads(Path(model_json).read_text(encoding="utf-8"))
+        # WR-03: surface a friendly error instead of a raw traceback on bad JSON.
+        try:
+            model_overrides = json.loads(Path(model_json).read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            raise click.ClickException(f"Malformed JSON in {model_json}: {exc}")
 
     if from_path is not None:
         # D-10 file-first shared format.
-        data = json.loads(Path(from_path).read_text(encoding="utf-8"))
+        # WR-03: friendly error on malformed run JSON.
+        try:
+            data = json.loads(Path(from_path).read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            raise click.ClickException(f"Malformed JSON in {from_path}: {exc}")
         # D-11: apply scalar overrides to the RAW dict BEFORE validation
         # (these models have no validate_assignment, so mutate-then-validate).
         if eval_score is not None:
@@ -1031,8 +1039,24 @@ def experiment_log(
             exp = data.setdefault("experiment", {})
             local = exp.setdefault("local_model", {})
             local.update(model_overrides)
+        # WR-02 (1): a fragment that omits record_kind cannot be routed — surface
+        # a friendly error naming the missing field instead of letting it silently
+        # default to a coding_session and crash KajibaRecord validation.
+        if not isinstance(data, dict) or "record_kind" not in data:
+            raise click.ClickException(
+                f"Missing required field 'record_kind' in {from_path}: "
+                "an experiment fragment must declare \"record_kind\": "
+                "\"model_experiment\"."
+            )
         # Pitfall 1: load_record (not validate_record) routes to ExperimentRecord.
-        rec = load_record(data)
+        # WR-02 (2): wrap validation so ANY malformed/incomplete fragment yields a
+        # friendly ClickException instead of a raw ValidationError traceback.
+        try:
+            rec = load_record(data)
+        except ValidationError as exc:
+            raise click.ClickException(
+                f"Invalid experiment fragment in {from_path}: {exc}"
+            )
         if not isinstance(rec, ExperimentRecord):
             raise click.ClickException("--from file is not a model_experiment record.")
 
@@ -1055,6 +1079,21 @@ def experiment_log(
             local_model_name=model_name,
             local_model_output=local_model_output,
             eval_score=eval_score,
+        )
+
+    elif eval_score is not None or experiment_type is not None or task_category is not None:
+        # WR-01: SOME-but-not-all scalar flags supplied without --from. Name the
+        # missing flags instead of silently dropping into the interactive paste.
+        provided = {
+            "--score": eval_score is not None,
+            "--type": experiment_type is not None,
+            "--task-category": task_category is not None,
+        }
+        missing = [flag for flag, present in provided.items() if not present]
+        raise click.ClickException(
+            "Incomplete scalar flags: the scalar log mode requires --score, "
+            "--type, and --task-category together (or use --from FILE). "
+            f"Missing: {', '.join(missing)}."
         )
 
     else:
@@ -1257,6 +1296,174 @@ def experiment_scrub(record_id: str, out: Optional[str]) -> None:
             title="Scrubbed free text (raw store unchanged — D-08)",
         )
     )
+
+
+@experiment.command("review")
+@click.argument("record_id")
+@click.option(
+    "--critique",
+    default=None,
+    help="Inline reviewer critique text (highest precedence).",
+)
+@click.option(
+    "--from",
+    "from_path",
+    type=click.Path(exists=True),
+    default=None,
+    help="Read critique from a .txt (raw) or .json ({\"reviewer_critique\": ...}) file.",
+)
+@click.option(
+    "--reviewer-model",
+    "reviewer_model",
+    default=None,
+    help="Reviewer model name (e.g. gpt-4o); omit for a human reviewer (D-05).",
+)
+@click.option(
+    "--action",
+    "action",
+    type=click.Choice(list(RECOMMENDED_ACTIONS)),
+    default=None,
+    help="Recommended verdict for this run (D-06).",
+)
+def experiment_review(
+    record_id: str,
+    critique: Optional[str],
+    from_path: Optional[str],
+    reviewer_model: Optional[str],
+    action: Optional[str],
+) -> None:
+    """Attach a reviewer critique (and optional identity/verdict) to a run.
+
+    A reviewer — human or a model such as Grok — supplies a critique via
+    ``--critique``, ``--from FILE`` (.txt/.json), or an interactive offline
+    paste (D-04). Re-reviewing REPLACES the single ``reviewer_critique`` string
+    (D-07). ``--reviewer-model`` records the reviewer identity (omit = human,
+    D-05); ``--action`` records a vocab-validated verdict (D-06). All writes
+    funnel through :func:`_mutate_experiment` → ``update_experiment`` (D-03).
+
+    Args:
+        record_id: The bare record id of the experiment to review.
+        critique: Inline critique text (highest precedence).
+        from_path: Path to a .txt/.json critique file.
+        reviewer_model: Optional reviewer model name.
+        action: Optional recommended-action verdict.
+    """
+    text = _read_critique_input(critique, from_path)
+
+    def _apply_review(rec: ExperimentRecord) -> None:
+        rec.outcome.reviewer_critique = text
+        if reviewer_model is not None:
+            rec.experiment.reviewer_model = ModelMetadata(model_name=reviewer_model)
+        if action is not None:
+            rec.outcome.recommended_action = action
+
+    path = _mutate_experiment(record_id, _apply_review)
+    console.print(
+        Panel(
+            f"[green]Review saved[/green]\n{path}",
+            title="kajiba experiment review",
+        )
+    )
+
+
+@experiment.command("lessons")
+@click.argument("record_id", required=False)
+@click.option(
+    "--add",
+    "add",
+    multiple=True,
+    help="Add a lesson (repeatable). Combine with --category to tag it.",
+)
+@click.option(
+    "--category",
+    "category",
+    default=None,
+    help="Lesson category (e.g. prompting, http, tooling) — tags --add and "
+    "filters read/cross-record queries.",
+)
+def experiment_lessons(
+    record_id: Optional[str],
+    add: tuple[str, ...],
+    category: Optional[str],
+) -> None:
+    """Record or query category-tagged lessons learned (EREV-02).
+
+    Three modes:
+
+    * ``lessons <id> --add "..." [--category X]`` — append each lesson as
+      ``"category: text"`` (or raw text when no ``--category``); writes funnel
+      through :func:`_mutate_experiment` (D-03).
+    * ``lessons <id>`` — read mode: print the record's lessons, optionally
+      filtered by ``--category``.
+    * ``lessons --category X`` (no id) — store-wide query: aggregate matching
+      lessons across all records (D-11).
+
+    Args:
+        record_id: The bare record id (optional for cross-record queries).
+        add: Lessons to append (repeatable).
+        category: Optional category to tag added lessons or filter reads.
+    """
+    if add:
+        # (a) Write mode — require an id.
+        if not record_id:
+            raise click.ClickException("--add requires a <record_id>.")
+
+        def _apply_lessons(rec: ExperimentRecord) -> None:
+            for text in add:
+                if category is not None:
+                    rec.outcome.lessons_learned.append(f"{category.strip()}: {text}")
+                else:
+                    rec.outcome.lessons_learned.append(text)
+
+        path = _mutate_experiment(record_id, _apply_lessons)
+        console.print(
+            Panel(
+                f"[green]Added {len(add)} lesson(s)[/green]\n{path}",
+                title="kajiba experiment lessons",
+            )
+        )
+        return
+
+    if record_id:
+        # (b) Read mode — print one record's lessons, optionally filtered.
+        rec = _load_experiment(record_id)
+        wanted = category.strip().lower() if category is not None else None
+        table = Table(title=f"Lessons — {record_id}")
+        table.add_column("Category")
+        table.add_column("Lesson")
+        for lesson in rec.outcome.lessons_learned:
+            cat, text = _parse_lesson(lesson)
+            if wanted is not None and cat != wanted:
+                continue
+            table.add_row(cat, text)
+        console.print(table)
+        return
+
+    # (c) Cross-record query — requires --category.
+    if category is None:
+        raise click.ClickException(
+            "Provide a <record_id> to read/add, or --category to query "
+            "lessons across all records."
+        )
+
+    wanted = category.strip().lower()
+    EXPERIMENTS_DIR.mkdir(parents=True, exist_ok=True)
+    table = Table(title=f"Lessons across all records — category: {wanted}")
+    table.add_column("Record ID")
+    table.add_column("Category")
+    table.add_column("Lesson")
+    for f in sorted(EXPERIMENTS_DIR.glob("exp_*.json")):
+        try:
+            data = json.loads(f.read_text(encoding="utf-8"))
+        except Exception as exc:
+            logger.error("Failed to read experiment file %s: %s", f, exc)
+            continue
+        rec_id = str(data.get("record_id", ""))
+        for lesson in data.get("outcome", {}).get("lessons_learned", []):
+            cat, text = _parse_lesson(lesson)
+            if cat == wanted:
+                table.add_row(rec_id, cat, text)
+    console.print(table)
 
 
 @cli.command()
