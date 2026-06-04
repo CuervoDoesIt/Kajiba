@@ -136,8 +136,16 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
   3. Experiment records are written to a private namespace distinct from coding-session staging/outbox and never appear in publish/browse/download output
 
 **Plans**: 3 plans
+**Wave 1**
+
 - [ ] 11-01-PLAN.md — Experiment store foundation: log_experiment/build_experiment_record, EXPERIMENTS_DIR + re-exports (ELOG-02, ELOG-03 structural)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 11-02-PLAN.md — kajiba experiment CLI group: log (--from/flags/interactive) + list (ELOG-01)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 11-03-PLAN.md — Publish exclusion guard + D-14 regression + full-suite gate (ELOG-03 active)
 
 ### Phase 12: Eval Scoring & Scrub Tuning
