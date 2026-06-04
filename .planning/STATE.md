@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Experiment Logging
-status: executing
-stopped_at: Phase 13 context gathered
-last_updated: "2026-06-04T21:10:00.000Z"
+status: completed
+stopped_at: Completed 13-02-PLAN.md
+last_updated: "2026-06-04T20:58:47.567Z"
 last_activity: 2026-06-04 -- Completed 13-02-PLAN.md (update_experiment GREEN)
 progress:
   total_phases: 10
   completed_phases: 3
   total_plans: 15
-  completed_plans: 11
+  completed_plans: 13
   percent: 30
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-04-02)
 ## Current Position
 
 Phase: 13 (reviewer-critique-drift) — EXECUTING
-Plan: 3 of 5
+Plan: 4 of 5
 Status: Ready to execute (13-02 complete)
 Last activity: 2026-06-04 -- Completed 13-02-PLAN.md (update_experiment GREEN)
 
@@ -63,6 +63,7 @@ Progress: [██████████] 100%
 | Phase 12 P04 | 10m | 2 tasks | 3 files |
 | Phase 13 P01 | 18m | 3 tasks | 3 files |
 | Phase 13 P02 | 12m | 1 task | 2 files |
+| Phase 13 P03 | 9m | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -90,6 +91,7 @@ Progress: [██████████] 100%
 - [Phase ?]: 13-01: Landed all Wave 0 RED scaffolds for Phase 13. update_experiment locked to EQUAL guard (accept store_dir==expected_base; reject otherwise; default base = experiment_store.EXPERIMENTS_DIR at call time). 3 pre-existing log_experiment tests migrated to expected_base=store (RED now via TypeError, GREEN post-13-02). New test_experiment_drift.py (7 pure compute_drift tests). CLI review/lessons/drift + _parse_lesson + WR-01/02/03 RED; _isolate_store also isolates experiment_store.EXPERIMENTS_DIR (raising=False until 13-02). EXPERIMENTS_DIR parity test guards literal drift. schema.py untouched; pre-existing suite green, 0 regressions.
 
 - 13-02 (TDD GREEN, EREV-01/02/03): Added `update_experiment(record, store_dir, *, expected_base=None) -> Path` to experiment_store.py — the in-place overwrite write path (CR-01 closed, D-03). It OMITS log_experiment's `dest.exists()` early-return so corrections always overwrite, re-validates after mutation (`ExperimentRecord.model_validate(model_dump(...))`, Pitfall 3 — models lack validate_assignment), computes identity via frozen Phase 10 methods (identity excludes outcome → filename byte-stable, D-01), and writes atomically (mkstemp + os.replace + BaseException cleanup, verbatim from log_experiment). Added `EXPERIMENTS_DIR = Path.home()/".hermes"/"kajiba"/"experiments"` module constant (stdlib Path only, NO cli import — Click-free; mirrors cli.py:70; parity test guards drift). WR-04: replaced the old leaf-name guard (`resolved.name != "experiments"`) with the EQUAL predicate (`store_dir.resolve() == expected_base.resolve()`) on BOTH log_experiment (now with keyword-only `expected_base` param) and update_experiment; `expected_base` defaults None → resolved to EXPERIMENTS_DIR IN-BODY at call time (monkeypatchable, never def-time bound). DECISION: log_experiment keeps dedup-skip for identical re-logs; CR-01 closed by routing corrections through update_experiment (D-03/A5). DEVIATION (Rule 1): pre-existing test_experiment_exclusion `_isolate_dirs` broke under the tightened guard (patched only cli.EXPERIMENTS_DIR, not experiment_store.EXPERIMENTS_DIR) — added the store-module monkeypatch, matching 13-01's `_isolate_store` pattern. test_experiment_store.py 11/11 GREEN (4 new update + 3 migrated log + parity + refuses-outbox + base); schema.py untouched (git diff --quiet exit 0); full suite 296 passed / 2 pre-existing skips, 0 regressions (remaining reds are 13-03 drift module + 13-04/05 CLI subcommands, RED by design). Commit: feat 299c5ec.
+- [Phase ?]: 13-03 (TDD GREEN, EREV-03): Added src/kajiba/experiment_drift.py — pure Click-free stdlib compute_drift(records, threshold=DRIFT_THRESHOLD)->dict[str,bool] mirroring eval_scorer's shape but verdict PERSISTED by caller (D-02, vs compute-on-read). Groups by (local_model.model_name, task_category); flags both directions (D-14) beyond DRIFT_THRESHOLD=0.15 (flag-only, no config read); <2-run guard before any mean() call; verdict spans ALL record_ids for idempotent set/clear (D-15). DEVIATION (Rule 1): plan/RESEARCH specified leave-one-out baseline but it flagged non-outlier peers, contradicting locked 13-01 tests — switched to WHOLE-GROUP mean (A1/Discretion #4 delegate baseline choice). 7/7 drift tests GREEN; schema.py untouched; full suite 303 passed (+7 vs 296), 19 fails all confined to test_cli_experiment.py (13-04/05 CLI subcommands, RED by design), 0 regressions. Commit: feat 2bd3530.
 
 ### Pending Todos
 
@@ -103,6 +105,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-06-04T21:10:00.000Z
+Last session: 2026-06-04T20:58:38.542Z
 Stopped at: Completed 13-02-PLAN.md
 Resume file: None

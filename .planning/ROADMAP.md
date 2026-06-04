@@ -193,7 +193,7 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
 **Wave 2** *(blocked on 13-01; 13-02 ∥ 13-03 parallel — no file overlap)*
 
 - [x] 13-02-PLAN.md — update_experiment() in-place overwrite write path + tightened D-13 guard (CR-01, WR-04)
-- [ ] 13-03-PLAN.md — experiment_drift.py: compute_drift + DRIFT_THRESHOLD pure compute (EREV-03)
+- [x] 13-03-PLAN.md — experiment_drift.py: compute_drift + DRIFT_THRESHOLD pure compute (EREV-03)
 
 **Wave 3** *(blocked on 13-02 + 13-03)*
 
@@ -252,6 +252,6 @@ Two parallel tracks share a foundation. Execute by dependency, not strict numeri
 | 10. Experiment Schema Foundation | v1.2 | 3/3 | Complete    | 2026-06-03 |
 | 11. Experiment Logging & Private Store | v1.2 | 3/3 | Complete    | 2026-06-04 |
 | 12. Eval Scoring & Scrub Tuning | v1.2 | 4/4 | Complete    | 2026-06-04 |
-| 13. Reviewer Critique & Drift | v1.2 | 1/5 | In Progress|  |
+| 13. Reviewer Critique & Drift | v1.2 | 3/5 | In Progress|  |
 | 14. Live Experiment Capture | v1.2 | 0/0 | Not started | - |
 | 15. Analysis Export & Practice-Project Integration | v1.2 | 0/0 | Not started | - |
