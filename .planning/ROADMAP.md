@@ -197,7 +197,7 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
 
 **Wave 3** *(blocked on 13-02 + 13-03)*
 
-- [ ] 13-04-PLAN.md — CLI review + lessons commands + shared helpers + __init__ re-exports + WR-01/02/03 fixes (EREV-01/02)
+- [x] 13-04-PLAN.md — CLI review + lessons commands + shared helpers + __init__ re-exports + WR-01/02/03 fixes (EREV-01/02)
 
 **Wave 4** *(blocked on 13-04 — cli.py overlap)*
 
