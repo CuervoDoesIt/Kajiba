@@ -22,6 +22,7 @@ from kajiba.config import (
     _load_config_value,
     _save_config_value,
     _show_pending_notifications,
+    get_hermes_home,
     VALID_CONFIG_KEYS,
 )
 from kajiba.privacy import anonymize_hardware, apply_consent_level, jitter_timestamp
@@ -71,11 +72,11 @@ console = Console()
 # Directory management
 # ---------------------------------------------------------------------------
 
-KAJIBA_BASE = Path.home() / ".hermes" / "kajiba"
+KAJIBA_BASE = get_hermes_home() / "kajiba"
 STAGING_DIR = KAJIBA_BASE / "staging"
 OUTBOX_DIR = KAJIBA_BASE / "outbox"
 EXPERIMENTS_DIR = KAJIBA_BASE / "experiments"
-DOWNLOADS_DIR = Path.home() / ".hermes" / "kajiba" / "downloads"
+DOWNLOADS_DIR = get_hermes_home() / "kajiba" / "downloads"
 
 # Fallback category for a lesson recorded without an explicit ``category:`` prefix.
 UNCATEGORIZED = "uncategorized"
@@ -849,7 +850,7 @@ def config(ctx: click.Context) -> None:
 @config.command("show")
 def config_show() -> None:
     """Show all configuration values."""
-    config_path = Path.home() / ".hermes" / "config.yaml"
+    config_path = get_hermes_home() / "config.yaml"
 
     # Build merged config: defaults + file overrides
     file_config: dict = {}
@@ -929,7 +930,7 @@ def config_get(key: str) -> None:
 
     if value == default:
         # Check if the value actually comes from config file or is just the default
-        config_path = Path.home() / ".hermes" / "config.yaml"
+        config_path = get_hermes_home() / "config.yaml"
         from_file = False
         if config_path.exists():
             try:

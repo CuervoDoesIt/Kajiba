@@ -32,6 +32,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Optional
 
+from kajiba.config import get_hermes_home
 from kajiba.schema import (
     ExperimentMetadata,
     ExperimentOutcome,
@@ -41,13 +42,13 @@ from kajiba.schema import (
 
 logger = logging.getLogger(__name__)
 
-# The canonical experiment store base. Duplicated from ``cli.py:70``'s
-# ``Path.home() / ".hermes" / "kajiba" / "experiments"`` value on purpose: the
-# store module stays Click-free (it never imports ``kajiba.cli``), yet the
-# production default guard base resolves equal to the directory ``cli.py`` passes
-# as ``store_dir``. The literal-parity test (test_experiments_dir_matches_cli)
-# guards against drift between the two definitions.
-EXPERIMENTS_DIR = Path.home() / ".hermes" / "kajiba" / "experiments"
+# The canonical experiment store base, derived via get_hermes_home() so it
+# follows the active Hermes profile (HERMES_HOME). The store module stays
+# Click-free (it never imports ``kajiba.cli``); parity with ``cli.py``'s
+# EXPERIMENTS_DIR is maintained because both derive from the same
+# get_hermes_home() helper. The literal-parity test
+# (test_experiments_dir_matches_cli) guards against drift between the two.
+EXPERIMENTS_DIR = get_hermes_home() / "kajiba" / "experiments"
 
 # ---------------------------------------------------------------------------
 # Write path

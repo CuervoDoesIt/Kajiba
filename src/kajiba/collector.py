@@ -179,14 +179,34 @@ class KajibaCollector:
         self._hardware: Optional[HardwareProfile] = None
         self._created_at: Optional[datetime] = None
 
-    def on_session_start(self, session_id: str, model_config: dict) -> None:
+    def on_session_start(
+        self,
+        session_id: str,
+        model_config: Optional[dict] = None,
+        *,
+        model_name: Optional[str] = None,
+        platform: Optional[str] = None,
+    ) -> None:
         """Capture model metadata and hardware at session start.
+
+        Backwards-compatible with the legacy positional-dict call
+        (``on_session_start(session_id, model_config)``) while also accepting
+        the Hermes v0.6.0 plugin hook kwargs ``model_name``/``platform``. When
+        ``model_config`` is not supplied, a minimal dict is built from the
+        keyword args so ``_extract_model_metadata`` always receives a dict.
 
         Args:
             session_id: Unique identifier for the session.
-            model_config: Dictionary from Hermes Agent's model configuration.
+            model_config: Optional dict from Hermes Agent's model configuration.
+            model_name: Optional model name from the plugin hook (keyword-only).
+            platform: Optional provider/platform from the plugin hook
+                (keyword-only); mapped to the ``provider`` field.
         """
         try:
+            if model_config is None and model_name is not None:
+                model_config = {"model_name": model_name, "provider": platform}
+            if model_config is None:
+                model_config = {}
             self._session_id = session_id
             self._conversations = []
             self._pain_points = []
