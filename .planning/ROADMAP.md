@@ -252,6 +252,6 @@ Two parallel tracks share a foundation. Execute by dependency, not strict numeri
 | 10. Experiment Schema Foundation | v1.2 | 3/3 | Complete    | 2026-06-03 |
 | 11. Experiment Logging & Private Store | v1.2 | 3/3 | Complete    | 2026-06-04 |
 | 12. Eval Scoring & Scrub Tuning | v1.2 | 4/4 | Complete    | 2026-06-04 |
-| 13. Reviewer Critique & Drift | v1.2 | 5/5 | Complete   | 2026-06-04 |
+| 13. Reviewer Critique & Drift | v1.2 | 5/5 | Complete    | 2026-06-04 |
 | 14. Live Experiment Capture | v1.2 | 0/0 | Not started | - |
 | 15. Analysis Export & Practice-Project Integration | v1.2 | 0/0 | Not started | - |
