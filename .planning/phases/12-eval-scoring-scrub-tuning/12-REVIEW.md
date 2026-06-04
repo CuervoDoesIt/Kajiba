@@ -15,11 +15,14 @@ files_reviewed_list:
   - tests/fixtures/experiment_thin.json
   - tests/fixtures/experiment_pii.json
 findings:
-  critical: 1
-  warning: 5
+  critical: 0
+  warning: 4
   info: 4
-  total: 10
+  total: 8
 status: issues_found
+resolved:
+  - CR-01
+  - WR-02
 ---
 
 # Phase 12: Code Review Report
@@ -55,6 +58,19 @@ regex fix itself remains deferred.
 ## Critical Issues
 
 ### CR-01: `experiment scrub` allowlist omits free-text `task_category` and `experiment_id`, leaking any PII placed there
+
+**Status:** RESOLVED (commit 7bc7a91)
+
+**Resolution:** Added `experiment["task_category"] = _apply(...)` to the
+allowlist in `experiment_scrub.py`, making it five scrubbed free-text surfaces;
+updated the module + function docstrings and the inline ALLOWLIST comment.
+`experiment_id` is deliberately NOT scrubbed and is documented as load-bearing
+identity (it drives the `exp_<id>.json` store filename, `compute_record_id`, and
+the dedup `submission_hash`; scrubbing it would break store-load and dedup) — the
+review's suggestion to route it through `_apply` is incorrect on this point.
+Strengthened `experiment_pii.json` so `task_category` carries an email, added
+`test_task_category_redacted`, and extended `test_model_and_hardware_preserved`
+to assert `experiment_id` is byte-identical pre/post scrub. Full suite green.
 
 **File:** `src/kajiba/experiment_scrub.py:68-82`
 **Issue:** The allowlist routes exactly four fields through `scrub_text`:
@@ -115,6 +131,16 @@ completeness it cannot guarantee, and add a regression test that asserts the
 is widened, making the gap visible).
 
 ### WR-02: Store-raw invariant is documented but not enforced for `--out`
+
+**Status:** RESOLVED (commit 803ade4)
+
+**Resolution:** The `experiment_scrub` command now resolves the `--out` path and
+raises a `click.ClickException` (matching the `_load_experiment` idiom) if it
+equals or resolves inside `EXPERIMENTS_DIR`, before any write. Added
+`test_experiment_scrub_out_into_store_rejected` (seeds a record, points `--out`
+at the raw `exp_<id>.json`, asserts non-zero exit + byte-unchanged raw file); the
+existing `test_experiment_scrub_out` confirms writes OUTSIDE the store still
+work. Full suite green.
 
 **File:** `src/kajiba/cli.py:1110-1117`
 **Issue:** Both the command docstring (`cli.py:1099-1100`) and the module
