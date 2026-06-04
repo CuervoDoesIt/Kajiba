@@ -1,17 +1,17 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.1
-milestone_name: Hermes Pipeline Validation
+milestone: v1.2
+milestone_name: Experiment Logging (Dual-Use)
 status: verifying
 stopped_at: Completed 12-04-PLAN.md
 last_updated: "2026-06-04T11:47:59.824Z"
 last_activity: 2026-06-04
 progress:
-  total_phases: 4
+  total_phases: 6
   completed_phases: 3
   total_plans: 10
   completed_plans: 10
-  percent: 75
+  percent: 50
 ---
 
 # Project State
@@ -22,7 +22,8 @@ See: .planning/PROJECT.md (updated 2026-04-02)
 
 **Core value:** Real-world AI session data, tagged with full runtime context, flowing into a community dataset that accelerates local model fine-tuning for everyone.
 **Current focus:** Phase 12 — eval-scoring-scrub-tuning
-**Parallel milestone:** v1.2 Experiment Logging (Dual-Use), Phases 10-15 — recommended start: Phase 10 (schema, v1.1-independent). See `.planning/seeds/v1.2-experiment-logging.md`.
+**Active milestone:** v1.2 Experiment Logging (Dual-Use), Phases 10-15 — Phases 10-12 complete (audited 2026-06-04, see `.planning/v1.2-MILESTONE-AUDIT.md`); next up Phase 13.
+**Parallel milestone:** v1.1 Hermes Pipeline Validation, Phases 6-9 — not yet started (Phase 6 discussed only). Shared foundation Phases 6-7 also gate v1.2 Phase 14 live capture.
 
 ## Current Position
 
