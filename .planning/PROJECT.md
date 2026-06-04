@@ -36,6 +36,7 @@ Real-world AI session data, tagged with full runtime context (model identity, co
 - ✓ `ExperimentRecord` type on a shared `RecordBase` + `record_kind` discriminator and `load_record()` factory, back-compatible with existing records (byte-identical record/submission IDs, SCHEMA_VERSION 0.2.0) — v1.2 Phase 10
 - ✓ `kajiba experiment` CLI (`log` --from/flags/interactive + `list`) and programmatic `log_experiment`/`build_experiment_record` entry points writing to a private `~/.hermes/kajiba/experiments/` store, structurally separated from staging/outbox and actively excluded from publish/submit (D-13 write guard + raw-dict `record_kind` publish skip) — v1.2 Phase 11 (ELOG-01/02/03)
 - ✓ Eval-specific completeness/confidence scorer (`eval_scorer.compute_eval_confidence`, `complete`/`partial`/`thin` bands distinct from gold/silver/bronze, experiment-only guard) + experiment-aware PII scrub (`experiment_scrub.scrub_experiment` — five free-text surfaces redacted via the shared engine while model identity & full hardware stay byte-identical) + `kajiba experiment score`/`scrub` CLI and Confidence column — v1.2 Phase 12 (EEVAL-01/02)
+- ✓ Reviewer critique attachment, queryable lessons, and quality-drift detection — `kajiba experiment review` (human or reviewer-model, re-review replaces, 3 input modes), `kajiba experiment lessons` (category+text via `_parse_lesson`, `--category` filter, cross-record query), and `kajiba experiment drift` (`experiment_drift.compute_drift` nearest-in-group-neighbor baseline + idempotent `drift_flag` persist/clear) — all writes funnel through `update_experiment` in-place overwrite (CR-01 closed, EQUAL store guard, identity byte-stable); Phase 10 schema untouched — v1.2 Phase 13 (EREV-01/02/03)
 
 ### Active
 
@@ -51,7 +52,7 @@ Real-world AI session data, tagged with full runtime context (model identity, co
 
 - [x] `kajiba experiment` CLI + programmatic deliberate logging into a private local store (no community publish) — validated in Phase 11
 - [x] Eval-specific scorer and experiment-aware scrub tuning (preserve model/hardware fields) — validated in Phase 12 (EEVAL-01/02)
-- [ ] Reviewer-model critique attachment, queryable `lessons_learned`, and quality-drift detection
+- [x] Reviewer-model critique attachment, queryable `lessons_learned`, and quality-drift detection — validated in Phase 13 (EREV-01/02/03)
 - [ ] Live experiment capture via shared Hermes hooks (depends on v1.1 Phase 6–7)
 - [ ] Analysis-oriented export + Nemotron/Qwen/Gemma practice-project integration
 
@@ -146,4 +147,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-04 after Phase 12 (Eval Scoring & Scrub Tuning) complete — eval-native confidence scorer + experiment-aware PII scrub (model/hardware preserved byte-identical) + `kajiba experiment score`/`scrub` CLI (EEVAL-01/02)*
+*Last updated: 2026-06-04 after Phase 13 (Reviewer Critique & Drift) complete — `kajiba experiment review`/`lessons`/`drift` CLI + `update_experiment` in-place overwrite (CR-01) + pure `compute_drift` module; schema frozen (EREV-01/02/03)*
