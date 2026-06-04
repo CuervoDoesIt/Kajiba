@@ -1355,6 +1355,16 @@ yaml = pytest.importorskip("yaml")
 class TestConfigSubcommands:
     """Tests for the restructured config command with set/get/show subcommands."""
 
+    @pytest.fixture(autouse=True)
+    def _isolate_hermes_home(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Clear HERMES_HOME so config reads resolve under the patched temp home.
+
+        These tests monkeypatch ``Path.home`` for isolation; an inherited
+        HERMES_HOME would otherwise route get_hermes_home() to the real profile
+        and leak its config.yaml overrides into the assertions.
+        """
+        monkeypatch.delenv("HERMES_HOME", raising=False)
+
     def test_bare_config_shows_table(self, runner: CliRunner) -> None:
         """Bare `kajiba config` still shows config table (backward compat)."""
         result = runner.invoke(cli, ["config"])
