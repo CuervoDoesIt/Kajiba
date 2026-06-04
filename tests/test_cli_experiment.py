@@ -190,6 +190,30 @@ def test_experiment_scrub_out(
     assert raw_path.read_bytes() == before
 
 
+def test_experiment_scrub_out_into_store_rejected(
+    runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`experiment scrub <id> --out <inside store>` is refused, leaving the raw file unchanged (WR-02)."""
+    store = _isolate_store(tmp_path, monkeypatch)
+    record_id = _seed(runner, store, PII_FIXTURE)
+
+    raw_path = store / f"exp_{record_id}.json"
+    before = raw_path.read_bytes()
+    # An --out that points back into the experiment store would clobber the raw
+    # copy and break the store-raw invariant (D-08).
+    out_file = store / f"exp_{record_id}.json"
+
+    result = runner.invoke(
+        cli, ["experiment", "scrub", record_id, "--out", str(out_file)],
+    )
+
+    # The command must refuse (non-zero exit, no traceback) and leave the raw
+    # store byte-identical.
+    assert result.exit_code != 0
+    assert "Traceback" not in result.output
+    assert raw_path.read_bytes() == before
+
+
 def test_experiment_list_confidence(
     runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:

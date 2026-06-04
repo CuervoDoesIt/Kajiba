@@ -1109,8 +1109,18 @@ def experiment_scrub(record_id: str, out: Optional[str]) -> None:
 
     if out is not None:
         # D-08: write the scrubbed COPY to an explicit destination only — the
-        # raw store file is never touched.
-        out_path = Path(out)
+        # raw store file is never touched. Guard (WR-02): refuse any --out that
+        # resolves to a location inside EXPERIMENTS_DIR, mirroring the
+        # _load_experiment traversal guard. Without this, --out pointed at the
+        # store would clobber the raw exp_<id>.json and break the store-raw
+        # invariant the command's docstring promises.
+        out_path = Path(out).resolve()
+        store_root = EXPERIMENTS_DIR.resolve()
+        if out_path == store_root or store_root in out_path.parents:
+            raise click.ClickException(
+                "Refusing to write scrubbed copy into the experiment store "
+                f"(store-raw invariant, D-08). Choose an --out path outside {store_root}."
+            )
         out_path.write_text(
             json.dumps(scrubbed.model_dump(mode="json", by_alias=True), indent=2),
             encoding="utf-8",
