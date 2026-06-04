@@ -57,7 +57,7 @@ Requirements for the Experiment Logging (Dual-Use) milestone. Runs **in parallel
 
 - [x] **ELOG-01**: User can deliberately record an eval run via a `kajiba experiment` CLI command group, without a live Hermes session
 - [x] **ELOG-02**: A programmatic logging entry point lets an external script (the practice project) write `ExperimentRecord`s directly
-- [ ] **ELOG-03**: Experiment records persist in a private local namespace, separate from coding-session staging/outbox, and are excluded from any community publish path
+- [x] **ELOG-03**: Experiment records persist in a private local namespace, separate from coding-session staging/outbox, and are excluded from any community publish path
 
 ### Experiment Evaluation & Privacy
 
@@ -139,7 +139,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ESCH-04 | Phase 10 | Complete (10-03 — golden tripwire green for all 5 fixtures) |
 | ELOG-01 | Phase 11 | Complete (11-02) |
 | ELOG-02 | Phase 11 | Complete (11-01) |
-| ELOG-03 | Phase 11 | Pending |
+| ELOG-03 | Phase 11 | Complete |
 | EEVAL-01 | Phase 12 | Pending |
 | EEVAL-02 | Phase 12 | Pending |
 | EREV-01 | Phase 13 | Pending |

@@ -146,7 +146,7 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 11-03-PLAN.md — Publish exclusion guard + D-14 regression + full-suite gate (ELOG-03 active)
+- [x] 11-03-PLAN.md — Publish exclusion guard + D-14 regression + full-suite gate (ELOG-03 active) — 3 tasks, 276 passed/2 skipped, 0 regressions
 
 ### Phase 12: Eval Scoring & Scrub Tuning
 
@@ -220,7 +220,7 @@ Two parallel tracks share a foundation. Execute by dependency, not strict numeri
 | 8. HITL Validation + Pipeline Integration | v1.1 | 0/0 | Not started | - |
 | 9. Fine-Tune Experiment | v1.1 | 0/0 | Not started | - |
 | 10. Experiment Schema Foundation | v1.2 | 3/3 | Complete    | 2026-06-03 |
-| 11. Experiment Logging & Private Store | v1.2 | 0/0 | Not started | - |
+| 11. Experiment Logging & Private Store | v1.2 | 3/3 | Awaiting verify-work | - |
 | 12. Eval Scoring & Scrub Tuning | v1.2 | 0/0 | Not started | - |
 | 13. Reviewer Critique & Drift | v1.2 | 0/0 | Not started | - |
 | 14. Live Experiment Capture | v1.2 | 0/0 | Not started | - |
