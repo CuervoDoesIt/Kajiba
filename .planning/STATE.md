@@ -4,8 +4,8 @@ milestone: v1.2
 milestone_name: Experiment Logging
 status: verifying
 stopped_at: "Phase 13 complete & verified. Phase 14 (ECAP-01) deferred — blocked on v1.1 Phase 6 & 7 (unbuilt). Decision: build v1.1 Phase 6 (plugin foundation) first."
-last_updated: "2026-06-04T22:34:06.031Z"
-last_activity: 2026-06-04
+last_updated: "2026-06-04T22:48:32.672Z"
+last_activity: 2026-06-04 -- Phase 06 planning complete
 progress:
   total_phases: 10
   completed_phases: 4
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-04-02)
 Phase: 14
 Plan: Not started
 Status: Ready for /gsd-verify-work (all 5 plans complete; full suite green, schema frozen)
-Last activity: 2026-06-04
+Last activity: 2026-06-04 -- Phase 06 planning complete
 
 Progress: [██████████] 100%
 
