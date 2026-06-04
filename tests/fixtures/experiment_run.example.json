@@ -1,0 +1,29 @@
+{
+  "schema_version": "0.2.0",
+  "record_kind": "model_experiment",
+  "experiment": {
+    "experiment_id": "exp_001",
+    "experiment_type": "model_evaluation",
+    "local_model": {
+      "model_name": "Hermes-3-Llama-3.1-8B",
+      "quantization": "Q4_K_M",
+      "provider": "ollama",
+      "is_local": true
+    },
+    "reviewer_model": {
+      "model_name": "gpt-4o"
+    },
+    "task_category": "coding",
+    "task_description": "Write a binary search function.",
+    "started_at": "2026-06-03T12:00:00Z",
+    "completed_at": "2026-06-03T12:05:00Z"
+  },
+  "outcome": {
+    "local_model_output": "def bsearch(a, x): ...",
+    "reviewer_critique": "Correct but missing edge cases.",
+    "eval_score": 0.82,
+    "drift_flag": false,
+    "lessons_learned": ["handle empty input"],
+    "recommended_action": "needs_fine_tune"
+  }
+}
