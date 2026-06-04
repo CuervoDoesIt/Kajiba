@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Hermes Pipeline Validation
 status: executing
-stopped_at: Completed 11-03-PLAN.md (final plan of Phase 11)
-last_updated: "2026-06-04T08:53:44.637Z"
+stopped_at: Phase 12 context gathered
+last_updated: "2026-06-04T09:36:13.945Z"
 last_activity: 2026-06-04
 progress:
-  total_phases: 3
+  total_phases: 4
   completed_phases: 2
   total_plans: 6
   completed_plans: 6
-  percent: 67
+  percent: 50
 ---
 
 # Project State
@@ -86,6 +86,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-06-04T03:00:00Z
-Stopped at: Completed 11-03-PLAN.md (final plan of Phase 11)
-Resume file: None — Phase 11 ready for /gsd-verify-work
+Last session: 2026-06-04T09:36:13.934Z
+Stopped at: Phase 12 context gathered
+Resume file: .planning/phases/12-eval-scoring-scrub-tuning/12-CONTEXT.md
