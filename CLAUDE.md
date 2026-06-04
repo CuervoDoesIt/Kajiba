@@ -88,14 +88,13 @@ Kajiba is an open-source, model-agnostic data pipeline that lets developers cont
 ## Conventions
 
 ## Naming Patterns
-- All source modules use `snake_case.py`: `schema.py`, `scrubber.py`, `scorer.py`, `collector.py`, `cli.py`, `hermes_integration.py`, `scrubber_llm.py`
+- All source modules use `snake_case.py`: `schema.py`, `scrubber.py`, `scorer.py`, `collector.py`, `cli.py`, `scrubber_llm.py`
 - Test files use `test_<module>.py` prefix: `test_schema.py`, `test_scrubber.py`, `test_scorer.py`, `test_collector.py`, `test_cli.py`
 - Fixture files use `<descriptive_name>.json`: `gold_trajectory.json`, `minimal_trajectory.json`, `pii_trajectory.json`
 - Use `PascalCase` for all classes
 - Pydantic models: `KajibaRecord`, `ConversationTurn`, `ToolCall`, `OutcomeSignals`, `ScrubLog`, `ModelMetadata`, `HardwareProfile`
 - Dataclasses: `Redaction`, `ScrubResult`, `QualityResult`, `SemanticRedaction`
 - Non-model classes: `KajibaCollector`
-- Protocol classes: `HermesAgent` (in `src/kajiba/hermes_integration.py`)
 - Public functions use `snake_case`: `validate_record()`, `scrub_text()`, `scrub_record()`, `compute_quality_score()`
 - Private/internal functions use `_snake_case` prefix: `_detect_hardware()`, `_extract_model_metadata()`, `_scrub_string_fields_in_turn()`, `_ensure_dirs()`, `_load_latest_staging()`, `_render_preview()`
 - Sub-score functions use `score_<dimension>` pattern: `score_coherence()`, `score_tool_validity()`, `score_outcome_quality()`, `score_information_density()`, `score_metadata_completeness()`
@@ -123,7 +122,6 @@ Kajiba is an open-source, model-agnostic data pipeline that lets developers cont
 - Use `Optional[X]` from `typing` (not `X | None` union syntax): see `src/kajiba/collector.py` line 13, `src/kajiba/schema.py` line 11
 - Use modern generic syntax: `list[str]`, `dict[str, int]`, `tuple[KajibaRecord, ScrubLog]` (not `List`, `Dict`, `Tuple` from `typing`)
 - Literal types used extensively for controlled vocabularies in `src/kajiba/schema.py`
-- Protocol class with `@runtime_checkable` for interface definition in `src/kajiba/hermes_integration.py`
 - `Callable` type used for function parameters in `src/kajiba/scrubber_llm.py` line 41
 ## Import Organization
 - Use `from X import Y` for specific names rather than bare `import X` (exception: standard library modules like `json`, `logging`, `re`, `copy`)
@@ -132,7 +130,7 @@ Kajiba is an open-source, model-agnostic data pipeline that lets developers cont
 ## Error Handling
 ## Logging
 - Each module creates its own logger: `logger = logging.getLogger(__name__)` at module level
-- Present in all source modules: `src/kajiba/schema.py`, `src/kajiba/scrubber.py`, `src/kajiba/scorer.py`, `src/kajiba/collector.py`, `src/kajiba/cli.py`, `src/kajiba/hermes_integration.py`, `src/kajiba/scrubber_llm.py`
+- Present in all source modules: `src/kajiba/schema.py`, `src/kajiba/scrubber.py`, `src/kajiba/scorer.py`, `src/kajiba/collector.py`, `src/kajiba/cli.py`, `src/kajiba/scrubber_llm.py`
 - CLI configures logging in the Click group: `logging.basicConfig(level=logging.WARNING)` at `src/kajiba/cli.py` line 165
 - Use `logger.info()` for lifecycle events: session start/end in `src/kajiba/collector.py` lines 184, 236
 - Use `logger.debug()` for optional/skipped features: GPU detection skip in `src/kajiba/collector.py` line 89
@@ -175,7 +173,7 @@ Kajiba is an open-source, model-agnostic data pipeline that lets developers cont
 - `src/kajiba/scorer.py`: Quality scoring
 - `src/kajiba/collector.py`: Session lifecycle capture
 - `src/kajiba/cli.py`: CLI commands
-- `src/kajiba/hermes_integration.py`: Hermes Agent adapter
+- `src/kajiba/plugin/`: Hermes Agent plugin package (provides `register(ctx)`; supersedes the removed `hermes_integration.py` adapter)
 ## Data Modeling
 - Use `BaseModel` for all schema models (not `dataclass`)
 - Use `model_validator(mode="after")` for cross-field validation: see `src/kajiba/schema.py` lines 265-287
@@ -211,10 +209,9 @@ Kajiba is an open-source, model-agnostic data pipeline that lets developers cont
 - Location: `src/kajiba/collector.py`
 - Contains: `KajibaCollector` class with event handlers (`on_session_start`, `on_turn_complete`, `on_session_end`, `on_rate`, `on_report`), hardware detection (`_detect_hardware()`), model metadata extraction (`_extract_model_metadata()`)
 - Depends on: `schema`, `scorer`, `scrubber`, `platform`, `subprocess`, `psutil` (optional)
-- Used by: `hermes_integration`, CLI (indirectly)
-- Purpose: Thin adapter that wires `KajibaCollector` lifecycle hooks into Hermes Agent's event system
-- Location: `src/kajiba/hermes_integration.py`
-- Contains: `HermesAgent` Protocol class, `register_hooks(agent)` function
+- Used by: the `src/kajiba/plugin/` package, CLI (indirectly)
+- Purpose: Hermes Agent plugin package that wires `KajibaCollector` lifecycle hooks into Hermes Agent's event system
+- Location: `src/kajiba/plugin/` (provides `register(ctx)`; supersedes the removed `hermes_integration.py` adapter)
 - Depends on: `collector`
 - Used by: Hermes Agent (external)
 - Purpose: Remove personally identifiable information from records before export/submission
@@ -245,10 +242,9 @@ Kajiba is an open-source, model-agnostic data pipeline that lets developers cont
 - Location: `src/kajiba/collector.py` (line 144)
 - Pattern: Observer/listener that receives events from the agent. All public methods are wrapped in try/except to ensure fault tolerance -- errors are logged but never propagated.
 - API: `on_session_start(session_id, model_config)`, `on_turn_complete(turn_dict)`, `on_session_end(session_id)`, `on_rate(rating, tags, comment)`, `on_report(category, description, severity)`, `export_record()`
-- Purpose: Define the expected interface for Hermes Agent integration via structural typing
-- Location: `src/kajiba/hermes_integration.py` (line 36)
-- Pattern: Python `Protocol` class (runtime_checkable) -- Hermes Agent does not need to import or inherit from Kajiba
-- Expected methods: `agent.on(event, callback)`, `agent.register_command(name, handler)`
+- Purpose: Hermes Agent integration entry point
+- Location: `src/kajiba/plugin/` package via `register(ctx)` (supersedes the removed `hermes_integration.py` Protocol adapter)
+- Pattern: Hermes v0.6.0 plugin `register(ctx)` hook registration -- the plugin package wires `KajibaCollector` lifecycle methods to Hermes events
 - Purpose: Result container for the five-sub-score quality assessment
 - Location: `src/kajiba/scorer.py` (line 39)
 - Pattern: Python dataclass with `composite_score`, `sub_scores` dict, and `quality_tier` string
@@ -263,9 +259,9 @@ Kajiba is an open-source, model-agnostic data pipeline that lets developers cont
 - Registered in: `pyproject.toml` `[project.scripts]` -> `kajiba = "kajiba.cli:cli"`
 - Triggers: User runs `kajiba <command>` from terminal
 - Commands: `preview`, `submit`, `export <path>`, `history`, `stats`, `config`
-- Location: `src/kajiba/hermes_integration.py` -> `register_hooks(agent)` function (line 48)
-- Triggers: Hermes Agent imports and calls `register_hooks(agent)` at startup
-- Returns: `KajibaCollector` instance for manual access if needed
+- Location: `src/kajiba/plugin/` package -> `register(ctx)` (supersedes the removed `hermes_integration.py` `register_hooks(agent)`)
+- Triggers: Hermes Agent loads the Kajiba plugin and calls `register(ctx)` at startup
+- Returns: registers `KajibaCollector` lifecycle hooks with the Hermes context
 - Location: `src/kajiba/schema.py` -> `validate_record(data)` function (line 372)
 - Triggers: Any Python code that needs to parse/validate a raw JSON dict into a `KajibaRecord`
 - Location: `src/kajiba/__init__.py` -> `__version__ = "0.1.0"`
