@@ -4,14 +4,14 @@ milestone: v1.1
 milestone_name: Hermes Pipeline Validation
 status: executing
 stopped_at: Phase 12 context gathered
-last_updated: "2026-06-04T11:08:03.503Z"
-last_activity: 2026-06-04 -- Phase 12 execution started
+last_updated: "2026-06-04T12:00:00.000Z"
+last_activity: 2026-06-04 -- Completed 12-02 (eval_scorer.py, EEVAL-01)
 progress:
   total_phases: 4
   completed_phases: 2
   total_plans: 10
-  completed_plans: 7
-  percent: 50
+  completed_plans: 8
+  percent: 80
 ---
 
 # Project State
@@ -27,11 +27,11 @@ See: .planning/PROJECT.md (updated 2026-04-02)
 ## Current Position
 
 Phase: 12 (eval-scoring-scrub-tuning) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 Status: Ready to execute
-Last activity: 2026-06-04 -- Phase 12 execution started
+Last activity: 2026-06-04 -- Completed 12-02 (eval_scorer.py, EEVAL-01)
 
-Progress: [██████████] 100%
+Progress: [████████░░] 80%
 
 ## Performance Metrics
 
@@ -56,6 +56,7 @@ Progress: [██████████] 100%
 
 *Updated after each plan completion*
 | Phase 12 P01 | 6m | 2 tasks | 5 files |
+| Phase 12 P02 | 6m | 1 task | 1 file |
 
 ## Accumulated Context
 
@@ -75,6 +76,7 @@ Progress: [██████████] 100%
 - 11-03: Closed the active half of ELOG-03 (publish exclusion guard + D-14 regression). `publish` Step 4 loop now skips any outbox record whose raw-dict `record_kind == "model_experiment"` BEFORE `validate_record` (Pitfall 1 / T-11-10), printing `Skipping experiment record (never published): <name>` and `continue` — defense in depth over the structural `OUTBOX_DIR`/`EXPERIMENTS_DIR` split from 11-01 (T-11-08, D-13). `submit` gained a defensive `model_experiment` `click.ClickException` (T-11-09, Assumption A2 — structurally unreachable today, single guard not dead branching). New `tests/test_experiment_exclusion.py`: `test_publish_skips_experiment` (misplaced experiment in outbox skipped, network-free via a `GitHubOps` stub whose `check_auth` passes so the guard loop is reached but no PR opens) + `test_experiment_absent_from_community_paths` (D-14: real `log_experiment` write proven absent from outbox glob, byte-identical on disk, never in publish output). Full suite 276 passed / 2 pre-existing yaml-soft-dep skips, 0 regressions. ELOG-03 fully satisfied. Phase 11 ready for /gsd-verify-work (phase header owned by orchestrator). Commits: test c43d63f, feat 5610028.
 - 10-03: Authored `tests/test_schema_backcompat.py` (parametrized golden-ID tripwire over all 5 fixtures + legacy-load + record_kind default + base inheritance + load dispatch) and `tests/test_schema_experiment.py` (round-trip equality + vocab rejection + recommended_action=None + lessons_learned=[] + eval_score bounds). Schema untouched (`git diff --quiet src/kajiba/schema.py` exits 0). Full suite: 264 passed, 2 PRE-EXISTING skips (yaml soft-dep not installed in test_cli.py/test_config.py), 0 failures. All ESCH-01..05 now covered by passing automated tests. Phase 10 COMPLETE. (Note: 10-VALIDATION.md `wave_0_complete`/`nyquist_compliant` flip deferred to verify-work.)
 - [Phase ?]: 12-01: Wave 0 test foundation — 3 experiment fixtures (complete/thin/pii) + 2 RED scaffolds (8 contract tests). thin fixture required-fields-only so Plan 02 thin-band contract holds; pii fixture has real 64-hex model_hash + GPU name as byte-identical preservation targets. ScrubLog imported from kajiba.schema. RED confirmed (missing kajiba.eval_scorer/experiment_scrub only); pre-existing suite 276 passed, 0 regressions. Commits: 3a75662, e102686.
+- 12-02: Implemented `src/kajiba/eval_scorer.py` (EEVAL-01) — `compute_eval_confidence(ExperimentRecord) -> EvalConfidenceResult` completeness/confidence lens (D-01, compute-on-read D-03, advisory D-04). New single-responsibility module mirroring `scorer.py`'s shape, NOT bolted onto it (D-09). LOCKED contract honored verbatim: WEIGHTS sum 1.0 (output_present .30 / reviewer_critique .20 / model_metadata .20 / hardware_present .10 / lessons_learned .10 / outcome_signals .10), COMPLETE_THRESHOLD=0.80, PARTIAL_THRESHOLD=0.50. `_score_outcome_signals` scores ONLY recommended_action+completed_at (each 0.5) and gives NO credit for eval_score being in range (Pitfall 4) → required-fields-only thin fixture scores 0.0 there, composite ≈0.367 < 0.50 → band `thin`. Bands complete/partial/thin strictly disjoint from community tiers (D-02); portable no-vocab scan green. `TypeError` guard via `isinstance` rejects KajibaRecord (experiment-only lens). No schema mutation; test_eval_scorer.py 4/4 GREEN; full suite (ignoring test_experiment_scrub.py, RED until 12-03) 280 passed / 2 pre-existing skips, 0 regressions. Decision: removed literal community-tier words from the module docstring (the no-vocab scan only strips #-comment lines) — cosmetic, no behavior change. Commit: feat 07f0ab8.
 
 ### Pending Todos
 
@@ -88,6 +90,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-06-04T11:07:41.457Z
-Stopped at: Phase 12 context gathered
-Resume file: .planning/phases/12-eval-scoring-scrub-tuning/12-CONTEXT.md
+Last session: 2026-06-04T12:00:00.000Z
+Stopped at: Completed 12-02-PLAN.md
+Resume file: None
