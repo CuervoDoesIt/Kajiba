@@ -158,7 +158,20 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
   1. An eval-specific scorer assigns a quality result to an `ExperimentRecord` using signals appropriate to model-output evaluation (not coding-trajectory coherence)
   2. Scrubbing an `ExperimentRecord` redacts personal/PII data while preserving the model-identity and hardware fields needed for analysis
 
-**Plans**: TBD
+**Plans**: 4 plans
+
+**Wave 1**
+
+- [ ] 12-01-PLAN.md — Wave 0 test foundation: 3 experiment fixtures (complete/thin/pii) + RED scaffolds for eval scorer & experiment scrub (EEVAL-01/02)
+
+**Wave 2** *(blocked on Wave 1 completion; 12-02 ∥ 12-03 parallel — no file overlap)*
+
+- [ ] 12-02-PLAN.md — eval_scorer.py: compute_eval_confidence + EvalConfidenceResult, complete/partial/thin bands (EEVAL-01)
+- [ ] 12-03-PLAN.md — experiment_scrub.py: field-allowlist scrub reusing scrub_text, preserve model_hash/hardware byte-identical (EEVAL-02)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 12-04-PLAN.md — CLI wiring: experiment score/scrub subcommands + list Confidence column + __init__ re-exports + integration tests (EEVAL-01/02)
 
 ### Phase 13: Reviewer Critique & Drift
 
@@ -221,7 +234,7 @@ Two parallel tracks share a foundation. Execute by dependency, not strict numeri
 | 9. Fine-Tune Experiment | v1.1 | 0/0 | Not started | - |
 | 10. Experiment Schema Foundation | v1.2 | 3/3 | Complete    | 2026-06-03 |
 | 11. Experiment Logging & Private Store | v1.2 | 3/3 | Complete    | 2026-06-04 |
-| 12. Eval Scoring & Scrub Tuning | v1.2 | 0/0 | Not started | - |
+| 12. Eval Scoring & Scrub Tuning | v1.2 | 0/4 | Planned | - |
 | 13. Reviewer Critique & Drift | v1.2 | 0/0 | Not started | - |
 | 14. Live Experiment Capture | v1.2 | 0/0 | Not started | - |
 | 15. Analysis Export & Practice-Project Integration | v1.2 | 0/0 | Not started | - |
