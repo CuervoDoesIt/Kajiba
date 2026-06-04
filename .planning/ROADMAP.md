@@ -184,7 +184,24 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
   2. `lessons_learned` can be recorded in a queryable form (structured categories and/or free text) and read back
   3. Quality drift across repeated runs of the same model+task is computed and surfaced as a flag on the record
 
-**Plans**: TBD
+**Plans**: 5 plans
+
+**Wave 1**
+
+- [ ] 13-01-PLAN.md — Wave 0 test scaffolds: update_experiment + compute_drift unit tests + review/lessons/drift/WR CLI tests (RED) (EREV-01/02/03)
+
+**Wave 2** *(blocked on 13-01; 13-02 ∥ 13-03 parallel — no file overlap)*
+
+- [ ] 13-02-PLAN.md — update_experiment() in-place overwrite write path + tightened D-13 guard (CR-01, WR-04)
+- [ ] 13-03-PLAN.md — experiment_drift.py: compute_drift + DRIFT_THRESHOLD pure compute (EREV-03)
+
+**Wave 3** *(blocked on 13-02 + 13-03)*
+
+- [ ] 13-04-PLAN.md — CLI review + lessons commands + shared helpers + __init__ re-exports + WR-01/02/03 fixes (EREV-01/02)
+
+**Wave 4** *(blocked on 13-04 — cli.py overlap)*
+
+- [ ] 13-05-PLAN.md — CLI drift command (persist + idempotent clear) + experiment list enrichment + phase gate (EREV-03/02)
 
 ### Phase 14: Live Experiment Capture
 
@@ -235,6 +252,6 @@ Two parallel tracks share a foundation. Execute by dependency, not strict numeri
 | 10. Experiment Schema Foundation | v1.2 | 3/3 | Complete    | 2026-06-03 |
 | 11. Experiment Logging & Private Store | v1.2 | 3/3 | Complete    | 2026-06-04 |
 | 12. Eval Scoring & Scrub Tuning | v1.2 | 4/4 | Complete    | 2026-06-04 |
-| 13. Reviewer Critique & Drift | v1.2 | 0/0 | Not started | - |
+| 13. Reviewer Critique & Drift | v1.2 | 0/5 | Planned | - |
 | 14. Live Experiment Capture | v1.2 | 0/0 | Not started | - |
 | 15. Analysis Export & Practice-Project Integration | v1.2 | 0/0 | Not started | - |
