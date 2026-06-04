@@ -6,6 +6,7 @@ and activity logging for contribution modes.
 
 import json
 import logging
+import os
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Optional
@@ -25,7 +26,24 @@ TIER_ORDER: dict[str, int] = {
     "review_needed": 1,
 }
 
-KAJIBA_BASE = Path.home() / ".hermes" / "kajiba"
+
+def get_hermes_home() -> Path:
+    """Resolve the active Hermes home directory.
+
+    Checks the ``HERMES_HOME`` environment variable first (Hermes v0.6.0
+    profile isolation); falls back to ``~/.hermes`` when unset or empty.
+    Read on every call (never cached) so a later-set HERMES_HOME is honored.
+
+    Returns:
+        Path to the active Hermes home directory.
+    """
+    env = os.environ.get("HERMES_HOME")
+    if env:
+        return Path(env)
+    return Path.home() / ".hermes"
+
+
+KAJIBA_BASE = get_hermes_home() / "kajiba"
 ACTIVITY_LOG = KAJIBA_BASE / "activity.jsonl"
 
 VALID_CONFIG_KEYS: dict[str, dict] = {
@@ -77,7 +95,7 @@ VALID_CONFIG_KEYS: dict[str, dict] = {
 
 
 def _load_config_value(key: str, default: str) -> str:
-    """Read a single value from ~/.hermes/config.yaml under the kajiba section.
+    """Read a single value from the active Hermes config.yaml under the kajiba section.
 
     Args:
         key: The config key to look up (e.g. "dataset_repo").
@@ -86,7 +104,7 @@ def _load_config_value(key: str, default: str) -> str:
     Returns:
         The config value as a string, or the default.
     """
-    config_path = Path.home() / ".hermes" / "config.yaml"
+    config_path = get_hermes_home() / "config.yaml"
     if not config_path.exists():
         return default
     try:
@@ -102,7 +120,7 @@ def _load_config_value(key: str, default: str) -> str:
 
 
 def _save_config_value(key: str, value: str) -> None:
-    """Write a single value to ~/.hermes/config.yaml under the kajiba section.
+    """Write a single value to the active Hermes config.yaml under the kajiba section.
 
     Type coercion: "true"/"false" -> bool, digit strings -> int, else string.
 
@@ -120,7 +138,7 @@ def _save_config_value(key: str, value: str) -> None:
             "PyYAML is required for config set. Install it: pip install pyyaml"
         )
 
-    config_path = Path.home() / ".hermes" / "config.yaml"
+    config_path = get_hermes_home() / "config.yaml"
     config_path.parent.mkdir(parents=True, exist_ok=True)
 
     full_config: dict = {}

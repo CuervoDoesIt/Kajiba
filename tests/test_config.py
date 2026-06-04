@@ -20,8 +20,14 @@ yaml = pytest.importorskip("yaml")
 
 @pytest.fixture
 def fake_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """Redirect Path.home() to a temp directory for config isolation."""
+    """Redirect Path.home() to a temp directory for config isolation.
+
+    Also clears HERMES_HOME so get_hermes_home() falls back to the fake
+    ~/.hermes profile; an inherited HERMES_HOME would otherwise break the
+    temp-home isolation these config tests rely on.
+    """
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    monkeypatch.delenv("HERMES_HOME", raising=False)
     return tmp_path
 
 

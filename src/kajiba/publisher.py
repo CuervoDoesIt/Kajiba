@@ -21,6 +21,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Optional
 
+from kajiba.config import get_hermes_home
 from kajiba.schema import SCHEMA_VERSION
 
 logger = logging.getLogger(__name__)
@@ -35,7 +36,7 @@ DEFAULT_NUM_SHARDS = 256
 DEFAULT_DATASET_REPO = "CuervoDoesIt/kajiba-dataset"
 """Default upstream dataset repository on GitHub."""
 
-CLONE_DIR = Path.home() / ".hermes" / "kajiba" / "dataset-clone"
+CLONE_DIR = get_hermes_home() / "kajiba" / "dataset-clone"
 """Persistent clone location for the dataset fork."""
 
 

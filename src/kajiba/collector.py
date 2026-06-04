@@ -28,14 +28,19 @@ from kajiba.schema import (
     ToolCall,
     Trajectory,
 )
-from kajiba.config import _load_config_value, _log_activity, tier_meets_threshold
+from kajiba.config import (
+    _load_config_value,
+    _log_activity,
+    get_hermes_home,
+    tier_meets_threshold,
+)
 from kajiba.privacy import anonymize_hardware, apply_consent_level, jitter_timestamp
 from kajiba.scorer import compute_quality_score
 from kajiba.scrubber import scrub_record
 
 logger = logging.getLogger(__name__)
 
-KAJIBA_BASE = Path.home() / ".hermes" / "kajiba"
+KAJIBA_BASE = get_hermes_home() / "kajiba"
 STAGING_DIR = KAJIBA_BASE / "staging"
 OUTBOX_DIR = KAJIBA_BASE / "outbox"
 
