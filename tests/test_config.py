@@ -40,6 +40,44 @@ def fake_activity_log(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 
 # ---------------------------------------------------------------------------
+# get_hermes_home tests
+# ---------------------------------------------------------------------------
+
+
+class TestGetHermesHome:
+    """Tests for get_hermes_home (D-10 path helper, added in Plan 02)."""
+
+    def test_get_hermes_home_env(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+    ) -> None:
+        """Returns the HERMES_HOME env var path when set."""
+        from kajiba.config import get_hermes_home
+
+        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        assert get_hermes_home() == tmp_path
+
+    def test_get_hermes_home_unset(
+        self, fake_home: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Falls back to ~/.hermes when HERMES_HOME is unset."""
+        from kajiba.config import get_hermes_home
+
+        monkeypatch.delenv("HERMES_HOME", raising=False)
+        assert get_hermes_home() == fake_home / ".hermes"
+
+    def test_hermes_home_isolation_under_temp(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+    ) -> None:
+        """A derived base resolves under the HERMES_HOME temp dir (isolation)."""
+        from kajiba.config import get_hermes_home
+
+        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        base = get_hermes_home() / "kajiba"
+        assert base.parent == tmp_path
+        assert str(base).startswith(str(tmp_path))
+
+
+# ---------------------------------------------------------------------------
 # _load_config_value tests
 # ---------------------------------------------------------------------------
 
