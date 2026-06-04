@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Experiment Logging
-status: verifying
+status: executing
 stopped_at: Phase 13 context gathered
-last_updated: "2026-06-04T20:35:57.502Z"
-last_activity: 2026-06-04 -- Phase 13 planning complete
+last_updated: "2026-06-04T20:52:17.486Z"
+last_activity: 2026-06-04 -- Phase 13 execution started
 progress:
   total_phases: 10
   completed_phases: 3
-  total_plans: 10
-  completed_plans: 10
+  total_plans: 15
+  completed_plans: 11
   percent: 30
 ---
 
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-02)
 
 **Core value:** Real-world AI session data, tagged with full runtime context, flowing into a community dataset that accelerates local model fine-tuning for everyone.
-**Current focus:** Phase 12 — eval-scoring-scrub-tuning
+**Current focus:** Phase 13 — reviewer-critique-drift
 **Active milestone:** v1.2 Experiment Logging (Dual-Use), Phases 10-15 — Phases 10-12 complete (audited 2026-06-04, see `.planning/v1.2-MILESTONE-AUDIT.md`); next up Phase 13.
 **Parallel milestone:** v1.1 Hermes Pipeline Validation, Phases 6-9 — not yet started (Phase 6 discussed only). Shared foundation Phases 6-7 also gate v1.2 Phase 14 live capture.
 
 ## Current Position
 
-Phase: 12
-Plan: Not started
-Status: All plans complete — ready for /gsd-verify-work
-Last activity: 2026-06-04 -- Phase 13 planning complete
+Phase: 13 (reviewer-critique-drift) — EXECUTING
+Plan: 2 of 5
+Status: Ready to execute
+Last activity: 2026-06-04 -- Phase 13 execution started
 
 Progress: [██████████] 100%
 
@@ -61,6 +61,7 @@ Progress: [██████████] 100%
 | Phase 12 P02 | 6m | 1 task | 1 file |
 | Phase 12 P03 | 5m | 1 task | 1 file |
 | Phase 12 P04 | 10m | 2 tasks | 3 files |
+| Phase 13 P01 | 18m | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -85,6 +86,7 @@ Progress: [██████████] 100%
 - 12-03: Implemented `src/kajiba/experiment_scrub.py` (EEVAL-02) — `scrub_experiment(ExperimentRecord) -> (ExperimentRecord, ScrubLog)`, the divergent-tail share-boundary scrub. Reuses `scrub_text`/`SCRUB_PATTERNS` verbatim (no fork, D-09) on a FIELD ALLOWLIST: `experiment.task_description`, `outcome.local_model_output`, `outcome.reviewer_critique` (Optional-guarded, Pitfall 2), per-element `outcome.lessons_learned` (list shape preserved, Pitfall 1). Model/hardware/model_hash/reviewer_model/scalar-outcome fields preserved byte-identical (D-05/D-06); envelope-mirrors `scrub_record` (model_dump→mutate copy→model_validate, D-08 store-raw upheld). ScrubLog folds api_keys+hex_tokens, potential_names=0 (Open Q2 RESOLVED). NEVER imports/calls `kajiba.privacy` — portable no-coupling source scan green. Decision: docstring describes the privacy SKIP boundary in prose (no literal helper names) so the source scan passes. test_experiment_scrub.py 4/4 GREEN; full suite 284 passed / 2 pre-existing skips, 0 regressions. Commit: feat c166de6.
 
 - 12-04: Wired EEVAL-01/02 into the user-facing CLI + package surface (the only plan touching shared cli.py/__init__.py). New `_load_experiment(record_id)` store-load helper enforces T-12-10 (resolved-parent path-traversal guard, `path.resolve().parent == EXPERIMENTS_DIR.resolve()`) and T-12-11 (`load_record` + `isinstance(ExperimentRecord)` → clean ClickException, no traceback). `experiment score <id>` renders a compute-on-read confidence breakdown (per-check sub-scores + composite + complete/partial/thin band) plus a SEPARATE panel surfacing answer-quality `eval_score` distinctly from record confidence (Pitfall 4, D-03 never persists). `experiment scrub <id> [--out FILE]` previews a redaction-count table + scrubbed free text, or writes a scrubbed COPY to `--out` — NEVER overwrites the raw `exp_<id>.json` (D-08, T-12-12). `experiment list` gained a distinct "Confidence" column alongside the preserved "Score" (eval_score) column (T-12-13). Re-exported `compute_eval_confidence` + `scrub_experiment` from `kajiba/__init__.py` (A3). Decision: scrub PII assertion keys on the email (`[REDACTED_EMAIL]`) the shared scrubber reliably handles; discovered a pre-existing community-scrubber gap (`sk-[a-zA-Z0-9]{32,}` misses `sk-live-` hyphenated keys) — logged to `deferred-items.md`, NOT fixed (D-09 forbids forking the shared regex layer; out of scope for the integration plan). 5 new CLI tests (reuse `_isolate_store` verbatim, Pitfall 3); full suite 289 passed / 2 pre-existing skips, 0 regressions. Phase 12 all 4 plans complete. Commits: feat b70ba48, test 944527d.
+- [Phase ?]: 13-01: Landed all Wave 0 RED scaffolds for Phase 13. update_experiment locked to EQUAL guard (accept store_dir==expected_base; reject otherwise; default base = experiment_store.EXPERIMENTS_DIR at call time). 3 pre-existing log_experiment tests migrated to expected_base=store (RED now via TypeError, GREEN post-13-02). New test_experiment_drift.py (7 pure compute_drift tests). CLI review/lessons/drift + _parse_lesson + WR-01/02/03 RED; _isolate_store also isolates experiment_store.EXPERIMENTS_DIR (raising=False until 13-02). EXPERIMENTS_DIR parity test guards literal drift. schema.py untouched; pre-existing suite green, 0 regressions.
 
 ### Pending Todos
 
@@ -98,6 +100,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-06-04T20:14:02.137Z
+Last session: 2026-06-04T20:52:12.813Z
 Stopped at: Phase 13 context gathered
 Resume file: .planning/phases/13-reviewer-critique-drift/13-CONTEXT.md

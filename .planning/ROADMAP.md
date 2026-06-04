@@ -188,7 +188,7 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
 
 **Wave 1**
 
-- [ ] 13-01-PLAN.md — Wave 0 test scaffolds: update_experiment + compute_drift unit tests + review/lessons/drift/WR CLI tests (RED) (EREV-01/02/03)
+- [x] 13-01-PLAN.md — Wave 0 test scaffolds: update_experiment + compute_drift unit tests + review/lessons/drift/WR CLI tests (RED) (EREV-01/02/03)
 
 **Wave 2** *(blocked on 13-01; 13-02 ∥ 13-03 parallel — no file overlap)*
 
@@ -252,6 +252,6 @@ Two parallel tracks share a foundation. Execute by dependency, not strict numeri
 | 10. Experiment Schema Foundation | v1.2 | 3/3 | Complete    | 2026-06-03 |
 | 11. Experiment Logging & Private Store | v1.2 | 3/3 | Complete    | 2026-06-04 |
 | 12. Eval Scoring & Scrub Tuning | v1.2 | 4/4 | Complete    | 2026-06-04 |
-| 13. Reviewer Critique & Drift | v1.2 | 0/5 | Planned | - |
+| 13. Reviewer Critique & Drift | v1.2 | 1/5 | In Progress|  |
 | 14. Live Experiment Capture | v1.2 | 0/0 | Not started | - |
 | 15. Analysis Export & Practice-Project Integration | v1.2 | 0/0 | Not started | - |

@@ -66,9 +66,9 @@ Requirements for the Experiment Logging (Dual-Use) milestone. Runs **in parallel
 
 ### Experiment Review & Drift
 
-- [ ] **EREV-01**: User (or a reviewer model such as Grok) can attach a critique to an existing experiment record via `kajiba experiment review`
-- [ ] **EREV-02**: User can capture `lessons_learned` on a record in a queryable form (structured categories and/or free text)
-- [ ] **EREV-03**: Quality drift across repeated runs of the same model+task is computed and flagged on the record
+- [x] **EREV-01**: User (or a reviewer model such as Grok) can attach a critique to an existing experiment record via `kajiba experiment review`
+- [x] **EREV-02**: User can capture `lessons_learned` on a record in a queryable form (structured categories and/or free text)
+- [x] **EREV-03**: Quality drift across repeated runs of the same model+task is computed and flagged on the record
 
 ### Experiment Live Capture
 
@@ -142,9 +142,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ELOG-03 | Phase 11 | Complete |
 | EEVAL-01 | Phase 12 | Complete |
 | EEVAL-02 | Phase 12 | Complete |
-| EREV-01 | Phase 13 | Pending |
-| EREV-02 | Phase 13 | Pending |
-| EREV-03 | Phase 13 | Pending |
+| EREV-01 | Phase 13 | Complete |
+| EREV-02 | Phase 13 | Complete |
+| EREV-03 | Phase 13 | Complete |
 | ECAP-01 | Phase 14 | Pending |
 | EEXP-01 | Phase 15 | Pending |
 | EEXP-02 | Phase 15 | Pending |
