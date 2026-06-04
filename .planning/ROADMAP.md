@@ -135,7 +135,10 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
   2. An external script can create and persist an `ExperimentRecord` via a programmatic entry point
   3. Experiment records are written to a private namespace distinct from coding-session staging/outbox and never appear in publish/browse/download output
 
-**Plans**: TBD
+**Plans**: 3 plans
+- [ ] 11-01-PLAN.md — Experiment store foundation: log_experiment/build_experiment_record, EXPERIMENTS_DIR + re-exports (ELOG-02, ELOG-03 structural)
+- [ ] 11-02-PLAN.md — kajiba experiment CLI group: log (--from/flags/interactive) + list (ELOG-01)
+- [ ] 11-03-PLAN.md — Publish exclusion guard + D-14 regression + full-suite gate (ELOG-03 active)
 
 ### Phase 12: Eval Scoring & Scrub Tuning
 
