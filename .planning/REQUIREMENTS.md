@@ -9,15 +9,15 @@ Requirements for Hermes Pipeline Validation milestone. Each maps to roadmap phas
 
 ### Plugin Integration
 
-- [ ] **PLUG-01**: Kajiba plugin scaffold created at `~/.hermes/plugins/kajiba/` with `plugin.yaml` manifest and `register(ctx)` entry point
-- [ ] **PLUG-02**: Plugin registers hooks for `on_session_start`, `post_llm_call`, `post_tool_call`, and `on_session_end` via `ctx.register_hook()`
+- [x] **PLUG-01**: Kajiba plugin scaffold created at `~/.hermes/plugins/kajiba/` with `plugin.yaml` manifest and `register(ctx)` entry point
+- [x] **PLUG-02**: Plugin registers hooks for `on_session_start`, `post_llm_call`, `post_tool_call`, and `on_session_end` via `ctx.register_hook()`
 - [x] **PLUG-03**: All `~/.hermes` paths replaced with HERMES_HOME-aware resolution for v0.6.0 profile isolation
 - [ ] **PLUG-04**: Plugin installable via `pip install kajiba[hermes]` entry point (auto-registers without manual file copy)
 - [ ] **PLUG-05**: Optional `pre_llm_call` context injection into ephemeral system prompt (off by default, configurable)
 
 ### Data Capture
 
-- [ ] **CAPT-01**: Logging-only plugin stub deployed to empirically confirm hook kwargs against live Hermes v0.6.0
+- [x] **CAPT-01**: Logging-only plugin stub deployed to empirically confirm hook kwargs against live Hermes v0.6.0
 - [ ] **CAPT-02**: User turns captured from `pre_llm_call` and assistant responses from `post_llm_call`, assembled into `ConversationTurn` objects
 - [ ] **CAPT-03**: Tool calls captured from `post_tool_call` events and attached to the correct assistant turn via pending turn buffer
 - [ ] **CAPT-04**: Full model metadata captured via `ollama.show()` (parameter count, quantization, family, context length) and stored in `ModelMetadata`
@@ -113,12 +113,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PLUG-01 | Phase 6 | Pending |
-| PLUG-02 | Phase 6 | Pending |
+| PLUG-01 | Phase 6 | Complete |
+| PLUG-02 | Phase 6 | Complete |
 | PLUG-03 | Phase 6 | Complete |
 | PLUG-04 | Phase 8 | Pending |
 | PLUG-05 | Phase 8 | Pending |
-| CAPT-01 | Phase 6 | Pending |
+| CAPT-01 | Phase 6 | Complete |
 | CAPT-02 | Phase 7 | Pending |
 | CAPT-03 | Phase 7 | Pending |
 | CAPT-04 | Phase 7 | Pending |
