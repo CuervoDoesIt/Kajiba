@@ -1151,6 +1151,11 @@ def experiment_list() -> None:
     # eval trust is never confused with answer quality (Pitfall 4, T-12-13).
     table.add_column("Score", justify="right")
     table.add_column("Confidence")
+    # "Lessons" is the lesson count; "Drift" surfaces the persisted drift_flag.
+    # Both are read from the RAW dict (no full validation needed for display) so
+    # one malformed file never blanks the table (Pitfall 6).
+    table.add_column("Lessons", justify="right")
+    table.add_column("Drift")
 
     for f in files:
         try:
@@ -1160,6 +1165,8 @@ def experiment_list() -> None:
             continue
         experiment_meta = data.get("experiment", {})
         outcome = data.get("outcome", {})
+        lessons = outcome.get("lessons_learned", [])
+        drift = "⚠" if outcome.get("drift_flag") else ""
         # Compute-on-read confidence band (D-03 — never persisted); guard
         # rendering against per-file load/score errors, continuing as the
         # surrounding loop does.
@@ -1176,6 +1183,8 @@ def experiment_list() -> None:
             str(experiment_meta.get("task_category", "")),
             str(outcome.get("eval_score", "")),
             band,
+            str(len(lessons)),
+            drift,
         )
 
     console.print(table)
