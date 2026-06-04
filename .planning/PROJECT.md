@@ -34,6 +34,7 @@ Real-world AI session data, tagged with full runtime context (model identity, co
 - ✓ Configurable contribution modes — ad-hoc review gate and continuous auto-submit with quality threshold — v1.0
 - ✓ Browsable dataset catalog — `kajiba browse` with model drill-down and `kajiba download` with filtered subsets — v1.0
 - ✓ `ExperimentRecord` type on a shared `RecordBase` + `record_kind` discriminator and `load_record()` factory, back-compatible with existing records (byte-identical record/submission IDs, SCHEMA_VERSION 0.2.0) — v1.2 Phase 10
+- ✓ `kajiba experiment` CLI (`log` --from/flags/interactive + `list`) and programmatic `log_experiment`/`build_experiment_record` entry points writing to a private `~/.hermes/kajiba/experiments/` store, structurally separated from staging/outbox and actively excluded from publish/submit (D-13 write guard + raw-dict `record_kind` publish skip) — v1.2 Phase 11 (ELOG-01/02/03)
 
 ### Active
 
@@ -47,7 +48,7 @@ Real-world AI session data, tagged with full runtime context (model identity, co
 
 <!-- Parallel milestone: v1.2 Experiment Logging (Dual-Use) -->
 
-- [ ] `kajiba experiment` CLI + programmatic deliberate logging into a private local store (no community publish)
+- [x] `kajiba experiment` CLI + programmatic deliberate logging into a private local store (no community publish) — validated in Phase 11
 - [ ] Eval-specific scorer and experiment-aware scrub tuning (preserve model/hardware fields)
 - [ ] Reviewer-model critique attachment, queryable `lessons_learned`, and quality-drift detection
 - [ ] Live experiment capture via shared Hermes hooks (depends on v1.1 Phase 6–7)
@@ -144,4 +145,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-03 after Phase 10 (Experiment Schema Foundation) complete — `ExperimentRecord` on shared `RecordBase`, back-compatible*
+*Last updated: 2026-06-04 after Phase 11 (Experiment Logging & Private Store) complete — `kajiba experiment` CLI + programmatic logging into a private, publish-excluded local store (ELOG-01/02/03)*
