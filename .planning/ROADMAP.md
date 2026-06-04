@@ -167,7 +167,7 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
 **Wave 2** *(blocked on Wave 1 completion; 12-02 ∥ 12-03 parallel — no file overlap)*
 
 - [x] 12-02-PLAN.md — eval_scorer.py: compute_eval_confidence + EvalConfidenceResult, complete/partial/thin bands (EEVAL-01)
-- [ ] 12-03-PLAN.md — experiment_scrub.py: field-allowlist scrub reusing scrub_text, preserve model_hash/hardware byte-identical (EEVAL-02)
+- [x] 12-03-PLAN.md — experiment_scrub.py: field-allowlist scrub reusing scrub_text, preserve model_hash/hardware byte-identical (EEVAL-02)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 

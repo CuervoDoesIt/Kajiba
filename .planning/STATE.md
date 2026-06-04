@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Hermes Pipeline Validation
 status: executing
-stopped_at: Phase 12 context gathered
-last_updated: "2026-06-04T12:00:00.000Z"
-last_activity: 2026-06-04 -- Completed 12-02 (eval_scorer.py, EEVAL-01)
+stopped_at: Completed 12-03-PLAN.md
+last_updated: "2026-06-04T12:30:00.000Z"
+last_activity: 2026-06-04 -- Completed 12-03 (experiment_scrub.py, EEVAL-02)
 progress:
   total_phases: 4
   completed_phases: 2
   total_plans: 10
-  completed_plans: 8
-  percent: 80
+  completed_plans: 9
+  percent: 90
 ---
 
 # Project State
@@ -27,11 +27,11 @@ See: .planning/PROJECT.md (updated 2026-04-02)
 ## Current Position
 
 Phase: 12 (eval-scoring-scrub-tuning) — EXECUTING
-Plan: 3 of 4
+Plan: 4 of 4
 Status: Ready to execute
-Last activity: 2026-06-04 -- Completed 12-02 (eval_scorer.py, EEVAL-01)
+Last activity: 2026-06-04 -- Completed 12-03 (experiment_scrub.py, EEVAL-02)
 
-Progress: [████████░░] 80%
+Progress: [█████████░] 90%
 
 ## Performance Metrics
 
@@ -57,6 +57,7 @@ Progress: [████████░░] 80%
 *Updated after each plan completion*
 | Phase 12 P01 | 6m | 2 tasks | 5 files |
 | Phase 12 P02 | 6m | 1 task | 1 file |
+| Phase 12 P03 | 5m | 1 task | 1 file |
 
 ## Accumulated Context
 
@@ -78,6 +79,8 @@ Progress: [████████░░] 80%
 - [Phase ?]: 12-01: Wave 0 test foundation — 3 experiment fixtures (complete/thin/pii) + 2 RED scaffolds (8 contract tests). thin fixture required-fields-only so Plan 02 thin-band contract holds; pii fixture has real 64-hex model_hash + GPU name as byte-identical preservation targets. ScrubLog imported from kajiba.schema. RED confirmed (missing kajiba.eval_scorer/experiment_scrub only); pre-existing suite 276 passed, 0 regressions. Commits: 3a75662, e102686.
 - 12-02: Implemented `src/kajiba/eval_scorer.py` (EEVAL-01) — `compute_eval_confidence(ExperimentRecord) -> EvalConfidenceResult` completeness/confidence lens (D-01, compute-on-read D-03, advisory D-04). New single-responsibility module mirroring `scorer.py`'s shape, NOT bolted onto it (D-09). LOCKED contract honored verbatim: WEIGHTS sum 1.0 (output_present .30 / reviewer_critique .20 / model_metadata .20 / hardware_present .10 / lessons_learned .10 / outcome_signals .10), COMPLETE_THRESHOLD=0.80, PARTIAL_THRESHOLD=0.50. `_score_outcome_signals` scores ONLY recommended_action+completed_at (each 0.5) and gives NO credit for eval_score being in range (Pitfall 4) → required-fields-only thin fixture scores 0.0 there, composite ≈0.367 < 0.50 → band `thin`. Bands complete/partial/thin strictly disjoint from community tiers (D-02); portable no-vocab scan green. `TypeError` guard via `isinstance` rejects KajibaRecord (experiment-only lens). No schema mutation; test_eval_scorer.py 4/4 GREEN; full suite (ignoring test_experiment_scrub.py, RED until 12-03) 280 passed / 2 pre-existing skips, 0 regressions. Decision: removed literal community-tier words from the module docstring (the no-vocab scan only strips #-comment lines) — cosmetic, no behavior change. Commit: feat 07f0ab8.
 
+- 12-03: Implemented `src/kajiba/experiment_scrub.py` (EEVAL-02) — `scrub_experiment(ExperimentRecord) -> (ExperimentRecord, ScrubLog)`, the divergent-tail share-boundary scrub. Reuses `scrub_text`/`SCRUB_PATTERNS` verbatim (no fork, D-09) on a FIELD ALLOWLIST: `experiment.task_description`, `outcome.local_model_output`, `outcome.reviewer_critique` (Optional-guarded, Pitfall 2), per-element `outcome.lessons_learned` (list shape preserved, Pitfall 1). Model/hardware/model_hash/reviewer_model/scalar-outcome fields preserved byte-identical (D-05/D-06); envelope-mirrors `scrub_record` (model_dump→mutate copy→model_validate, D-08 store-raw upheld). ScrubLog folds api_keys+hex_tokens, potential_names=0 (Open Q2 RESOLVED). NEVER imports/calls `kajiba.privacy` — portable no-coupling source scan green. Decision: docstring describes the privacy SKIP boundary in prose (no literal helper names) so the source scan passes. test_experiment_scrub.py 4/4 GREEN; full suite 284 passed / 2 pre-existing skips, 0 regressions. Commit: feat c166de6.
+
 ### Pending Todos
 
 None.
@@ -90,6 +93,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-06-04T12:00:00.000Z
-Stopped at: Completed 12-02-PLAN.md
+Last session: 2026-06-04T12:30:00.000Z
+Stopped at: Completed 12-03-PLAN.md
 Resume file: None
