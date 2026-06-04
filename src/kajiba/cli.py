@@ -52,6 +52,8 @@ from kajiba.schema import (
     SubmissionMetadata, load_record, validate_record,
 )
 from kajiba.experiment_store import build_experiment_record, log_experiment
+from kajiba.eval_scorer import compute_eval_confidence
+from kajiba.experiment_scrub import scrub_experiment
 from kajiba.scorer import compute_quality_score
 from kajiba.scrubber import flag_org_domains, scrub_record
 
@@ -75,6 +77,55 @@ def _ensure_dirs() -> None:
     STAGING_DIR.mkdir(parents=True, exist_ok=True)
     OUTBOX_DIR.mkdir(parents=True, exist_ok=True)
     EXPERIMENTS_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _load_experiment(record_id: str) -> ExperimentRecord:
+    """Load a single experiment record from the private store by record_id.
+
+    SECURITY (T-12-10): the untrusted ``record_id`` is used to construct a
+    filesystem path, so the resolved parent is verified to be EXPERIMENTS_DIR
+    before any read — a crafted id containing path separators or ``..`` cannot
+    escape the store (mirror of the Phase 11 D-13 store guard). The loaded
+    record is then validated and required to be an ExperimentRecord
+    (T-12-11), rejecting non-experiment or malformed records with a clean
+    ClickException (no traceback).
+
+    Args:
+        record_id: The bare record id (e.g. ``kajiba_exp_<12hex>``); the
+            ``exp_`` prefix and ``.json`` suffix are added internally.
+
+    Returns:
+        The validated ExperimentRecord.
+
+    Raises:
+        click.ClickException: If the path escapes the store, the file is
+            missing, the JSON is malformed, or the record is not an
+            ExperimentRecord.
+    """
+    _ensure_dirs()
+    path = EXPERIMENTS_DIR / f"exp_{record_id}.json"
+
+    # T-12-10: reject path traversal — the resolved parent must be the store.
+    if path.resolve().parent != EXPERIMENTS_DIR.resolve():
+        raise click.ClickException(f"Invalid experiment id: {record_id}")
+
+    if not path.exists():
+        raise click.ClickException(f"No experiment found with id: {record_id}")
+
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        rec = load_record(data)
+    except Exception as exc:
+        logger.error("Failed to load experiment %s: %s", record_id, exc)
+        raise click.ClickException(f"Could not load experiment: {record_id}")
+
+    # T-12-11: completeness/scrub lenses apply to experiment records only.
+    if not isinstance(rec, ExperimentRecord):
+        raise click.ClickException(
+            f"Record {record_id} is not a model_experiment record."
+        )
+
+    return rec
 
 
 def _load_latest_staging() -> Optional[KajibaRecord]:
@@ -955,7 +1006,11 @@ def experiment_list() -> None:
     table.add_column("Record ID")
     table.add_column("Type")
     table.add_column("Task")
+    # "Score" is the answer-quality eval_score; "Confidence" is the
+    # compute-on-read record-completeness band — kept as distinct columns so
+    # eval trust is never confused with answer quality (Pitfall 4, T-12-13).
     table.add_column("Score", justify="right")
+    table.add_column("Confidence")
 
     for f in files:
         try:
@@ -965,14 +1020,133 @@ def experiment_list() -> None:
             continue
         experiment_meta = data.get("experiment", {})
         outcome = data.get("outcome", {})
+        # Compute-on-read confidence band (D-03 — never persisted); guard
+        # rendering against per-file load/score errors, continuing as the
+        # surrounding loop does.
+        band = ""
+        try:
+            rec = load_record(data)
+            if isinstance(rec, ExperimentRecord):
+                band = compute_eval_confidence(rec).confidence_band
+        except Exception as exc:
+            logger.error("Failed to score experiment file %s: %s", f, exc)
         table.add_row(
             str(data.get("record_id", "")),
             str(experiment_meta.get("experiment_type", "")),
             str(experiment_meta.get("task_category", "")),
             str(outcome.get("eval_score", "")),
+            band,
         )
 
     console.print(table)
+
+
+@experiment.command("score")
+@click.argument("record_id")
+def experiment_score(record_id: str) -> None:
+    """Show the compute-on-read confidence breakdown for one experiment.
+
+    Loads ``exp_<record_id>.json`` from the private store, computes the
+    eval-completeness confidence (per-check sub-scores, weighted composite, and
+    a complete/partial/thin band) and renders it. This is a trust lens on the
+    eval RECORD's completeness (D-01) — it is purely advisory, computed on read,
+    and NEVER written back to the store (D-03). The separate answer-quality
+    ``eval_score`` is rendered distinctly so confidence is never confused with
+    answer quality (Pitfall 4, T-12-13).
+
+    Args:
+        record_id: The bare record id of the experiment to score.
+    """
+    rec = _load_experiment(record_id)
+    result = compute_eval_confidence(rec)
+
+    table = Table(title=f"Eval Confidence — {record_id}")
+    table.add_column("Check")
+    table.add_column("Sub-score", justify="right")
+    for check, value in result.sub_scores.items():
+        table.add_row(check, f"{value:.3f}")
+    table.add_row("[bold]Composite[/bold]", f"[bold]{result.composite_score:.3f}[/bold]")
+    table.add_row("[bold]Confidence band[/bold]", f"[bold]{result.confidence_band}[/bold]")
+
+    console.print(table)
+    # Pitfall 4: surface the answer-quality eval_score separately and clearly
+    # distinguished from the record-completeness confidence above.
+    console.print(
+        Panel(
+            f"Answer quality (eval_score): {rec.outcome.eval_score}\n"
+            f"Record confidence: {result.confidence_band} "
+            f"({result.composite_score:.3f})",
+            title="Confidence vs. answer quality",
+        )
+    )
+
+
+@experiment.command("scrub")
+@click.argument("record_id")
+@click.option(
+    "--out",
+    type=click.Path(),
+    default=None,
+    help="Write the scrubbed copy to this file (never overwrites the raw store).",
+)
+def experiment_scrub(record_id: str, out: Optional[str]) -> None:
+    """Preview or emit a scrubbed copy of an experiment's free text.
+
+    Loads ``exp_<record_id>.json``, redacts only the caller-supplied free-text
+    surfaces via :func:`~kajiba.experiment_scrub.scrub_experiment` (model and
+    hardware identity are preserved byte-identical), and either previews the
+    redaction summary to stdout or, with ``--out FILE``, writes the scrubbed
+    record JSON there. It NEVER overwrites the raw ``exp_<id>.json`` in the
+    store (store-raw invariant, D-08, T-12-12).
+
+    Args:
+        record_id: The bare record id of the experiment to scrub.
+        out: Optional path to write the scrubbed record JSON; when omitted, a
+            redaction summary is previewed to stdout.
+    """
+    rec = _load_experiment(record_id)
+    scrubbed, scrub_log = scrub_experiment(rec)
+
+    if out is not None:
+        # D-08: write the scrubbed COPY to an explicit destination only — the
+        # raw store file is never touched.
+        out_path = Path(out)
+        out_path.write_text(
+            json.dumps(scrubbed.model_dump(mode="json", by_alias=True), indent=2),
+            encoding="utf-8",
+        )
+        console.print(
+            Panel(
+                f"[green]Scrubbed copy written[/green]\n{out_path}",
+                title="kajiba experiment scrub",
+            )
+        )
+        return
+
+    # Preview path: summarize redaction counts + the scrubbed free text. We
+    # render the SCRUBBED text only — raw PII is never echoed.
+    table = Table(title=f"Scrub Summary — {record_id}")
+    table.add_column("Category")
+    table.add_column("Redacted", justify="right")
+    for label, value in (
+        ("file_paths", scrub_log.file_paths_redacted),
+        ("api_keys", scrub_log.api_keys_redacted),
+        ("emails", scrub_log.emails_redacted),
+        ("network", scrub_log.network_redacted),
+        ("phone", scrub_log.phone_redacted),
+        ("crypto", scrub_log.crypto_redacted),
+        ("connection_strings", scrub_log.connection_strings_redacted),
+        ("items_flagged", scrub_log.items_flagged),
+    ):
+        table.add_row(label, str(value))
+    console.print(table)
+    console.print(
+        Panel(
+            f"task_description: {scrubbed.experiment.task_description}\n\n"
+            f"local_model_output: {scrubbed.outcome.local_model_output}",
+            title="Scrubbed free text (raw store unchanged — D-08)",
+        )
+    )
 
 
 @cli.command()
