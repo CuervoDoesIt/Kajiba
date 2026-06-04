@@ -78,7 +78,10 @@ def test_log_writes_file(tmp_path: Path) -> None:
 
     store = tmp_path / "experiments"
     rec = _make_record()
-    dest = log_experiment(rec, store)
+    # Pass expected_base=store so the EQUAL guard (13-02) accepts this
+    # tmp_path store dir instead of comparing against the real ~/.hermes
+    # default base.
+    dest = log_experiment(rec, store, expected_base=store)
 
     assert dest.exists()
     assert dest.parent == store
@@ -92,7 +95,7 @@ def test_atomic_write(tmp_path: Path) -> None:
     from kajiba.experiment_store import log_experiment
 
     store = tmp_path / "experiments"
-    dest = log_experiment(_make_record(), store)
+    dest = log_experiment(_make_record(), store, expected_base=store)
 
     leftover = list(store.glob("*.tmp"))
     assert leftover == [], f"temp files left behind: {leftover}"
@@ -105,8 +108,8 @@ def test_dedup_skip(tmp_path: Path) -> None:
     from kajiba.experiment_store import log_experiment
 
     store = tmp_path / "experiments"
-    first = log_experiment(_make_record(), store)
-    second = log_experiment(_make_record(), store)
+    first = log_experiment(_make_record(), store, expected_base=store)
+    second = log_experiment(_make_record(), store, expected_base=store)
 
     assert first == second
     assert len(list(store.glob("exp_*.json"))) == 1
@@ -121,10 +124,152 @@ def test_public_exports() -> None:
 
 
 def test_refuses_outbox_dir(tmp_path: Path) -> None:
-    """log_experiment refuses any directory not named 'experiments' (D-13)."""
+    """log_experiment refuses a store_dir != expected base (WR-04 / EQUAL guard).
+
+    With NO ``expected_base`` the guard falls back to the module default base
+    (the real ``experiments`` dir), which is not ``tmp_path/"outbox"`` →
+    rejected. Passing ``expected_base=tmp_path/"experiments"`` asserts the
+    same reject intent explicitly under the EQUAL predicate.
+    """
     import pytest
 
     from kajiba.experiment_store import log_experiment
 
     with pytest.raises(ValueError):
         log_experiment(_make_record(), tmp_path / "outbox")
+
+    with pytest.raises(ValueError):
+        log_experiment(
+            _make_record(),
+            tmp_path / "outbox",
+            expected_base=tmp_path / "experiments",
+        )
+
+
+# ---------------------------------------------------------------------------
+# Phase 13 RED scaffolds — update_experiment (CR-01 / WR-04) + EXPERIMENTS_DIR
+# parity. All five fail until 13-02 lands `update_experiment` and the
+# `experiment_store.EXPERIMENTS_DIR` constant. The store-guard tests use the
+# EQUAL predicate: accept store_dir == expected_base; reject store_dir !=
+# expected_base. Jointly satisfiable by 13-02's single predicate.
+# ---------------------------------------------------------------------------
+
+
+def test_update_overwrites_in_place(tmp_path: Path) -> None:
+    """update_experiment overwrites the same identity in place (CR-01, T-13-CR01).
+
+    The dedup-skip bug in log_experiment would leave the first (0.50) score on
+    disk; update_experiment must replace it with the corrected 0.90, leaving
+    exactly one file.
+    """
+    from kajiba.experiment_store import update_experiment
+
+    store = tmp_path / "experiments"
+
+    rec_lo = _make_record(
+        outcome=ExperimentOutcome(
+            local_model_output="def bsearch(a, x): ...",
+            eval_score=0.50,
+        ),
+    )
+    update_experiment(rec_lo, store, expected_base=store)
+
+    # Same identity (experiment_id / task_description / local_model_name /
+    # local_model_output / started_at unchanged), corrected score.
+    rec_hi = _make_record(
+        outcome=ExperimentOutcome(
+            local_model_output="def bsearch(a, x): ...",
+            eval_score=0.90,
+        ),
+    )
+    dest = update_experiment(rec_hi, store, expected_base=store)
+
+    files = list(store.glob("exp_*.json"))
+    assert len(files) == 1
+    data = json.loads(dest.read_text(encoding="utf-8"))
+    # Bug-closure: dedup-skip would have left 0.50 here.
+    assert data["outcome"]["eval_score"] == 0.90
+
+
+def test_identity_stable_across_mutation(tmp_path: Path) -> None:
+    """Mutating non-identity fields keeps record_id and filename byte-stable (CR-01)."""
+    from kajiba.experiment_store import update_experiment
+
+    store = tmp_path / "experiments"
+
+    rec = _make_record()
+    first = update_experiment(rec, store, expected_base=store)
+    first_id = rec.record_id
+    first_name = first.name
+
+    # Mutate only NON-identity fields (identity excludes outcome metadata).
+    rec.outcome.reviewer_critique = "Now reviewed in depth."
+    rec.outcome.lessons_learned = ["added more lessons", "and another"]
+    rec.outcome.drift_flag = True
+
+    second = update_experiment(rec, store, expected_base=store)
+
+    assert rec.record_id == first_id
+    assert second.name == first_name
+
+
+def test_update_guard_rejects_dir_outside_base(tmp_path: Path) -> None:
+    """update_experiment rejects store_dir != expected_base (WR-04, T-13-ERR).
+
+    EQUAL predicate: bad_dir.resolve() != base.resolve() → ValueError. The
+    accept tests pass store_dir == expected_base and are accepted by the SAME
+    predicate, so all cases are jointly satisfiable.
+    """
+    import pytest
+
+    from kajiba.experiment_store import update_experiment
+
+    base = tmp_path / "experiments"
+    bad_dir = tmp_path / "elsewhere" / "experiments"
+
+    with pytest.raises(ValueError):
+        update_experiment(_make_record(), bad_dir, expected_base=base)
+
+
+def test_update_default_base_guard(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    """Default expected_base reads experiment_store.EXPERIMENTS_DIR at call time.
+
+    Proves the PRODUCTION default path (update_experiment(rec, EXPERIMENTS_DIR)
+    with no expected_base) is accepted exactly as production uses it, and pins
+    the default-binding-at-call-time rule so the parent-vs-equal regression
+    cannot recur silently.
+    """
+    import pytest
+
+    import kajiba.experiment_store as store_mod
+
+    base = tmp_path / "experiments"
+    monkeypatch.setattr(store_mod, "EXPERIMENTS_DIR", base)
+
+    # ACCEPT: default base == store_dir (monkeypatched), no expected_base.
+    store_mod.update_experiment(_make_record(), base)
+    assert len(list(base.glob("exp_*.json"))) == 1
+
+    # REJECT: default base (tmp_path/"experiments") != tmp_path/"elsewhere".
+    with pytest.raises(ValueError):
+        store_mod.update_experiment(_make_record(), tmp_path / "elsewhere")
+
+
+def test_experiments_dir_matches_cli() -> None:
+    """cli.EXPERIMENTS_DIR and experiment_store.EXPERIMENTS_DIR stay equal (T-13-DRIFT-CFG).
+
+    After 13-02 lands the constant in experiment_store.py, the two literals must
+    match (both resolved) so the store guard's default base equals the directory
+    the CLI actually writes to. Literal drift fails fast in CI rather than only
+    fail-closing at production runtime. RED now on the missing
+    experiment_store.EXPERIMENTS_DIR.
+    """
+    import kajiba.cli
+    import kajiba.experiment_store
+
+    assert (
+        kajiba.cli.EXPERIMENTS_DIR.resolve()
+        == kajiba.experiment_store.EXPERIMENTS_DIR.resolve()
+    )
