@@ -42,6 +42,11 @@ def _isolate_dirs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Path
     monkeypatch.setattr("kajiba.cli.OUTBOX_DIR", outbox)
     monkeypatch.setattr("kajiba.cli.EXPERIMENTS_DIR", experiments)
     monkeypatch.setattr("kajiba.cli.KAJIBA_BASE", tmp_path)
+    # 13-02 tightened the store guard to an EQUAL expected_base check whose
+    # default base is experiment_store.EXPERIMENTS_DIR read at call time. This
+    # test calls log_experiment without expected_base (production semantics), so
+    # the store-module constant must also point at the tmp store to stay isolated.
+    monkeypatch.setattr("kajiba.experiment_store.EXPERIMENTS_DIR", experiments)
     return outbox, experiments
 
 

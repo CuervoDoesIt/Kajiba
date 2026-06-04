@@ -41,12 +41,25 @@ from kajiba.schema import (
 
 logger = logging.getLogger(__name__)
 
+# The canonical experiment store base. Duplicated from ``cli.py:70``'s
+# ``Path.home() / ".hermes" / "kajiba" / "experiments"`` value on purpose: the
+# store module stays Click-free (it never imports ``kajiba.cli``), yet the
+# production default guard base resolves equal to the directory ``cli.py`` passes
+# as ``store_dir``. The literal-parity test (test_experiments_dir_matches_cli)
+# guards against drift between the two definitions.
+EXPERIMENTS_DIR = Path.home() / ".hermes" / "kajiba" / "experiments"
+
 # ---------------------------------------------------------------------------
 # Write path
 # ---------------------------------------------------------------------------
 
 
-def log_experiment(record: ExperimentRecord, store_dir: Path) -> Path:
+def log_experiment(
+    record: ExperimentRecord,
+    store_dir: Path,
+    *,
+    expected_base: Optional[Path] = None,
+) -> Path:
     """Persist a validated ExperimentRecord to the private experiment store.
 
     Computes the record's content-addressable identity via the frozen schema
@@ -58,21 +71,32 @@ def log_experiment(record: ExperimentRecord, store_dir: Path) -> Path:
     Args:
         record: An already-validated ExperimentRecord (D-08). Its
             ``record_id`` and ``submission_hash`` are computed and set here.
-        store_dir: The experiments store directory (``EXPERIMENTS_DIR``).
-            Must resolve to a directory named ``experiments`` (D-13).
+        store_dir: The experiments store directory. Must resolve EQUAL to
+            ``expected_base`` (WR-04 guard, D-13).
+        expected_base: The canonical experiments base the ``store_dir`` must
+            EQUAL. Defaults to ``None`` → the module's :data:`EXPERIMENTS_DIR`
+            resolved AT CALL TIME (never bound at def-time), so ``cli.py``
+            callers passing the real ``EXPERIMENTS_DIR`` are accepted without
+            passing it, while tests pass ``tmp_path/'experiments'`` (or
+            monkeypatch ``experiment_store.EXPERIMENTS_DIR``) to stay isolated
+            and Click-free.
 
     Returns:
         Path to the written — or pre-existing identical — JSON file.
 
     Raises:
-        ValueError: If ``store_dir`` does not resolve to an ``experiments``
-            directory (structural privacy guard, D-13).
+        ValueError: If ``store_dir`` does not resolve EQUAL to
+            ``expected_base`` (structural privacy guard, WR-04 / D-13).
     """
-    # D-13 structural guard: refuse to write anywhere but the experiment store.
+    # WR-04 / D-13 structural guard: refuse to write anywhere but the canonical
+    # experiment store. Resolve the default base at CALL TIME so a monkeypatch
+    # of EXPERIMENTS_DIR is honored (never bind it as a def-time default).
+    if expected_base is None:
+        expected_base = EXPERIMENTS_DIR
     resolved = store_dir.resolve()
-    if resolved.name != "experiments":
+    if resolved != expected_base.resolve():
         raise ValueError(
-            f"Experiment store must be the 'experiments' directory, got {resolved}"
+            f"store_dir {resolved} is not the expected experiment store {expected_base}"
         )
 
     store_dir.mkdir(parents=True, exist_ok=True)
@@ -102,6 +126,99 @@ def log_experiment(record: ExperimentRecord, store_dir: Path) -> Path:
         raise
 
     logger.info("Experiment logged to %s", dest)
+    return dest
+
+
+def update_experiment(
+    record: ExperimentRecord,
+    store_dir: Path,
+    *,
+    expected_base: Optional[Path] = None,
+) -> Path:
+    """Overwrite an existing experiment in place — the corrective write path.
+
+    This is the single in-place overwrite write path that all three Phase 13
+    commands funnel through (D-03). It closes CR-01 (the ``log_experiment``
+    dedup-skip data-loss bug) by INTENTIONALLY overwriting ``exp_<id>.json``
+    rather than early-returning on ``dest.exists()``: logging then updating the
+    same identity with a corrected ``eval_score`` leaves exactly one file whose
+    on-disk score is the corrected value.
+
+    In-place overwrite is safe because the record's content-addressable identity
+    excludes the outcome/metadata fields a correction mutates: ``compute_record_id``
+    / ``compute_submission_hash`` (schema.py:445-467) hash only the experiment
+    identity payload, so ``record_id`` — and therefore the on-disk filename —
+    stays byte-stable across any outcome/metadata mutation (D-01).
+
+    The record is re-validated before writing (the models lack
+    ``validate_assignment``, so re-validation is the project rule, Pitfall 3):
+    an out-of-range value forced into the dict is rejected by Pydantic, not
+    persisted.
+
+    Args:
+        record: The ExperimentRecord to overwrite in place. Its ``record_id``
+            and ``submission_hash`` are (re)computed here.
+        store_dir: The experiments store directory. Must resolve EQUAL to
+            ``expected_base`` (WR-04 guard, D-13).
+        expected_base: The canonical experiments base the ``store_dir`` must
+            EQUAL. Defaults to ``None`` → the module's :data:`EXPERIMENTS_DIR`
+            resolved AT CALL TIME (never bound at def-time), so ``cli.py``
+            callers passing the real ``EXPERIMENTS_DIR`` are accepted without
+            passing it, while tests pass ``tmp_path/'experiments'`` (or
+            monkeypatch ``experiment_store.EXPERIMENTS_DIR``) to stay isolated
+            and Click-free.
+
+    Returns:
+        Path to the overwritten JSON file.
+
+    Raises:
+        ValueError: If ``store_dir`` does not resolve EQUAL to
+            ``expected_base`` (structural privacy guard, WR-04 / D-13).
+        pydantic.ValidationError: If the re-validated record fails validation.
+    """
+    # WR-04 / D-13 structural guard: refuse to write anywhere but the canonical
+    # experiment store. Resolve the default base at CALL TIME so a monkeypatch
+    # of EXPERIMENTS_DIR is honored (never bind it as a def-time default).
+    if expected_base is None:
+        expected_base = EXPERIMENTS_DIR
+    resolved = store_dir.resolve()
+    if resolved != expected_base.resolve():
+        raise ValueError(
+            f"store_dir {resolved} is not the expected experiment store {expected_base}"
+        )
+
+    store_dir.mkdir(parents=True, exist_ok=True)
+
+    # Re-validate after mutation: the models lack validate_assignment, so a
+    # mutated record must be re-validated before it crosses into storage
+    # (Pitfall 3). An out-of-range value is rejected here, not persisted.
+    record = ExperimentRecord.model_validate(
+        record.model_dump(mode="json", by_alias=True)
+    )
+
+    # Identity comes from the frozen Phase 10 schema methods — never hand-rolled.
+    # Identity excludes outcome/metadata, so the filename is stable across
+    # corrections (CR-01 / D-01).
+    record.compute_record_id()
+    record.compute_submission_hash()
+    dest = store_dir / f"exp_{record.record_id}.json"
+
+    # NO dest.exists() early-return: update_experiment ALWAYS overwrites (CR-01).
+    data = record.model_dump(mode="json", by_alias=True)
+    payload = json.dumps(data, ensure_ascii=False, indent=2) + "\n"
+
+    # Atomic write: temp file in the same dir, then os.replace (atomic and
+    # overwrite-safe on both POSIX and Windows).
+    fd, tmp_name = tempfile.mkstemp(dir=store_dir, suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(payload)
+        os.replace(tmp_name, dest)
+    except BaseException:
+        Path(tmp_name).unlink(missing_ok=True)
+        raise
+
+    logger.info("Experiment updated in place: %s", dest)
     return dest
 
 
