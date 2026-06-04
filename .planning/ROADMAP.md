@@ -56,7 +56,27 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
   4. All Kajiba file paths resolve correctly under HERMES_HOME profile isolation (not hardcoded `~/.hermes`)
   5. Developer can symlink the Kajiba plugin directory into Hermes for a rapid edit-reload development cycle
 
-**Plans**: TBD
+**Plans**: 5 plans
+
+**Wave 1**
+
+- [ ] 06-01-PLAN.md — Wave 0 test scaffolds: get_hermes_home cases, test_plugin (stub ctx/register/kwargs/debug), static hermes_integration guard (PLUG-03/PLUG-02/CAPT-01)
+
+**Wave 2** *(blocked on 06-01)*
+
+- [ ] 06-02-PLAN.md — HERMES_HOME path migration across 5 modules (parity-safe) + delete hermes_integration.py + collector signature adapt (PLUG-03)
+
+**Wave 3** *(blocked on 06-02 — needs new collector signature + get_hermes_home)*
+
+- [ ] 06-03-PLAN.md — Plugin package: register(ctx) + 4 hooks + KAJIBA_DEBUG discovery mode + plugin.yaml (PLUG-01/PLUG-02/CAPT-01)
+
+**Wave 4** *(blocked on 06-03)*
+
+- [ ] 06-04-PLAN.md — docs/hermes-setup.md: WSL2/GPU/Ollama/Hermes checkpoints + symlink dev workflow + troubleshooting (ENV-01/ENV-02/ENV-03)
+
+**Wave 5** *(live, human-verify; blocked on 06-03 + 06-04)*
+
+- [ ] 06-05-PLAN.md — Live env + plugin load + KAJIBA_DEBUG hook-kwargs capture → 06-HOOK-KWARGS.md (ENV-01/02/03, PLUG-01/02, CAPT-01)
 
 ### Phase 7: Turn Capture + Semantic PII Scrubbing
 
