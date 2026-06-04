@@ -1,0 +1,16 @@
+# Kajiba Hermes plugin manifest.
+#
+# Hermes reads this manifest to discover and load the plugin from the symlinked
+# plugin directory (Plan 04). NOTE: these manifest field names (name, version,
+# description, provides_hooks, provides_tools) are [ASSUMED] from the Hermes
+# plugin contract and remain unconfirmed until Plan 05's live load verifies the
+# real schema and records it in 06-HOOK-KWARGS.md.
+name: kajiba
+version: "0.2.0"
+description: "Captures Hermes session data for the Kajiba community dataset"
+provides_hooks:
+  - on_session_start
+  - post_llm_call
+  - post_tool_call
+  - on_session_end
+provides_tools: []
