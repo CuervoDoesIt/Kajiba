@@ -233,9 +233,15 @@ class TestCalibration:
         # Surface the FP-rate artifact (visible with `pytest -s`).
         print(f"CALIBRATION_FP_RATE={fp_rate:.4f} flag_band={len(flag_band)}")
 
-        # HARD GATE: zero auto-redacts (>=0.7) on known-safe code identifiers.
-        assert auto_redact == [], (
-            f"D-06 calibration gate FAILED: {len(auto_redact)} code identifiers "
-            f"auto-redacted at score>=0.7 (FP rate {fp_rate:.4f}): "
-            f"{[s['text'] for s in auto_redact]}"
+        # HARD GATE: zero KNOWN-SAFE code identifiers auto-redacted (>=0.7).
+        # Genuine PII seeded in the fixture (TRUE_POSITIVE_NAMES) is EXPECTED to
+        # auto-redact and must NOT trip this gate — the gate measures false
+        # positives on code, not the total number of detections. Asserting on the
+        # full ``auto_redact`` set would wrongly fail whenever GLiNER correctly
+        # catches the seeded true-positive names (the latent bug the first real
+        # LANE-B run on the DGX surfaced; this assert had never executed before).
+        assert false_positives == [], (
+            f"D-06 calibration gate FAILED: {len(false_positives)} known-safe code "
+            f"identifiers auto-redacted at score>=0.7 (FP rate {fp_rate:.4f}): "
+            f"{[s['text'] for s in false_positives]}"
         )
