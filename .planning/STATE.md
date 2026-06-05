@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Experiment Logging
-status: executing
-stopped_at: "Completed 06-02-PLAN.md (HERMES_HOME migration + collector adapt + hermes_integration deletion). Next: 06-03 (kajiba.plugin package)."
+status: paused
+stopped_at: "Phase 06 PAUSED at the 06-05 checkpoint pending re-plan. Waves 1-4 (06-01..06-04) committed. At the live-verification checkpoint, discovered Hermes shifted v0.6.0 -> v0.15.x with native Windows (developer already runs v0.15.1 natively); hook kwargs now documented. WSL2-based 06-05 premise obsolete. Re-scope via /gsd-discuss-phase 6. See 06-REPLAN-RESEARCH.md."
 last_updated: "2026-06-04T23:19:49.228Z"
-last_activity: 2026-06-04 -- Phase 06 Plan 02 complete (HERMES_HOME migration + collector adapt + hermes_integration deletion)
+last_activity: 2026-06-04 -- Phase 06 paused at 06-05 checkpoint; Hermes v0.6->v0.15 + native-Windows shift flagged for re-plan (research in 06-REPLAN-RESEARCH.md)
 progress:
   total_phases: 10
   completed_phases: 4
@@ -27,12 +27,12 @@ See: .planning/PROJECT.md (updated 2026-04-02)
 
 ## Current Position
 
-Phase: 06 (environment-plugin-foundation) — EXECUTING
-Plan: 5 of 5
-Status: Ready to execute
-Last activity: 2026-06-04 -- Phase 06 Plan 02 complete (HERMES_HOME migration + collector adapt + hermes_integration deletion)
+Phase: 06 (environment-plugin-foundation) — PAUSED (pending re-plan)
+Plan: 5 of 5 (06-01..06-04 done; 06-05 not started)
+Status: Paused at 06-05 checkpoint — Hermes v0.6→v0.15.x + native-Windows shift discovered; re-scope via /gsd-discuss-phase 6
+Last activity: 2026-06-04 -- Phase 06 paused at 06-05 checkpoint for re-plan (see 06-REPLAN-RESEARCH.md)
 
-Progress: [██████████] 100%
+Progress: [████████░░] 80% (4/5 plans; 06-05 re-scoping)
 
 ## Performance Metrics
 
