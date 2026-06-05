@@ -107,7 +107,7 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
 
 **Wave 3** *(blocked on 07-04 — cli.py)*
 
-- [ ] 07-05-PLAN.md — CLI Layer-C wiring: shared helper across scrub_record sites, semantic flags into the existing preview panel, graceful degrade (PRIV-01/02/04)
+- [x] 07-05-PLAN.md — CLI Layer-C wiring: shared helper across scrub_record sites, semantic flags into the existing preview panel, graceful degrade (PRIV-01/02/04)
 
 **Wave 4** *(live, human-action; blocked on 07-03 + 07-04 + 07-05)*
 

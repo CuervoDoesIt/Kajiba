@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Experiment Logging
 status: executing
-stopped_at: "Phase 7 Plan 04 complete (GLiNER semantic scrubber GREEN + stub retired)"
-last_updated: "2026-06-05T21:42:00.000Z"
-last_activity: "2026-06-05 -- Phase 07 Plan 04 complete (scrubber_semantic.py: D-05 bands, D-07 asymmetric, soft-import; scrubber_llm retired)"
+stopped_at: "Phase 7 Plan 05 complete (Layer C wired into CLI; flagged-panel surfacing GREEN; graceful degrade)"
+last_updated: "2026-06-05T21:50:43.000Z"
+last_activity: "2026-06-05 -- Phase 07 Plan 05 complete (cli.py _apply_semantic_layer wired into preview/submit/export/review; model-free flagged-panel test GREEN)"
 progress:
   total_phases: 10
   completed_phases: 4
   total_plans: 27
-  completed_plans: 25
-  percent: 46
+  completed_plans: 26
+  percent: 48
 ---
 
 # Project State
@@ -28,11 +28,11 @@ See: .planning/PROJECT.md (updated 2026-04-02)
 ## Current Position
 
 Phase: 07 (turn-capture-semantic-pii-scrubbing) — EXECUTING
-Plan: 5 of 6
+Plan: 6 of 6
 Status: Ready to execute
-Last activity: 2026-06-05 -- Phase 07 Plan 04 complete (GLiNER semantic scrubber GREEN + stub retired)
+Last activity: 2026-06-05 -- Phase 07 Plan 05 complete (Layer C wired into CLI; flagged-panel surfacing GREEN)
 
-Progress: [███████░░░] 67% (4/6 plans)
+Progress: [████████░░] 83% (5/6 plans)
 
 ## Performance Metrics
 
@@ -78,6 +78,7 @@ Progress: [███████░░░] 67% (4/6 plans)
 | Phase 07 P02 | 14m | 2 tasks | 2 files |
 | Phase 07 P03 | 12m | 3 tasks | 2 files |
 | Phase 07 P04 | 3m | 2 tasks | 3 files |
+| Phase 07 P05 | 5m | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -126,6 +127,8 @@ Progress: [███████░░░] 67% (4/6 plans)
 
 - 07-04 (Wave 2 GREEN, PRIV-01/02/03 + D-04/05/06/07/09/10/11): Built src/kajiba/scrubber_semantic.py — GLiNER Layer-C semantic PII scrubber. classify_band/partition_spans implement the D-05 float bands (>=0.7 redact / 0.4-0.7 flag / <0.4 ignore). _get_model() is a within-run singleton (D-09) soft-importing gliner+torch INSIDE the function (psutil-style); ImportError -> SemanticScrubUnavailable (PRIV-04/D-10), CUDA-with-CPU-fallback, capital-PII GLINER_MODEL_ID="nvidia/gliner-PII" (Correction 1). detect_entities runs ONE inference pass at the 0.4 flag floor. scrub_record_semantic(record) -> (record, names_redacted, list[FlaggedItem]) mirrors scrub_record's deep-copy discipline (model_dump(by_alias=True)->mutate copy->KajibaRecord.model_validate, input never mutated) and enforces D-07 asymmetric coverage: ConversationTurn.value redacts >=0.7 (right-to-left span replacement with [REDACTED_PERSON]/[REDACTED_NAME]) and flags 0.4-0.7; tool_input/tool_output are FLAG-ONLY (text byte-unchanged, the anti-corruption rule). FlaggedItem (reused from kajiba.scrubber, D-08) carries reason=f"GLiNER {label} (confidence {score:.2f})" (Pattern 7). DECISION: scrub_record_semantic degrades to a no-op (returns record,0,[]) when [llm-scrub] is absent — the LANE A asymmetric tests call it directly without gliner and assert on the return value (not pytest.raises); 07-05 surfaces the missing extra at the CLI boundary. Retired scrubber_llm.py: re-exports the new entry points, removed the dead model_fn/SemanticRedaction(confidence:str) string-confidence interface (legacy scrub_semantic now raises SemanticScrubUnavailable). DEVIATION (Rule 1): pre-existing test_scrubber.py::TestLLMScrubberStub pinned the retired stub's NotImplementedError — repointed to assert SemanticScrubUnavailable(match="retired"), matching the plan's mandate to remove the old interface (no production behavior weakened). LANE B (detect/calibration) left SKIPPED — [llm-scrub] (gliner/torch, multi-GB) NOT installed per environment guidance; D-06 calibration hard gate + FP-rate run when the extra is present. git diff --quiet src/kajiba/scrubber.py exit 0 (Layer B untouched); import kajiba.scrubber_semantic/scrubber_llm clean offline. Full suite 348 passed / 4 skipped (2 LANE-B + 2 pre-existing yaml), 0 regressions. Commits: feat dfaeb6a, feat e94bc6f.
 
+- 07-05 (Wave 3 GREEN, PRIV-01/02/04 + D-08/09/11 + T-07-12/13): Wired Layer C into the CLI via a single shared `_apply_semantic_layer(scrubbed_record, regex_flagged, scrub_log)` helper in cli.py — runs `scrub_record_semantic` inside `try/except SemanticScrubUnavailable`, sets `ScrubLog.potential_names_redacted`, does `items_flagged += len(semantic_flags)`, and returns `regex_flagged + semantic_flags` so the SAME `_render_preview(flagged_items=...)` panel surfaces both (D-08, no new render surface). Invoked at all 4 flag-rendering `scrub_record` sites: `preview`, `submit`, `export` (T-07-12 — semantic redactions applied to the record that flows downstream before it can leave the machine), `review`. On `SemanticScrubUnavailable` the helper degrades to regex-only so `kajiba preview` exits 0 without `[llm-scrub]` (T-07-13/PRIV-04). No `pipeline_stage`, no persisted scrub state (D-09). Model-free `TestSemanticFlaggedPanel` tests monkeypatch `kajiba.cli.scrub_record_semantic` (no gliner needed): one asserts the synthetic flag text + `GLiNER company (confidence 0.55)` reason appear in the panel, one asserts exit 0 when `SemanticScrubUnavailable` is raised. DEVIATION (Rule 1): a pre-existing module-level `importorskip("yaml")` in test_cli.py was silently skipping the ENTIRE test_cli.py file when PyYAML is absent (masking ~80 CLI tests incl. the new flagged-panel ones) — scoped it to a class-level `skipif` on `TestConfigSubcommands`; this unmasked the previously-skipped CLI tests (all pass). Full suite 430 passed / 16 skipped (PyYAML soft-dep + LANE-B GLiNER), 0 regressions. Commits: test 961aa94, feat 99758a2.
+
 ### Pending Todos
 
 None.
@@ -138,6 +141,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-06-05T21:42:00.000Z
-Stopped at: Phase 7 Plan 04 complete (GLiNER semantic scrubber GREEN + stub retired)
-Resume file: .planning/phases/07-turn-capture-semantic-pii-scrubbing/07-05-PLAN.md
+Last session: 2026-06-05T21:50:43.000Z
+Stopped at: Phase 7 Plan 05 complete (Layer C wired into CLI; flagged-panel surfacing GREEN; graceful degrade)
+Resume file: .planning/phases/07-turn-capture-semantic-pii-scrubbing/07-06-PLAN.md
