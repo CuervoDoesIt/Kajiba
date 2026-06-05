@@ -10,10 +10,14 @@ each kwarg it receives -- the diagnostic mechanism (D-05, CAPT-01) that the
 Plan 05 live v0.15.x session uses to confirm the documented hook payload shapes
 that unblock Phase 7.
 
-Scope note (Phase 6): ``on_session_start`` / ``on_session_end`` drive real
-collector state; ``on_post_llm_call`` / ``on_post_tool_call`` are debug-log-only
-capture stubs -- ConversationTurn / ToolCall assembly is deferred to Phase 7
-because the turn-hook kwarg shapes are [ASSUMED] until Plan 05 confirms them.
+Scope note (Phase 7): all four handlers now drive real collector state.
+``on_post_llm_call`` dispatches the user/assistant pair to the collector's
+paired-turn capture (CAPT-02) and ``on_post_tool_call`` dispatches tool events
+to the collector's turn-keyed tool ingest (CAPT-03). The kwarg names are the
+live-verified Hermes v0.15.x payload contract from 06-HOOK-KWARGS.md. Each
+handler keeps the ``KAJIBA_DEBUG`` log line and the fault-tolerant try/except +
+``if _collector is not None`` shell so a raising collector never disrupts
+Hermes. No scrubbing happens in hooks (scrub is a CLI step).
 """
 
 import logging
@@ -85,31 +89,57 @@ def on_session_start(session_id=None, model=None, platform=None, **kwargs) -> No
 
 
 def on_post_llm_call(**kwargs) -> None:
-    """Debug-log a Hermes post-LLM-call event (capture-only stub).
+    """Dispatch a Hermes post-LLM-call event to the collector (CAPT-02).
 
-    Phase 6 logs the kwargs only; turn assembly is deferred to Phase 7 because
-    the kwarg shape is [ASSUMED] until Plan 05 captures it live.
+    Keeps the ``KAJIBA_DEBUG`` log line, then extracts the live-verified
+    payload kwargs (``user_message``/``assistant_response``/``turn_id`` plus
+    session/model context) and invokes the collector's paired-turn capture when
+    a collector is installed. ``kwargs.get(...)`` tolerates missing/extra kwargs
+    (MP-2); a raising collector is swallowed so Hermes is never disrupted.
 
     Args:
         **kwargs: The raw post-LLM-call payload (all tolerated; MP-2).
     """
     try:
         _log_kwargs("on_post_llm_call", {}, kwargs)
+        if _collector is not None:
+            _collector.on_llm_turn(
+                user_message=kwargs.get("user_message", ""),
+                assistant_response=kwargs.get("assistant_response", ""),
+                turn_id=kwargs.get("turn_id"),
+                conversation_history=kwargs.get("conversation_history"),
+                session_id=kwargs.get("session_id"),
+                model=kwargs.get("model"),
+            )
     except Exception:
         logger.exception("Error in on_post_llm_call hook")
 
 
 def on_post_tool_call(**kwargs) -> None:
-    """Debug-log a Hermes post-tool-call event (capture-only stub).
+    """Dispatch a Hermes post-tool-call event to the collector (CAPT-03).
 
-    Phase 6 logs the kwargs only; tool-call assembly is deferred to Phase 7
-    because the kwarg shape is [ASSUMED] until Plan 05 captures it live.
+    Keeps the ``KAJIBA_DEBUG`` log line, then extracts the live-verified tool
+    payload kwargs and invokes the collector's tool-ingest method when a
+    collector is installed. ``kwargs.get(...)`` tolerates missing/extra kwargs
+    (MP-2); a raising collector is swallowed so Hermes is never disrupted.
 
     Args:
         **kwargs: The raw post-tool-call payload (all tolerated; MP-2).
     """
     try:
         _log_kwargs("on_post_tool_call", {}, kwargs)
+        if _collector is not None:
+            _collector.on_tool_call(
+                tool_name=kwargs.get("tool_name", ""),
+                args=kwargs.get("args"),
+                result=kwargs.get("result"),
+                tool_call_id=kwargs.get("tool_call_id"),
+                turn_id=kwargs.get("turn_id"),
+                status=kwargs.get("status"),
+                error_type=kwargs.get("error_type"),
+                error_message=kwargs.get("error_message"),
+                duration_ms=kwargs.get("duration_ms"),
+            )
     except Exception:
         logger.exception("Error in on_post_tool_call hook")
 
