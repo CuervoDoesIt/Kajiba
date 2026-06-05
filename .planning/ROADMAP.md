@@ -76,7 +76,7 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
 
 **Wave 5** *(live, human-verify; blocked on 06-03 + 06-04)*
 
-- [ ] 06-05-PLAN.md — re-plan: native-Windows live confirm of documented v0.15.x hook kwargs (remote backend, hermes plugins enable + KAJIBA_DEBUG) → 06-HOOK-KWARGS.md; resolve discovery dir; promote plugin.yaml to [CONFIRMED v0.15.x] (ENV-01/02/03, PLUG-01/02, CAPT-01)
+- [x] 06-05-PLAN.md — re-plan: native-Windows live confirm of documented v0.15.x hook kwargs (remote backend, hermes plugins enable + KAJIBA_DEBUG) → 06-HOOK-KWARGS.md; resolve discovery dir; promote plugin.yaml to [CONFIRMED v0.15.x] (ENV-01/02/03, PLUG-01/02, CAPT-01) — completed 2026-06-05 (live v0.15.1, all 4 hooks fired)
 
 ### Phase 7: Turn Capture + Semantic PII Scrubbing
 
@@ -265,7 +265,7 @@ Two parallel tracks share a foundation. Execute by dependency, not strict numeri
 | 3. Dataset Publishing | v1.0 | 2/2 | Complete | 2026-03-31 |
 | 4. Contribution Modes | v1.0 | 3/3 | Complete | 2026-04-01 |
 | 5. Consumer Experience | v1.0 | 2/2 | Complete | 2026-04-02 |
-| 6. Environment + Plugin Foundation | v1.1 | 4/5 | In Progress|  |
+| 6. Environment + Plugin Foundation | v1.1 | 5/5 | Plans complete | 2026-06-05 |
 | 7. Turn Capture + Semantic PII Scrubbing | v1.1 | 0/0 | Not started | - |
 | 8. HITL Validation + Pipeline Integration | v1.1 | 0/0 | Not started | - |
 | 9. Fine-Tune Experiment | v1.1 | 0/0 | Not started | - |

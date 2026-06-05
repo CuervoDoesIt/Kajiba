@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Experiment Logging
 status: executing
-stopped_at: Completed 06-04-PLAN.md (corrective native-Windows v0.15.x rewrite)
-last_updated: "2026-06-05T11:15:15.000Z"
-last_activity: 2026-06-05 -- Completed 06-04 re-plan (native-Windows v0.15.x guide rewrite)
+stopped_at: Completed 06-05-PLAN.md (live v0.15.x hook-kwargs verification)
+last_updated: "2026-06-05T15:23:59.000Z"
+last_activity: 2026-06-05 -- Completed 06-05 (live v0.15.x hook-kwargs verification); Phase 6 plans complete
 progress:
   total_phases: 10
   completed_phases: 4
   total_plans: 21
-  completed_plans: 19
+  completed_plans: 20
   percent: 40
 ---
 
@@ -28,11 +28,11 @@ See: .planning/PROJECT.md (updated 2026-04-02)
 ## Current Position
 
 Phase: 06 (environment-plugin-foundation) — EXECUTING
-Plan: 1 of 5
-Status: Executing Phase 06
-Last activity: 2026-06-05 -- Phase 06 execution started
+Plan: 5 of 5
+Status: Executing Phase 06 — all 5 plans complete, ready for /gsd-verify-work
+Last activity: 2026-06-05 -- Completed 06-05 live v0.15.x hook-kwargs verification
 
-Progress: [████████░░] 80% (4/5 plans; 06-05 re-scoping)
+Progress: [██████████] 100% (5/5 plans)
 
 ## Performance Metrics
 
@@ -72,6 +72,7 @@ Progress: [████████░░] 80% (4/5 plans; 06-05 re-scoping)
 | Phase 06 P03 | 6m | 2 tasks | 3 files |
 | Phase 06 P04 | 2m | 1 tasks | 1 files |
 | Phase 06 P04 (re-plan) | 4m | 2 tasks | 4 files |
+| Phase 06 P05 | 2m | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -111,18 +112,20 @@ Progress: [████████░░] 80% (4/5 plans; 06-05 re-scoping)
 
 - 06-04 (re-plan, D-11/D-12/D-13/D-14/D-04-revised/D-20): Corrective IN-PLACE rewrite of docs/hermes-setup.md from WSL2/v0.6.0 to native-Windows-primary Hermes v0.15.x + remote backend (414 lines, no emojis, no residual v0.6.0). Six checkpoint-gated primary steps (install Hermes v0.15.x / editable-install Kajiba / symlink into resolved discovery plugins dir / `hermes plugins enable kajiba` REQUIRED / plugin loads + hooks fire / edit-reload); HERMES_PLUGINS_DEBUG=1 folded in alongside retained KAJIBA_DEBUG PII note (T-06-09); WSL2+GPU+Ollama+MP-8/MP-5/MP-9 relocated verbatim to an OPTIONAL Appendix; D-20 flag for stale ROADMAP SC-1/ENV-01/ENV-02 wording (NOT edited). Version-reconciled plugin.yaml header comment + plugin/__init__.py + plugin/hooks.py docstrings to v0.15.x (manifest tags stay [ASSUMED]; [CONFIRMED] promotion is 06-05/D-18). DEVIATION (Rule 3): reworded intro + D-20 note to keep literal WSL2/v0.6.0 strings only inside the Appendix (satisfies appendix-before-WSL2 ordering + no-v0.6.0-outside-appendix). tests/test_plugin.py 3/3 green. Commits: docs a34e165 (plugin source), docs af7e15b (guide rewrite).
 
+- 06-05 (live verification, D-15/D-16/D-17/D-18/D-19/D-21, ENV-01/02/03 + PLUG-01/02 + CAPT-01): Live Hermes v0.15.1 native-Windows session (id 20260605_111446_5a978c) on a REMOTE backend (nvidia/nemotron-3-ultra:free via OpenRouter; earlier same-build run used claude-opus-4-8 — no GPU/Ollama) with KAJIBA_DEBUG=1 fired all four hooks; startup line `Kajiba registered hooks: on_session_start, post_llm_call, post_tool_call, on_session_end` confirmed register(ctx) ran. Wrote 06-HOOK-KWARGS.md — per-hook kwarg tables dual-tagged [DOCUMENTED v0.15.x] + [VERIFIED] (undocumented extras [VERIFIED]-only), 8 cross-cutting findings, Phase 7 implications (CAPT-02/03 mapping); synthetic PII placeholders (T-06-11). KEY FINDINGS: telemetry_schema_version="hermes.observer.v1" on ALL four hooks; on_session_end is TURN-SCOPED (per run_conversation, not session-final); post_tool_call.result is a JSON str while args is a dict; rich correlation ids task_id/turn_id ("<session>:<task>:<8hex>")/tool_call_id/api_request_id; D-17 discovery dir = <HERMES_HOME>/plugins/ i.e. %LOCALAPPDATA%\hermes\plugins\ (confirmed via installed source AND `hermes plugins list` source=user); D-19 `hermes plugins enable kajiba` REQUIRED (inert until enabled); ENV-03 native-Windows symlink FAILED (admin required, Dev Mode off) → COPY fallback used; plugin installed editable into the Hermes venv (%LOCALAPPDATA%\hermes\hermes-agent\venv, kajiba 0.2.0) not the repo .venv. Promoted plugin.yaml header [ASSUMED] → [CONFIRMED v0.15.x] (D-18, comment-only). hooks.py [ASSUMED] docstrings left for Phase 7 (out of scope). tests/test_plugin.py 3/3 green. No deviations. Phase 6 all 5 plans complete — ready for /gsd-verify-work. Commits: docs e401885 (06-HOOK-KWARGS.md), docs 3b13724 (plugin.yaml promotion), docs ec27472 (summary).
+
 ### Pending Todos
 
 None.
 
 ### Blockers/Concerns
 
-- Hermes hook kwargs need empirical verification (no formal payload schema published)
+- RESOLVED 2026-06-05 (06-05): Hermes hook kwargs verified live on v0.15.1 — all four hooks' payloads recorded dual-tagged in 06-HOOK-KWARGS.md. The "no formal payload schema published" blocker is permanently closed (D-16/D-21).
 - GLiNER false positive rate on code content needs calibration in Phase 7
-- WSL2 CUDA driver stub overwrite risk -- install only cuda-toolkit, not cuda meta-package
+- WSL2 CUDA driver stub overwrite risk -- install only cuda-toolkit, not cuda meta-package (WSL2-only; native-Windows is now the primary path)
 
 ## Session Continuity
 
-Last session: 2026-06-05T11:15:15.000Z
-Stopped at: Completed 06-04-PLAN.md (corrective native-Windows v0.15.x rewrite); next up 06-05 live hook-kwargs verification
-Resume file: .planning/phases/06-environment-plugin-foundation/06-05-PLAN.md
+Last session: 2026-06-05T15:23:59.000Z
+Stopped at: Completed 06-05-PLAN.md (live v0.15.x hook-kwargs verification); Phase 6 all 5 plans complete — next up /gsd-verify-work for Phase 6
+Resume file: None
