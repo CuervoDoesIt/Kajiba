@@ -1,11 +1,11 @@
 # Kajiba Hermes plugin manifest.
 #
-# Hermes reads this manifest to discover and load the plugin from the symlinked
-# plugin directory (Plan 04). Target framework: Hermes Agent v0.15.x. NOTE:
-# these manifest field names (name, version, description, provides_hooks,
-# provides_tools) are [ASSUMED] from the Hermes v0.15.x plugin contract and
-# remain unconfirmed until Plan 05's live load verifies the real schema and
-# records it in 06-HOOK-KWARGS.md.
+# Hermes reads this manifest to discover and load the plugin from the resolved
+# discovery dir (Plan 04). Target framework: Hermes Agent v0.15.x. These manifest
+# field names (name, version, description, provides_hooks, provides_tools) are
+# [CONFIRMED v0.15.x] (D-18): Plan 05's live load on Hermes v0.15.1 plus the
+# installed-source check verified the schema; the four hooks fired live and the
+# kwargs are recorded in 06-HOOK-KWARGS.md.
 name: kajiba
 version: "0.2.0"
 description: "Captures Hermes session data for the Kajiba community dataset"
