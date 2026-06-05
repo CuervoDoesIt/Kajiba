@@ -72,11 +72,11 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
 
 **Wave 4** *(blocked on 06-03)*
 
-- [x] 06-04-PLAN.md — docs/hermes-setup.md: WSL2/GPU/Ollama/Hermes checkpoints + symlink dev workflow + troubleshooting (ENV-01/ENV-02/ENV-03)
+- [ ] 06-04-PLAN.md — docs/hermes-setup.md re-plan: native-Windows v0.15.x primary path + hermes plugins enable + HERMES_PLUGINS_DEBUG; WSL2/GPU/Ollama demoted to optional appendix; v0.6.0->v0.15.x reconciliation across guide + plugin source (ENV-01/ENV-02/ENV-03)
 
 **Wave 5** *(live, human-verify; blocked on 06-03 + 06-04)*
 
-- [ ] 06-05-PLAN.md — Live env + plugin load + KAJIBA_DEBUG hook-kwargs capture → 06-HOOK-KWARGS.md (ENV-01/02/03, PLUG-01/02, CAPT-01)
+- [ ] 06-05-PLAN.md — re-plan: native-Windows live confirm of documented v0.15.x hook kwargs (remote backend, hermes plugins enable + KAJIBA_DEBUG) → 06-HOOK-KWARGS.md; resolve discovery dir; promote plugin.yaml to [CONFIRMED v0.15.x] (ENV-01/02/03, PLUG-01/02, CAPT-01)
 
 ### Phase 7: Turn Capture + Semantic PII Scrubbing
 
