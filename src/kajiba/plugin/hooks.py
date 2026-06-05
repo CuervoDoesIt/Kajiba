@@ -1,11 +1,14 @@
 """Hermes hook handlers for the Kajiba plugin.
 
-Each handler accepts ``**kwargs`` (forward-compat; avoids a silent ``TypeError``
-that Hermes would swallow -- MP-2) and dispatches to the module-level
-``KajibaCollector``. When ``KAJIBA_DEBUG=1``, every handler logs the name, type,
-and a truncated value of each kwarg it receives -- the empirical-discovery
-mechanism (D-05, CAPT-01) that the Plan 05 live session uses to capture the
-ground-truth hook payload shapes that unblock Phase 7.
+Targets Hermes Agent v0.15.x. Each handler accepts ``**kwargs`` (forward-compat;
+avoids a silent ``TypeError`` that Hermes would swallow -- MP-2) and dispatches
+to the module-level ``KajibaCollector``. The v0.15.x lifecycle hook signatures
+are documented (see 06-REPLAN-RESEARCH section 3); the ``**kwargs`` tolerance
+keeps the handlers robust to additional documented kwargs. When
+``KAJIBA_DEBUG=1``, every handler logs the name, type, and a truncated value of
+each kwarg it receives -- the diagnostic mechanism (D-05, CAPT-01) that the
+Plan 05 live v0.15.x session uses to confirm the documented hook payload shapes
+that unblock Phase 7.
 
 Scope note (Phase 6): ``on_session_start`` / ``on_session_end`` drive real
 collector state; ``on_post_llm_call`` / ``on_post_tool_call`` are debug-log-only

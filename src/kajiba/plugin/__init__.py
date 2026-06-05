@@ -1,10 +1,13 @@
 """Hermes plugin entry point for Kajiba.
 
-Hermes discovers this package under ``~/.hermes/plugins/kajiba/`` (a dev-only
+Targets Hermes Agent v0.15.x. Hermes discovers this package under the resolved
+plugins discovery directory (``<HERMES_HOME>/plugins/kajiba/`` -- a dev-only
 symlink into ``src/kajiba/plugin/``) and calls ``register(ctx)`` once at startup
-to wire Kajiba's session-lifecycle hooks. This replaces the deleted
-Protocol-based ``hermes_integration.py`` adapter (D-07): the new contract is
-``ctx.register_hook(event, callback)``, not ``agent.on(...)`` (anti-pattern MP-1).
+to wire Kajiba's session-lifecycle hooks. The plugin must also be enabled
+(``hermes plugins enable kajiba``); a discovered-but-disabled plugin will not
+load. This replaces the deleted Protocol-based ``hermes_integration.py`` adapter
+(D-07): the v0.15.x contract is ``ctx.register_hook(event, callback)``, not
+``agent.on(...)`` (anti-pattern MP-1).
 """
 
 import logging
