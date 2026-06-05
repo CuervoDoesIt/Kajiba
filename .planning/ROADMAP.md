@@ -96,7 +96,7 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
 
 **Wave 1** *(parallel — disjoint files)*
 
-- [ ] 07-01-PLAN.md — Wave 0 capture scaffolds (RED: paired-turn/tool-buffer/session-end-once/ollama/remote-degrade) + [llm-scrub] extra (CAPT-02/03/04, PRIV-04)
+- [x] 07-01-PLAN.md — Wave 0 capture scaffolds (RED: paired-turn/tool-buffer/session-end-once/ollama/remote-degrade) + [llm-scrub] extra (CAPT-02/03/04, PRIV-04)
 - [ ] 07-02-PLAN.md — Wave 0 semantic scaffolds (RED: bands/asymmetric/calibration/soft-import) + code_content_pii.json fixture (PRIV-01/02/03)
 
 **Wave 2** *(parallel — blocked on Wave 1; disjoint files)*
