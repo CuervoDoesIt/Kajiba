@@ -169,3 +169,63 @@ If you run the sudoers line above, even more commands (full apt etc.) will be un
 ---
 
 *This concludes the on-machine execution of 07-DGX-HANDOFF.md STEP 0-3. Permissions guidance included per follow-up query. Ready for 07-LIVE-CAPTURE.md or /gsd-verify-work.*
+
+## GPU-Usage Run
+
+**Task A (corrected D-06 calibration gate):**
+- `git pull --ff-only origin master` (to ef64e88, the assertion fix targeting false_positives)
+- `source .venv/bin/activate && python -m pytest tests/test_scrubber_semantic.py -k "detect or calibration" -x -s --tb=line`
+- Result: 2 passed, 1 skipped (TestSoftImport drm warning expected); TestDetect PASSED; TestCalibration PASSED with exact line `CALIBRATION_FP_RATE=0.0000 flag_band=0`
+- (The prior assert bug on auto_redact==[] for seeded true positives in fixture is now resolved in the test; FP rate on safe tokens remains 0.0000 as measured.)
+
+**GPU enablement (Ollama on GB10 / sm_121):**
+- Diagnose: `nvidia-smi` showed NVIDIA GB10, compute_cap=12.1, CUDA Version 13.0; torch earlier confirmed cu130 aarch64 CUDA.
+- Stock arm64 ollama (v0.30.6, the linux-arm64.tar.zst we extracted to ~/.local/ollama) initially skipped in prior runs ("skipping CUDA device — compute capability not in compiled architectures" for cc=1210).
+- Fix: restarted with `export OLLAMA_DEBUG=1 ; ollama serve` (using proper background handling). Logs showed:
+  - GPU discovery: libDirs with cuda_v12 and cuda_v13
+  - Skipped some v12 but "verifying if device is supported" for cc=12.1
+  - Selected: "inference compute id=0 ... name=CUDA0 description=\"NVIDIA GB10\" ... driver=13.0"
+  - On model load (during benchmark): "load_tensors: offloading 31 repeating layers to GPU"; "offloaded 33/33 layers to GPU"; "CUDA0 model buffer size = 4155.99 MiB"; "llama_kv_cache: CUDA0 KV buffer size = 16384.00 MiB"; "sched_reserve: CUDA0 compute buffer size"; runner "library=CUDA" "vram=21.0 GiB"
+  - "inference runner.inference=\"[{ID:0 Library:CUDA}]\""
+- Prebuilt cuda_v13 libs in the tarball supported sm_121/cc=12.1 (no source build needed).
+- Docker attempt (option c): `docker --version` worked (29.2.1); `docker run --gpus all ... ollama/ollama` hit "permission denied while trying to connect to the docker API at unix:///var/run/docker.sock" (docker group / runtime access issue on this setup; also would have re-pulled the 4.7 GB model). Reverted to host ollama binary + server.
+- Build from source (option b) not pursued after prebuilt succeeded (would have required user-local go install + clone + `CMAKE_CUDA_ARCHITECTURES=121 make`, plus possible apt for missing build tools without NOPASSWD sudo).
+- Verification (all three):
+  - ollama serve logs: explicit "offloaded 33/33 layers to GPU", CUDA0, full layer offload + CUDA library (not CPU).
+  - nvidia-smi: GB10 present; during short gen low util sampled post-completion (gen too fast ~0.5s); the ollama child `llama-server` process was active; separate long-running Nemotron 30B llama-server (nemotron-deploy build) independently using GPU.
+  - tokens/sec: 51.1 t/s (30 tokens in 0.59s) on the GPU offload path. (Prior early runs showed 38-59 t/s in logs with skips; now confirmed GPU path via layer offload + library=CUDA.)
+
+**New GPU-backed capture (throwaway, non-sensitive cyberpunk 2D prototype theme):**
+- Config unchanged (provider=custom, base_url=http://localhost:11434/v1, hermes3:8b; plugin enabled; YOLO + approvals off for autonomy).
+- Staging cleaned pre-run (rm old to ensure exactly one new file from this session).
+- Session: 20260605_192518_ea3f16 (hermes chat with explicit prompt to use terminal tool for file create + cat; 4 messages, 2 tool calls executed).
+- Exactly **1** new staging file: `~/.hermes/kajiba/staging/session_20260605_192518_ea3f16.json` (2355 bytes).
+- Model block (live from ollama.show() via collector, matches `ollama show hermes3:8b`): 
+  ```
+  model:
+    model_name: hermes3:8b
+    provider: ollama
+    parameter_count: 8.0B
+    quantization: Q4_0
+    model_family: llama
+    context_window: 131072
+  ```
+- Trajectory: 2 turns, 1 tool call (1 success, 0 failed).
+- `kajiba preview` (GLiNER Layer C ran live):
+  - silver tier, composite score 0.755
+  - Turns: 2, Tool calls: 1 total (1 success)
+  - Model: hermes3:8b (Q4_0)
+  - GLiNER Layer C active (fetched 13 files, onnxruntime drm warning non-blocking)
+  - Scrubbing: "No PII detected" path executed; Scrubbing Summary showed 1 low-confidence flag for review (not auto-redacted): "* cyberpunk GPU prototype — GLiNER project (confidence 0.52)" — triggered by prompt text containing "GPU prototype" (treated as potential project name by model; no real PII/names/secrets in throwaway content).
+  - First turn (human): prompt instructing terminal tool use for /tmp file.
+  - Last turn (gpt): confirmation of file creation and cat output.
+- Security: `security.redact_secrets` kept false for this isolated throwaway (as in prior YOLO setup); per review guidance, would run `hermes config set security.redact_secrets true` before any real/non-throwaway capture. yolo/approvals scoped to this DGX playground only.
+
+**Commit/push:**
+- `git add .planning/phases/07-turn-capture-semantic-pii-scrubbing/07-DGX-EVIDENCE.md`
+- `git commit -m "test(07-06): GPU-usage run + calibration gate confirmation"`
+- `git push origin master`
+
+(Only this evidence file appended; no other tracked files or source edited per scope. All PII-safe: only counts, shapes, IDs, rates, log excerpts, preview summaries.)
+
+Short observed summary: Task A green with exact FP rate. GPU offload succeeded via cuda_v13 in prebuilt (33/33 layers, CUDA lib, 21GiB vram logged). New session with 1 real tool call success produced exactly 1 staging file with full live model metadata. kajiba preview confirmed GLiNER Layer C active on the record (low-conf flag only on test prompt text). Docker path blocked by perms; no build needed. Proof complete for GPU path on DGX.
