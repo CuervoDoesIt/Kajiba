@@ -25,7 +25,8 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
 
 **Milestone Goal:** Prove the end-to-end pipeline works with the real Hermes Agent -- collect actual session data, walk it through scrub/score/publish, and fine-tune a local model with the result.
 
-- [x] **Phase 6: Environment + Plugin Foundation** - Working Hermes dev environment and plugin scaffold that receives hook events (completed 2026-06-05)
+- [x] **Phase 6: Environment + Plugin Foundation** - Working Hermes dev environment and plugin scaffold that receives hook events
+ (completed 2026-06-05)
 - [ ] **Phase 7: Turn Capture + Semantic PII Scrubbing** - Real session data flowing through capture and semantic privacy layers
 - [ ] **Phase 8: HITL Validation + Pipeline Integration** - Manual review workflow and end-to-end pipeline smoke test on real data
 - [ ] **Phase 9: Fine-Tune Experiment** - QLoRA fine-tune of a local 3B model on Kajiba-collected data as milestone gate
@@ -91,7 +92,25 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
   4. Running `kajiba preview` on a captured session shows GLiNER-detected personal names, company names, and project names redacted (not just regex patterns)
   5. Entities with confidence between 0.4 and 0.7 are flagged for human review rather than auto-redacted
 
-**Plans**: TBD
+**Plans**: 6 plans
+
+**Wave 1** *(parallel — disjoint files)*
+
+- [ ] 07-01-PLAN.md — Wave 0 capture scaffolds (RED: paired-turn/tool-buffer/session-end-once/ollama/remote-degrade) + [llm-scrub] extra (CAPT-02/03/04, PRIV-04)
+- [ ] 07-02-PLAN.md — Wave 0 semantic scaffolds (RED: bands/asymmetric/calibration/soft-import) + code_content_pii.json fixture (PRIV-01/02/03)
+
+**Wave 2** *(parallel — blocked on Wave 1; disjoint files)*
+
+- [ ] 07-03-PLAN.md — Promote capture: paired-turn + tool buffer (ok→success), ollama metadata + remote degrade, finalize-once session-end, promoted hooks (CAPT-02/03/04)
+- [ ] 07-04-PLAN.md — GLiNER scrubber_semantic: nvidia/gliner-PII detector, D-05 bands, D-07 asymmetric coverage, D-06 calibration gate, retire scrubber_llm stub (PRIV-01/02/03)
+
+**Wave 3** *(blocked on 07-04 — cli.py)*
+
+- [ ] 07-05-PLAN.md — CLI Layer-C wiring: shared helper across scrub_record sites, semantic flags into the existing preview panel, graceful degrade (PRIV-01/02/04)
+
+**Wave 4** *(live, human-action; blocked on 07-03 + 07-04 + 07-05)*
+
+- [ ] 07-06-PLAN.md — D-02 live local-Ollama capture run (Hermes 3 8B Q4): real ollama.show() metadata + live GLiNER preview → 07-LIVE-CAPTURE.md artifact (CAPT-04, PRIV-01)
 
 ### Phase 8: HITL Validation + Pipeline Integration
 
