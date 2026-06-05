@@ -27,6 +27,7 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
 
 - [x] **Phase 6: Environment + Plugin Foundation** - Working Hermes dev environment and plugin scaffold that receives hook events
  (completed 2026-06-05)
+
 - [ ] **Phase 7: Turn Capture + Semantic PII Scrubbing** - Real session data flowing through capture and semantic privacy layers
 - [ ] **Phase 8: HITL Validation + Pipeline Integration** - Manual review workflow and end-to-end pipeline smoke test on real data
 - [ ] **Phase 9: Fine-Tune Experiment** - QLoRA fine-tune of a local 3B model on Kajiba-collected data as milestone gate
@@ -97,7 +98,7 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
 **Wave 1** *(parallel — disjoint files)*
 
 - [x] 07-01-PLAN.md — Wave 0 capture scaffolds (RED: paired-turn/tool-buffer/session-end-once/ollama/remote-degrade) + [llm-scrub] extra (CAPT-02/03/04, PRIV-04)
-- [ ] 07-02-PLAN.md — Wave 0 semantic scaffolds (RED: bands/asymmetric/calibration/soft-import) + code_content_pii.json fixture (PRIV-01/02/03)
+- [x] 07-02-PLAN.md — Wave 0 semantic scaffolds (RED: bands/asymmetric/calibration/soft-import) + code_content_pii.json fixture (PRIV-01/02/03)
 
 **Wave 2** *(parallel — blocked on Wave 1; disjoint files)*
 
@@ -285,7 +286,7 @@ Two parallel tracks share a foundation. Execute by dependency, not strict numeri
 | 4. Contribution Modes | v1.0 | 3/3 | Complete | 2026-04-01 |
 | 5. Consumer Experience | v1.0 | 2/2 | Complete | 2026-04-02 |
 | 6. Environment + Plugin Foundation | v1.1 | 5/5 | Complete    | 2026-06-05 |
-| 7. Turn Capture + Semantic PII Scrubbing | v1.1 | 0/0 | Not started | - |
+| 7. Turn Capture + Semantic PII Scrubbing | v1.1 | 2/6 | In Progress|  |
 | 8. HITL Validation + Pipeline Integration | v1.1 | 0/0 | Not started | - |
 | 9. Fine-Tune Experiment | v1.1 | 0/0 | Not started | - |
 | 10. Experiment Schema Foundation | v1.2 | 3/3 | Complete    | 2026-06-03 |
