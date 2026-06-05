@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Experiment Logging
 status: executing
-stopped_at: "Phase 7 Plan 03 complete (turn/tool capture GREEN + promoted hook dispatch)"
-last_updated: "2026-06-05T21:40:00.000Z"
-last_activity: "2026-06-05 -- Phase 07 Plan 03 complete (paired-turn capture, tool buffer, ollama enrichment, finalize-once, hook dispatch)"
+stopped_at: "Phase 7 Plan 04 complete (GLiNER semantic scrubber GREEN + stub retired)"
+last_updated: "2026-06-05T21:42:00.000Z"
+last_activity: "2026-06-05 -- Phase 07 Plan 04 complete (scrubber_semantic.py: D-05 bands, D-07 asymmetric, soft-import; scrubber_llm retired)"
 progress:
   total_phases: 10
   completed_phases: 4
   total_plans: 27
-  completed_plans: 24
-  percent: 44
+  completed_plans: 25
+  percent: 46
 ---
 
 # Project State
@@ -28,11 +28,11 @@ See: .planning/PROJECT.md (updated 2026-04-02)
 ## Current Position
 
 Phase: 07 (turn-capture-semantic-pii-scrubbing) — EXECUTING
-Plan: 4 of 6
+Plan: 5 of 6
 Status: Ready to execute
-Last activity: 2026-06-05 -- Phase 07 Plan 03 complete (turn/tool capture GREEN + promoted hook dispatch)
+Last activity: 2026-06-05 -- Phase 07 Plan 04 complete (GLiNER semantic scrubber GREEN + stub retired)
 
-Progress: [█████░░░░░] 50% (3/6 plans)
+Progress: [███████░░░] 67% (4/6 plans)
 
 ## Performance Metrics
 
@@ -77,6 +77,7 @@ Progress: [█████░░░░░] 50% (3/6 plans)
 | Phase 07 P01 | 11m | 3 tasks | 3 files |
 | Phase 07 P02 | 14m | 2 tasks | 2 files |
 | Phase 07 P03 | 12m | 3 tasks | 2 files |
+| Phase 07 P04 | 3m | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -123,6 +124,8 @@ Progress: [█████░░░░░] 50% (3/6 plans)
 
 - 07-03 (Wave 2 GREEN, CAPT-02/03/04 + session-end fix): Promoted the Phase 6 debug-only hook stubs into real turn/tool capture and fixed the turn-scoped on_session_end bug — all 9 collector + 2 dispatch 07-01 RED scaffolds now GREEN, the 2 fault tests stayed green. collector.py: on_llm_turn (paired human+gpt ConversationTurn, conversation_history context-only never re-ingested → no double-count, Correction 4); on_tool_call (turn_id-keyed pending buffer attach-or-buffer for both tool orderings, dedup by tool_call_id, json.loads result with try/except fallback truncated [:2000], json.dumps args into tool_input, _map_tool_status maps error fields→error/timeout else status=="ok"→"success" EXACTLY, Correction 2); _enrich_from_ollama (psutil-style soft-import + try/except around ollama.show, dict-or-object A1) + _build_metadata_and_hardware (local Ollama enrich vs remote slug inference, params left None, HardwareProfile.inference_backend set, D-03; Anthropic→provider="custom"+inference_backend="anthropic", Correction 5, NO schema change); on_session_start now accepts provider/**_ and stops mis-mapping platform→provider; finalize-once on_session_end (idempotent overwrite of session_{id}.json → N firings = ONE file, Correction 3; continuous-mode auto-submit gated by _finalized once-flag). plugin/hooks.py: on_post_llm_call/on_post_tool_call promoted from debug-log stubs to real kwargs.get(...) dispatch keeping _log_kwargs + try/except + if _collector is not None; no pre_llm_call registered (Phase 8). DECISION: telemetry_schema_version held as module constant TELEMETRY_SCHEMA_VERSION="hermes.observer.v1" (no ModelMetadata field, schema frozen) for a future schema bump; hooks tolerate the incoming kwarg via **_. DEVIATION (structural): Task 1+2 landed in ONE commit (fad5b8a) — both edit only collector.py and are inseparably coupled through on_session_start; both task selectors pass. test_collector.py + test_plugin.py 35 passed; git diff --quiet src/kajiba/schema.py exit 0; import kajiba.collector/plugin.hooks clean offline. OUT-OF-SCOPE: tests/test_scrubber_semantic.py 8 RED belong to sibling plan 07-04 (logged to deferred-items.md, NOT fixed). Commits: feat fad5b8a, feat cb67f21, docs 326859f.
 
+- 07-04 (Wave 2 GREEN, PRIV-01/02/03 + D-04/05/06/07/09/10/11): Built src/kajiba/scrubber_semantic.py — GLiNER Layer-C semantic PII scrubber. classify_band/partition_spans implement the D-05 float bands (>=0.7 redact / 0.4-0.7 flag / <0.4 ignore). _get_model() is a within-run singleton (D-09) soft-importing gliner+torch INSIDE the function (psutil-style); ImportError -> SemanticScrubUnavailable (PRIV-04/D-10), CUDA-with-CPU-fallback, capital-PII GLINER_MODEL_ID="nvidia/gliner-PII" (Correction 1). detect_entities runs ONE inference pass at the 0.4 flag floor. scrub_record_semantic(record) -> (record, names_redacted, list[FlaggedItem]) mirrors scrub_record's deep-copy discipline (model_dump(by_alias=True)->mutate copy->KajibaRecord.model_validate, input never mutated) and enforces D-07 asymmetric coverage: ConversationTurn.value redacts >=0.7 (right-to-left span replacement with [REDACTED_PERSON]/[REDACTED_NAME]) and flags 0.4-0.7; tool_input/tool_output are FLAG-ONLY (text byte-unchanged, the anti-corruption rule). FlaggedItem (reused from kajiba.scrubber, D-08) carries reason=f"GLiNER {label} (confidence {score:.2f})" (Pattern 7). DECISION: scrub_record_semantic degrades to a no-op (returns record,0,[]) when [llm-scrub] is absent — the LANE A asymmetric tests call it directly without gliner and assert on the return value (not pytest.raises); 07-05 surfaces the missing extra at the CLI boundary. Retired scrubber_llm.py: re-exports the new entry points, removed the dead model_fn/SemanticRedaction(confidence:str) string-confidence interface (legacy scrub_semantic now raises SemanticScrubUnavailable). DEVIATION (Rule 1): pre-existing test_scrubber.py::TestLLMScrubberStub pinned the retired stub's NotImplementedError — repointed to assert SemanticScrubUnavailable(match="retired"), matching the plan's mandate to remove the old interface (no production behavior weakened). LANE B (detect/calibration) left SKIPPED — [llm-scrub] (gliner/torch, multi-GB) NOT installed per environment guidance; D-06 calibration hard gate + FP-rate run when the extra is present. git diff --quiet src/kajiba/scrubber.py exit 0 (Layer B untouched); import kajiba.scrubber_semantic/scrubber_llm clean offline. Full suite 348 passed / 4 skipped (2 LANE-B + 2 pre-existing yaml), 0 regressions. Commits: feat dfaeb6a, feat e94bc6f.
+
 ### Pending Todos
 
 None.
@@ -135,6 +138,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-06-05T21:40:00.000Z
-Stopped at: Phase 7 Plan 03 complete (turn/tool capture GREEN + promoted hook dispatch)
-Resume file: .planning/phases/07-turn-capture-semantic-pii-scrubbing/07-04-PLAN.md
+Last session: 2026-06-05T21:42:00.000Z
+Stopped at: Phase 7 Plan 04 complete (GLiNER semantic scrubber GREEN + stub retired)
+Resume file: .planning/phases/07-turn-capture-semantic-pii-scrubbing/07-05-PLAN.md
