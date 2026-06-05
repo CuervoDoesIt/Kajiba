@@ -25,7 +25,7 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
 
 **Milestone Goal:** Prove the end-to-end pipeline works with the real Hermes Agent -- collect actual session data, walk it through scrub/score/publish, and fine-tune a local model with the result.
 
-- [ ] **Phase 6: Environment + Plugin Foundation** - Working Hermes dev environment and plugin scaffold that receives hook events
+- [x] **Phase 6: Environment + Plugin Foundation** - Working Hermes dev environment and plugin scaffold that receives hook events (completed 2026-06-05)
 - [ ] **Phase 7: Turn Capture + Semantic PII Scrubbing** - Real session data flowing through capture and semantic privacy layers
 - [ ] **Phase 8: HITL Validation + Pipeline Integration** - Manual review workflow and end-to-end pipeline smoke test on real data
 - [ ] **Phase 9: Fine-Tune Experiment** - QLoRA fine-tune of a local 3B model on Kajiba-collected data as milestone gate
@@ -265,7 +265,7 @@ Two parallel tracks share a foundation. Execute by dependency, not strict numeri
 | 3. Dataset Publishing | v1.0 | 2/2 | Complete | 2026-03-31 |
 | 4. Contribution Modes | v1.0 | 3/3 | Complete | 2026-04-01 |
 | 5. Consumer Experience | v1.0 | 2/2 | Complete | 2026-04-02 |
-| 6. Environment + Plugin Foundation | v1.1 | 5/5 | Plans complete | 2026-06-05 |
+| 6. Environment + Plugin Foundation | v1.1 | 5/5 | Complete    | 2026-06-05 |
 | 7. Turn Capture + Semantic PII Scrubbing | v1.1 | 0/0 | Not started | - |
 | 8. HITL Validation + Pipeline Integration | v1.1 | 0/0 | Not started | - |
 | 9. Fine-Tune Experiment | v1.1 | 0/0 | Not started | - |
