@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Experiment Logging
 status: executing
-stopped_at: Completed 06-05-PLAN.md (live v0.15.x hook-kwargs verification); Phase 6 all 5 plans complete — next up /gsd-verify-work for Phase 6
+stopped_at: Phase 6 complete and verified (VERIFICATION passed 7/7). Next: Phase 7 (Turn Capture + Semantic PII Scrubbing) — final v1.1 dependency gating v1.2 Phase 14 live capture.
 last_updated: "2026-06-05T15:36:30.962Z"
 last_activity: 2026-06-05
 progress:
@@ -21,15 +21,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-02)
 
 **Core value:** Real-world AI session data, tagged with full runtime context, flowing into a community dataset that accelerates local model fine-tuning for everyone.
-**Current focus:** Phase 06 — environment-plugin-foundation
+**Current focus:** Phase 6 complete and verified (2026-06-05) — next up Phase 7 (Turn Capture + Semantic PII Scrubbing)
 **Active milestone:** v1.2 Experiment Logging (Dual-Use), Phases 10-15 — Phases 10-12 complete (audited 2026-06-04, see `.planning/v1.2-MILESTONE-AUDIT.md`); next up Phase 13.
-**Parallel milestone:** v1.1 Hermes Pipeline Validation, Phases 6-9 — not yet started (Phase 6 discussed only). Shared foundation Phases 6-7 also gate v1.2 Phase 14 live capture.
+**Parallel milestone:** v1.1 Hermes Pipeline Validation, Phases 6-9 — Phase 6 complete (verified 2026-06-05); Phase 7 next. Shared foundation Phases 6-7 gate v1.2 Phase 14 live capture (Phase 6 dependency now cleared).
 
 ## Current Position
 
-Phase: 10
+Phase: 7 (next — not started)
 Plan: Not started
-Status: Executing Phase 06 — all 5 plans complete, ready for /gsd-verify-work
+Status: Phase 6 complete and verified (PASSED 7/7). Next: /gsd-discuss-phase 7.
 Last activity: 2026-06-05
 
 Progress: [██████████] 100% (5/5 plans)
