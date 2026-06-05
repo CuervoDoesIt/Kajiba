@@ -626,3 +626,296 @@ class TestSaveToStaging:
         record = validate_record(data)
         assert record.trajectory.turn_count == 2
         assert record.schema_version == SCHEMA_VERSION
+
+
+# ---------------------------------------------------------------------------
+# Phase 7 RED capture scaffolds (CAPT-02/03/04)
+#
+# These tests pin the not-yet-built paired-turn / tool-buffer / turn-scoped
+# session-end / ollama-metadata / remote-degrade capture surface ahead of the
+# 07-03 implementation. They reference collector methods and behaviors that do
+# NOT yet exist, so they fail at collection or assertion (RED). The kwarg names
+# below are the live-verified Hermes v0.15.x payload contract from
+# 06-HOOK-KWARGS.md. The four CRITICAL CORRECTIONS are encoded as executable
+# assertions:
+#   - Correction 2: tool status "ok" -> "success"
+#   - Correction 3: turn-scoped on_session_end writes EXACTLY ONE staging file
+#   - Correction 4: a populated conversation_history must NOT double-count turns
+# Selectors (07-VALIDATION map): llm_turn, tool_buffer, session_end_once,
+# ollama_metadata, remote_degrade.
+# ---------------------------------------------------------------------------
+
+
+# Live-verified turn_id format: "<session>:<task>:<8hex>" (06-HOOK-KWARGS Hook 2)
+_TURN_ID = "sess-7:sess-7:0cd552b7"
+
+
+def _start_llm_session(
+    collector: KajibaCollector, session_id: str = "sess-7", model: str = "test-model",
+) -> None:
+    """Start a session the way the promoted post_llm_call path will."""
+    collector.on_session_start(session_id=session_id, model_name=model, platform="cli")
+
+
+class TestPairedTurnCapture:
+    """CAPT-02: one post_llm_call -> exactly one human turn + one gpt turn."""
+
+    def test_llm_turn_appends_paired_human_and_gpt(self) -> None:
+        """One on_llm_turn call appends exactly one human then one gpt turn."""
+        collector = KajibaCollector()
+        _start_llm_session(collector)
+
+        # The new paired-turn entry point (does NOT exist yet -> RED).
+        collector.on_llm_turn(
+            user_message="Deploy the FastAPI service using Docker.",
+            assistant_response="I'll help you deploy. Let me check the project.",
+            turn_id=_TURN_ID,
+        )
+
+        turns = collector._conversations
+        assert len(turns) == 2
+        assert turns[0].from_ == "human"
+        assert turns[0].value == "Deploy the FastAPI service using Docker."
+        assert turns[1].from_ == "gpt"
+        assert turns[1].value == "I'll help you deploy. Let me check the project."
+
+    def test_llm_turn_history_does_not_double_count(self) -> None:
+        """A populated conversation_history must NOT add extra turns (Correction 4)."""
+        collector = KajibaCollector()
+        _start_llm_session(collector)
+
+        history = [
+            {"role": "human", "content": "earlier prompt"},
+            {"role": "gpt", "content": "earlier reply"},
+        ]
+        # Even with prior history supplied, exactly one human+gpt pair is appended.
+        collector.on_llm_turn(
+            user_message="new prompt",
+            assistant_response="new reply",
+            turn_id=_TURN_ID,
+            conversation_history=history,
+        )
+
+        assert len(collector._conversations) == 2
+
+
+class TestToolBufferCapture:
+    """CAPT-03: tool events buffered by turn_id, status ok->success, dedup, parse."""
+
+    def test_tool_buffer_status_ok_maps_to_success(self) -> None:
+        """status='ok' produces a ToolCall with tool_status == 'success' (Correction 2)."""
+        collector = KajibaCollector()
+        _start_llm_session(collector)
+
+        collector.on_tool_call(
+            tool_name="read_file",
+            args={"path": "/app/main.py"},
+            result='{"content": "print(1)"}',
+            tool_call_id="call_abc123",
+            turn_id=_TURN_ID,
+            status="ok",
+        )
+        collector.on_llm_turn(
+            user_message="read the file",
+            assistant_response="done",
+            turn_id=_TURN_ID,
+        )
+
+        gpt_turn = collector._conversations[1]
+        assert gpt_turn.from_ == "gpt"
+        assert gpt_turn.tool_calls is not None
+        assert len(gpt_turn.tool_calls) == 1
+        assert gpt_turn.tool_calls[0].tool_status == "success"
+
+    def test_tool_buffer_dedups_on_tool_call_id(self) -> None:
+        """A duplicate tool_call_id is deduped to a single ToolCall."""
+        collector = KajibaCollector()
+        _start_llm_session(collector)
+
+        for _ in range(2):
+            collector.on_tool_call(
+                tool_name="read_file",
+                args={"path": "/app/main.py"},
+                result='{"content": "x"}',
+                tool_call_id="call_dup",
+                turn_id=_TURN_ID,
+                status="ok",
+            )
+        collector.on_llm_turn(
+            user_message="q",
+            assistant_response="a",
+            turn_id=_TURN_ID,
+        )
+
+        gpt_turn = collector._conversations[1]
+        assert gpt_turn.tool_calls is not None
+        assert len(gpt_turn.tool_calls) == 1
+
+    def test_tool_buffer_parses_result_and_serializes_args(self) -> None:
+        """result (JSON str) is parsed; args (dict) is serialized into tool_input."""
+        collector = KajibaCollector()
+        _start_llm_session(collector)
+
+        collector.on_tool_call(
+            tool_name="read_file",
+            args={"path": "/app/main.py"},
+            result='{"content": "hello world"}',
+            tool_call_id="call_parse",
+            turn_id=_TURN_ID,
+            status="ok",
+        )
+        collector.on_llm_turn(
+            user_message="q",
+            assistant_response="a",
+            turn_id=_TURN_ID,
+        )
+
+        tc = collector._conversations[1].tool_calls[0]
+        # args dict serialized into tool_input (round-trips back to the dict).
+        assert json.loads(tc.tool_input) == {"path": "/app/main.py"}
+        # result JSON string parsed before storage (the inner content survives).
+        assert "hello world" in tc.tool_output
+
+
+class TestSessionEndOnce:
+    """CAPT-03: turn-scoped on_session_end writes EXACTLY ONE staging file."""
+
+    def test_session_end_once_writes_single_staging_file(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """N on_session_end firings -> exactly ONE staging file (Correction 3)."""
+        import kajiba.collector as collector_mod
+
+        staging = tmp_path / "staging"
+        monkeypatch.setattr(collector_mod, "STAGING_DIR", staging)
+        monkeypatch.setattr(
+            collector_mod, "_load_config_value",
+            lambda key, default: "ad-hoc" if key == "contribution_mode" else default,
+        )
+
+        collector = KajibaCollector()
+        _start_llm_session(collector)
+        collector.on_llm_turn(
+            user_message="first", assistant_response="r1", turn_id=_TURN_ID,
+        )
+
+        # Hermes fires on_session_end after EACH run_conversation turn (finding 2).
+        collector.on_session_end(session_id="sess-7")
+        collector.on_llm_turn(
+            user_message="second", assistant_response="r2", turn_id=_TURN_ID,
+        )
+        collector.on_session_end(session_id="sess-7")
+        collector.on_session_end(session_id="sess-7")
+
+        files = list(staging.glob("*.json"))
+        # EXACTLY ONE file per session, not one-per-end-event.
+        assert len(files) == 1
+
+    def test_session_end_once_reflects_full_trajectory(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """The single staging file reflects the full accumulated trajectory (no reset)."""
+        import kajiba.collector as collector_mod
+
+        staging = tmp_path / "staging"
+        monkeypatch.setattr(collector_mod, "STAGING_DIR", staging)
+        monkeypatch.setattr(
+            collector_mod, "_load_config_value",
+            lambda key, default: "ad-hoc" if key == "contribution_mode" else default,
+        )
+
+        collector = KajibaCollector()
+        _start_llm_session(collector)
+        collector.on_llm_turn(
+            user_message="first", assistant_response="r1", turn_id=_TURN_ID,
+        )
+        collector.on_session_end(session_id="sess-7")
+        collector.on_llm_turn(
+            user_message="second", assistant_response="r2", turn_id=_TURN_ID,
+        )
+        collector.on_session_end(session_id="sess-7")
+
+        files = list(staging.glob("*.json"))
+        assert len(files) == 1
+        data = json.loads(files[0].read_text(encoding="utf-8"))
+        # turn_count GREW to 4 (2 paired turns); it did not reset to the last turn.
+        assert data["trajectory"]["turn_count"] == 4
+
+
+class TestOllamaMetadata:
+    """CAPT-04: ollama.show() mapped into ModelMetadata (mocked)."""
+
+    def test_ollama_metadata_populates_model_fields(
+        self, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """With ollama.show() mocked, captured ModelMetadata carries non-null fields."""
+        import sys
+        import types
+
+        fake_ollama = types.ModuleType("ollama")
+
+        def _show(model_name: str) -> dict:
+            return {
+                "details": {
+                    "parameter_size": "8.0B",
+                    "quantization_level": "Q4_0",
+                    "family": "llama",
+                },
+                "model_info": {"llama.context_length": 8192},
+                "digest": "sha256:abc123",
+            }
+
+        fake_ollama.show = _show
+        monkeypatch.setitem(sys.modules, "ollama", fake_ollama)
+
+        collector = KajibaCollector()
+        # New ollama-enrichment entry point (does NOT exist yet -> RED).
+        collector.on_session_start(
+            session_id="sess-ollama",
+            model_name="hermes3:8b",
+            platform="cli",
+            provider="ollama",
+        )
+
+        meta = collector._model_metadata
+        assert meta is not None
+        assert meta.parameter_count == "8.0B"
+        assert meta.quantization == "Q4_0"
+        assert meta.model_family == "llama"
+        assert meta.context_window == 8192
+        assert meta.model_hash is not None
+
+
+class TestRemoteDegrade:
+    """CAPT-04: remote backend with no ollama -> slug inference, params None (D-03)."""
+
+    def test_remote_degrade_leaves_params_none_no_raise(
+        self, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """A remote model with ollama absent yields is_local False and None params."""
+        import sys
+
+        # Simulate ollama being unavailable / raising.
+        monkeypatch.setitem(sys.modules, "ollama", None)
+
+        collector = KajibaCollector()
+        # Remote slug (e.g. an Anthropic/openrouter model) -> no exception.
+        collector.on_session_start(
+            session_id="sess-remote",
+            model_name="anthropic/claude-opus-4-8",
+            platform="cli",
+        )
+
+        meta = collector._model_metadata
+        assert meta is not None
+        assert meta.is_local is False
+        # Slug-inferred provider/model_family present...
+        assert meta.provider is not None
+        assert meta.model_family is not None
+        # ...but param/quant/hash left None (remote degradation, D-03).
+        assert meta.parameter_count is None
+        assert meta.quantization is None
+        assert meta.model_hash is None
+        # Hardware inference_backend recorded (D-03).
+        assert collector._hardware is not None
+        assert collector._hardware.inference_backend is not None
