@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Experiment Logging
 status: executing
-stopped_at: "Phase 7 Plan 05 complete (Layer C wired into CLI; flagged-panel surfacing GREEN; graceful degrade)"
-last_updated: "2026-06-05T21:50:43.000Z"
-last_activity: "2026-06-05 -- Phase 07 Plan 05 complete (cli.py _apply_semantic_layer wired into preview/submit/export/review; model-free flagged-panel test GREEN)"
+stopped_at: "Phase 7 PAUSED at 07-06 checkpoint — live-capture proof relocated to DGX Spark (see 07-DGX-HANDOFF.md)"
+last_updated: "2026-06-05T22:20:00.000Z"
+last_activity: "2026-06-05 -- Phase 07 Waves 1-3 complete (5/6 plans GREEN, 430 passed/16 skipped); 07-06 (autonomous:false) paused at human-action gate and relocated to DGX Spark"
 progress:
   total_phases: 10
   completed_phases: 4
@@ -27,10 +27,10 @@ See: .planning/PROJECT.md (updated 2026-04-02)
 
 ## Current Position
 
-Phase: 07 (turn-capture-semantic-pii-scrubbing) — EXECUTING
-Plan: 6 of 6
-Status: Ready to execute
-Last activity: 2026-06-05 -- Phase 07 Plan 05 complete (Layer C wired into CLI; flagged-panel surfacing GREEN)
+Phase: 07 (turn-capture-semantic-pii-scrubbing) — PAUSED (07-06 checkpoint)
+Plan: 6 of 6 (07-06, autonomous:false — human-action gate)
+Status: Waves 1-3 complete (5/6 plans GREEN, 430 passed / 16 skipped). 07-06 live-capture proof RELOCATED to DGX Spark — awaiting live local-Ollama Hermes run. See 07-DGX-HANDOFF.md.
+Last activity: 2026-06-05 -- 07-01..07-05 complete; 07-06 paused at human-action checkpoint, relocated to DGX
 
 Progress: [████████░░] 83% (5/6 plans)
 
@@ -129,6 +129,8 @@ Progress: [████████░░] 83% (5/6 plans)
 
 - 07-05 (Wave 3 GREEN, PRIV-01/02/04 + D-08/09/11 + T-07-12/13): Wired Layer C into the CLI via a single shared `_apply_semantic_layer(scrubbed_record, regex_flagged, scrub_log)` helper in cli.py — runs `scrub_record_semantic` inside `try/except SemanticScrubUnavailable`, sets `ScrubLog.potential_names_redacted`, does `items_flagged += len(semantic_flags)`, and returns `regex_flagged + semantic_flags` so the SAME `_render_preview(flagged_items=...)` panel surfaces both (D-08, no new render surface). Invoked at all 4 flag-rendering `scrub_record` sites: `preview`, `submit`, `export` (T-07-12 — semantic redactions applied to the record that flows downstream before it can leave the machine), `review`. On `SemanticScrubUnavailable` the helper degrades to regex-only so `kajiba preview` exits 0 without `[llm-scrub]` (T-07-13/PRIV-04). No `pipeline_stage`, no persisted scrub state (D-09). Model-free `TestSemanticFlaggedPanel` tests monkeypatch `kajiba.cli.scrub_record_semantic` (no gliner needed): one asserts the synthetic flag text + `GLiNER company (confidence 0.55)` reason appear in the panel, one asserts exit 0 when `SemanticScrubUnavailable` is raised. DEVIATION (Rule 1): a pre-existing module-level `importorskip("yaml")` in test_cli.py was silently skipping the ENTIRE test_cli.py file when PyYAML is absent (masking ~80 CLI tests incl. the new flagged-panel ones) — scoped it to a class-level `skipif` on `TestConfigSubcommands`; this unmasked the previously-skipped CLI tests (all pass). Full suite 430 passed / 16 skipped (PyYAML soft-dep + LANE-B GLiNER), 0 regressions. Commits: test 961aa94, feat 99758a2.
 
+- 07-06 RELOCATED to DGX Spark (DECIDED 2026-06-05): the live-capture D-02 proof (install Ollama + Hermes 3 8B Q4, real local session capture, GLiNER on real prose) moves from the Windows RTX 4070 (8GB) to the DGX Spark (GB10, 128GB unified, Ubuntu/aarch64). Removes the plan's GLiNER CPU-fallback/OOM hedges, matches the project's `~/.hermes/kajiba/` Unix path conventions, and aligns with the Loop-B (optimize-Hermes' learning/memory) vision the DGX is the lab for. Handoff brief written to 07-DGX-HANDOFF.md; a fresh Hermes agent on the DGX runs Task 1 (install `[llm-scrub]` + LANE-B calibration hard gate) + Task 2 (live capture), then reports evidence back for Claude to write 07-LIVE-CAPTURE.md (Task 3). Phase 7 stays INCOMPLETE until the live proof lands.
+
 ### Pending Todos
 
 None.
@@ -141,6 +143,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-06-05T21:50:43.000Z
-Stopped at: Phase 7 Plan 05 complete (Layer C wired into CLI; flagged-panel surfacing GREEN; graceful degrade)
-Resume file: .planning/phases/07-turn-capture-semantic-pii-scrubbing/07-06-PLAN.md
+Last session: 2026-06-05
+Stopped at: Phase 7 Waves 1-3 complete (5/6 plans, 430 passed); 07-06 paused at human-action checkpoint and relocated to DGX Spark
+Resume file: .planning/phases/07-turn-capture-semantic-pii-scrubbing/07-DGX-HANDOFF.md (then write 07-LIVE-CAPTURE.md from reported evidence)
