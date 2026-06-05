@@ -64,6 +64,10 @@ from kajiba.experiment_drift import DRIFT_THRESHOLD, compute_drift
 from kajiba.experiment_scrub import scrub_experiment
 from kajiba.scorer import compute_quality_score
 from kajiba.scrubber import flag_org_domains, scrub_record
+from kajiba.scrubber_semantic import (
+    SemanticScrubUnavailable,
+    scrub_record_semantic,
+)
 
 logger = logging.getLogger(__name__)
 console = Console()
@@ -524,6 +528,53 @@ def _render_preview(
 # ---------------------------------------------------------------------------
 
 
+def _apply_semantic_layer(
+    scrubbed_record: KajibaRecord,
+    regex_flagged: list,
+    scrub_log: "object",
+) -> tuple[KajibaRecord, list]:
+    """Compose the Layer-C semantic scrub after the Layer-B regex scrub (D-11).
+
+    Runs :func:`kajiba.scrubber_semantic.scrub_record_semantic` on the
+    already-regex-scrubbed record inside a ``try/except SemanticScrubUnavailable``
+    (RESEARCH Pattern 6 / Pitfall 5). On success it folds the semantic results
+    into the existing flag channel so the SAME ``_render_preview(flagged_items=...)``
+    panel surfaces both regex and semantic flags (D-08 — no new render surface):
+
+    * sets ``scrub_log.potential_names_redacted`` to the GLiNER name-redaction count,
+    * increments ``scrub_log.items_flagged`` by the number of semantic flags,
+    * returns the semantically-scrubbed record plus the combined flag list.
+
+    When the ``[llm-scrub]`` extra is absent, ``scrub_record_semantic`` raises
+    :class:`SemanticScrubUnavailable`; this helper catches it and returns the
+    regex-only inputs unchanged so the calling command never crashes (PRIV-04 /
+    T-07-13 graceful degrade). Honors D-09 (stateless recompute, GLiNER loads once
+    per CLI invocation via the within-run singleton) and adds no ``pipeline_stage``.
+
+    Args:
+        scrubbed_record: The record after the Layer-B regex scrub.
+        regex_flagged: Flagged items already collected from the regex layer.
+        scrub_log: The :class:`~kajiba.schema.ScrubLog` from ``scrub_record``.
+
+    Returns:
+        ``(record, combined_flagged)`` — the (possibly semantically-scrubbed)
+        record and the regex + semantic flag list for ``_render_preview``.
+    """
+    try:
+        semantic_record, names_redacted, semantic_flags = scrub_record_semantic(
+            scrubbed_record
+        )
+    except SemanticScrubUnavailable:
+        # No [llm-scrub] extra installed: degrade to regex-only, never crash.
+        logger.debug("Semantic scrub unavailable ([llm-scrub] absent); regex-only.")
+        return scrubbed_record, regex_flagged
+
+    scrub_log.potential_names_redacted = names_redacted
+    scrub_log.items_flagged += len(semantic_flags)
+    combined_flagged = list(regex_flagged) + list(semantic_flags)
+    return semantic_record, combined_flagged
+
+
 def _submit_record(
     record: KajibaRecord,
     scrubbed: KajibaRecord,
@@ -609,6 +660,11 @@ def preview(detail: bool) -> None:
                 all_flagged.extend(flag_org_domains(tc.tool_input))
                 all_flagged.extend(flag_org_domains(tc.tool_output))
 
+    # Layer C: compose semantic scrub after regex (D-11), folding GLiNER
+    # redactions + flags into the existing flag channel (D-08). Degrades to
+    # regex-only when [llm-scrub] is absent.
+    scrubbed, all_flagged = _apply_semantic_layer(scrubbed, all_flagged, scrub_log)
+
     # Apply hardware anonymization for preview (show what export would look like)
     preview_record = anonymize_hardware(scrubbed)
 
@@ -657,6 +713,11 @@ def submit() -> None:
                 all_flagged.extend(flag_org_domains(tc.tool_input))
                 all_flagged.extend(flag_org_domains(tc.tool_output))
 
+    # Layer C: compose semantic scrub after regex (D-11) so semantic name
+    # redactions apply before the record can leave the machine (T-07-12), and
+    # flags surface in the same preview panel (D-08). Degrades gracefully.
+    scrubbed, all_flagged = _apply_semantic_layer(scrubbed, all_flagged, scrub_log)
+
     # Apply hardware anonymization for preview display
     preview_record = anonymize_hardware(scrubbed)
 
@@ -690,8 +751,13 @@ def export(path: str) -> None:
         console.print("[yellow]No sessions found in staging directory.[/yellow]")
         return
 
-    # Apply full privacy pipeline: scrub -> anonymize -> jitter -> consent strip
+    # Apply full privacy pipeline: scrub -> semantic scrub -> anonymize -> jitter
+    # -> consent strip. Layer C composes after Layer B (D-11) so GLiNER name
+    # redactions apply before the record is written to disk (T-07-12). Export
+    # renders no flag panel, so the combined flag list is discarded here; the
+    # semantic REDACTIONS still flow into the persisted record.
     scrubbed, scrub_log = scrub_record(record)
+    scrubbed, _ = _apply_semantic_layer(scrubbed, [], scrub_log)
     anonymized = anonymize_hardware(scrubbed)
     jittered = jitter_timestamp(anonymized)
 
@@ -1768,6 +1834,10 @@ def review() -> None:
                 for tc in turn.tool_calls:
                     all_flagged.extend(flag_org_domains(tc.tool_input))
                     all_flagged.extend(flag_org_domains(tc.tool_output))
+
+        # Layer C: compose semantic scrub after regex (D-11); semantic flags
+        # surface in the same review preview panel (D-08), degrade gracefully.
+        scrubbed, all_flagged = _apply_semantic_layer(scrubbed, all_flagged, scrub_log)
 
         preview_record = anonymize_hardware(scrubbed)
         quality = compute_quality_score(preview_record)
