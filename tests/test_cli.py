@@ -1349,9 +1349,20 @@ class TestPublishConsentReverification:
 # Config subcommands tests (Task 2)
 # ---------------------------------------------------------------------------
 
-yaml = pytest.importorskip("yaml")
+try:
+    import yaml as _yaml
+except ImportError:  # PyYAML is a soft dependency (CLAUDE.md)
+    _yaml = None
+
+# Scope the PyYAML requirement to ONLY the config-subcommand class. A
+# module-level ``importorskip`` here would silently skip the ENTIRE test_cli.py
+# file when PyYAML is absent (masking every other CLI test, including the
+# 07-05 semantic flagged-panel tests). The skip belongs on the class that
+# actually reads/writes ``~/.hermes/config.yaml``.
+yaml = _yaml
 
 
+@pytest.mark.skipif(_yaml is None, reason="PyYAML soft dependency not installed")
 class TestConfigSubcommands:
     """Tests for the restructured config command with set/get/show subcommands."""
 
@@ -2164,3 +2175,90 @@ class TestDownloadCommand:
         # Verify the successful shard was still written
         successful = tmp_path / "data" / "llama-3" / "gold" / "shard_f7.jsonl"
         assert successful.exists()
+
+
+# ---------------------------------------------------------------------------
+# Layer C (semantic) surfacing in preview (07-05, SC#4/#5, D-08)
+# ---------------------------------------------------------------------------
+
+
+class TestSemanticFlaggedPanel:
+    """Layer-C semantic flags surface in the preview flagged-for-review panel.
+
+    These tests are model-free: they monkeypatch the shared helper's
+    ``scrub_record_semantic`` so they run in the core suite without the
+    ``[llm-scrub]`` extra (gliner/torch). They pin the D-08 surfacing channel
+    (flags flow into the existing ``_render_preview(flagged_items=...)`` panel)
+    and the PRIV-04 graceful-degrade contract.
+    """
+
+    def test_flagged_panel_shows_semantic_entity(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """A 0.4-0.7 GLiNER entity appears in the flagged panel with text + reason.
+
+        The shared Layer-C helper's ``scrub_record_semantic`` is stubbed to return
+        a synthetic flagged company entity (no model needed). The preview flagged
+        panel must show both the entity text and the ``GLiNER ... (confidence ...)``
+        reason (SC#5, D-08).
+        """
+        from kajiba.scrubber import FlaggedItem
+
+        record_data = _minimal_record_data(
+            conversation_text="We deployed for Aldebaran Robotics last week.",
+        )
+        staging = tmp_path / "staging"
+        staging.mkdir()
+        (staging / "session_001.json").write_text(
+            json.dumps(record_data), encoding="utf-8",
+        )
+
+        def fake_semantic(record):
+            flag = FlaggedItem(
+                text="Aldebaran Robotics",
+                category="semantic_turn_value",
+                reason="GLiNER company (confidence 0.55)",
+                start=0,
+                end=0,
+            )
+            return record, 1, [flag]
+
+        monkeypatch.setattr("kajiba.cli.STAGING_DIR", staging)
+        monkeypatch.setattr("kajiba.cli.scrub_record_semantic", fake_semantic)
+
+        result = runner.invoke(cli, ["preview"])
+        assert result.exit_code == 0
+        assert "flagged for review" in result.output
+        assert "Aldebaran Robotics" in result.output
+        assert "GLiNER company (confidence 0.55)" in result.output
+
+    def test_preview_degrades_when_extra_absent(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """preview exits 0 and prints the regex summary when [llm-scrub] is absent.
+
+        With ``scrub_record_semantic`` raising ``SemanticScrubUnavailable`` (the
+        soft-import failure path), the shared helper must catch it and fall back
+        to the regex-only result — preview never crashes (PRIV-04, T-07-13).
+        """
+        from kajiba.scrubber_semantic import SemanticScrubUnavailable
+
+        record_data = _minimal_record_data(
+            conversation_text="Plain conversation with no semantic PII.",
+        )
+        staging = tmp_path / "staging"
+        staging.mkdir()
+        (staging / "session_001.json").write_text(
+            json.dumps(record_data), encoding="utf-8",
+        )
+
+        def raise_unavailable(record):
+            raise SemanticScrubUnavailable("no [llm-scrub] extra installed")
+
+        monkeypatch.setattr("kajiba.cli.STAGING_DIR", staging)
+        monkeypatch.setattr("kajiba.cli.scrub_record_semantic", raise_unavailable)
+
+        result = runner.invoke(cli, ["preview"])
+        assert result.exit_code == 0
+        # Regex scrub summary still rendered (no crash, degrade path).
+        assert result.exception is None
