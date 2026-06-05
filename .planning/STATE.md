@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Experiment Logging
-status: executing
-stopped_at: Phase 6 complete and verified (VERIFICATION passed 7/7). Next: Phase 7 (Turn Capture + Semantic PII Scrubbing) — final v1.1 dependency gating v1.2 Phase 14 live capture.
-last_updated: "2026-06-05T15:36:30.962Z"
+status: verifying
+stopped_at: Phase 7 context gathered
+last_updated: "2026-06-05T16:45:47.521Z"
 last_activity: 2026-06-05
 progress:
   total_phases: 10
@@ -127,6 +127,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-06-05T15:23:59.000Z
-Stopped at: Completed 06-05-PLAN.md (live v0.15.x hook-kwargs verification); Phase 6 all 5 plans complete — next up /gsd-verify-work for Phase 6
-Resume file: None
+Last session: 2026-06-05T16:45:47.491Z
+Stopped at: Phase 7 context gathered
+Resume file: .planning/phases/07-turn-capture-semantic-pii-scrubbing/07-CONTEXT.md
