@@ -451,8 +451,11 @@ class TestFlaggingSupport:
 
 
 class TestLLMScrubberStub:
-    """Test that the LLM scrubber stub raises NotImplementedError."""
+    """The legacy LLM-prompting stub is retired (07-04); the old string-confidence
+    ``scrub_semantic(text, model_fn)`` interface now raises SemanticScrubUnavailable."""
 
-    def test_raises_not_implemented(self) -> None:
-        with pytest.raises(NotImplementedError, match="not yet implemented"):
+    def test_retired_stub_raises_unavailable(self) -> None:
+        from kajiba.scrubber_semantic import SemanticScrubUnavailable
+
+        with pytest.raises(SemanticScrubUnavailable, match="retired"):
             scrub_semantic("some text", model_fn=lambda x: x)

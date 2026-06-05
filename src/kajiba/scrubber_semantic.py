@@ -193,3 +193,111 @@ def _placeholder_for_label(label: str) -> str:
     generic ``[REDACTED_NAME]`` tag.
     """
     return PLACEHOLDER_PERSON if label == "person" else PLACEHOLDER_NAME
+
+
+def _flagged_item(span: dict, field_category: str) -> FlaggedItem:
+    """Build a :class:`FlaggedItem` from a GLiNER span (Pattern 7).
+
+    The reason string carries the label and confidence so the preview panel can
+    surface ``snippet + label + confidence`` for human review.
+    """
+    label = span["label"]
+    score = span["score"]
+    return FlaggedItem(
+        text=span["text"],
+        category=field_category,
+        reason=f"GLiNER {label} (confidence {score:.2f})",
+        start=span["start"],
+        end=span["end"],
+    )
+
+
+def _redact_spans(text: str, redactions: list[dict]) -> tuple[str, int]:
+    """Replace high-confidence spans in ``text`` with ``[REDACTED_*]`` placeholders.
+
+    Spans are applied right-to-left (descending ``start``) so earlier offsets stay
+    valid as later text is rewritten.
+
+    Args:
+        text: The source text (a ``ConversationTurn.value``).
+        redactions: Span dicts with ``score >= 0.7`` to replace.
+
+    Returns:
+        A ``(scrubbed_text, person_redaction_count)`` tuple. The count tracks
+        ``person``-label redactions for ``potential_names_redacted``.
+    """
+    person_count = 0
+    for span in sorted(redactions, key=lambda s: s["start"], reverse=True):
+        placeholder = _placeholder_for_label(span["label"])
+        text = text[: span["start"]] + placeholder + text[span["end"] :]
+        if span["label"] == "person":
+            person_count += 1
+    return text, person_count
+
+
+# ---------------------------------------------------------------------------
+# Asymmetric composition (composes AFTER regex scrub, D-11)
+# ---------------------------------------------------------------------------
+
+
+def scrub_record_semantic(
+    record: KajibaRecord,
+) -> tuple[KajibaRecord, int, list[FlaggedItem]]:
+    """Apply the semantic (Layer C) scrub to an already-regex-scrubbed record.
+
+    Mirrors :func:`kajiba.scrubber.scrub_record`'s deep-copy discipline
+    (``model_dump(by_alias=True)`` → mutate the copy → ``model_validate``) so the
+    input record is never mutated.
+
+    Asymmetric coverage (D-07): in each ``ConversationTurn.value`` high-confidence
+    spans (``score >= 0.7``) are REDACTED (text replaced) while flag-band spans
+    (``0.4 <= score < 0.7``) are collected as :class:`FlaggedItem`s. In
+    ``tool_input`` / ``tool_output`` ALL spans (``score >= 0.4``) are collected as
+    flags ONLY — the tool field text is NEVER mutated, which protects code
+    training data from corruption (the core anti-corruption rule).
+
+    When the ``[llm-scrub]`` extra is absent the record is returned unchanged with
+    no redactions and no flags (graceful degradation); 07-05 surfaces the missing
+    extra separately at the CLI boundary.
+
+    Args:
+        record: A :class:`KajibaRecord`, expected to have already passed the
+            regex scrub (D-11 compose-after-regex).
+
+    Returns:
+        ``(scrubbed_record, names_redacted, flags)`` where ``names_redacted`` is
+        the count of ``person``-label auto-redactions and ``flags`` is the list of
+        :class:`FlaggedItem`s for human review.
+    """
+    data = record.model_dump(by_alias=True)
+    names_redacted = 0
+    flags: list[FlaggedItem] = []
+
+    try:
+        for turn in data.get("trajectory", {}).get("conversations", []):
+            # --- ConversationTurn.value: redact >=0.7, flag 0.4-0.7 ---
+            value = turn.get("value") or ""
+            spans = detect_entities(value)
+            redactions, value_flags = partition_spans(spans)
+            if redactions:
+                turn["value"], person_count = _redact_spans(value, redactions)
+                names_redacted += person_count
+            for span in value_flags:
+                flags.append(_flagged_item(span, "semantic_turn_value"))
+
+            # --- tool_input / tool_output: FLAG ONLY, never mutate (D-07) ---
+            for tool_call in turn.get("tool_calls") or []:
+                for tool_field in ("tool_input", "tool_output"):
+                    field_text = tool_call.get(tool_field) or ""
+                    tool_spans = detect_entities(field_text)
+                    # All spans >=0.4 (both bands) become flags; text untouched.
+                    for span in tool_spans:
+                        if span["score"] >= FLAG_THRESHOLD:
+                            flags.append(_flagged_item(span, f"semantic_{tool_field}"))
+    except SemanticScrubUnavailable:
+        # No [llm-scrub] extra: degrade to a no-op, returning the record intact.
+        logger.debug("Semantic scrub skipped: [llm-scrub] extra not installed")
+        return record, 0, []
+
+    scrubbed_record = KajibaRecord.model_validate(data)
+    return scrubbed_record, names_redacted, flags
