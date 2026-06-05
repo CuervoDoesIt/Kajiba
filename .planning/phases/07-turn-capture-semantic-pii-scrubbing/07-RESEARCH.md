@@ -503,18 +503,18 @@ Mark GLiNER-dependent tests with a skip-if-not-installed guard (`pytest.importor
 | A4 | No user turns are lost on interruption without `pre_llm_call` | Pattern 3 | Interrupted turns lack assistant response; if `post_llm_call` also skips `user_message` on interrupt, user turn is lost. CONFIRM in D-02 live run (the one open question). |
 | A5 | GLiNER `predict_entities` labels `company`/`organization`/`project` behave as expected on the NVIDIA model's 55-label space | Pattern 5/6 | Model may not recognize `project` as a label; D-06 calibration + a true-positive test will reveal. May need label tuning within D-04's set. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Interrupted-turn user capture (A4).**
+1. RESOLVED: **Interrupted-turn user capture (A4).**
    - Known: `post_llm_call` carries `user_message`; `on_session_end.interrupted` exists.
    - Unclear: whether `post_llm_call` fires at all (and carries `user_message`) when the user interrupts before a response.
    - Recommendation: rely on `post_llm_call` for now (Pattern 3); verify during the D-02 live run; only add `pre_llm_call` if the live run shows lost user turns.
 
-2. **Final-vs-turn `on_session_end` disambiguation (A3).**
+2. RESOLVED: **Final-vs-turn `on_session_end` disambiguation (A3).**
    - Known: fires per turn + at CLI exit; no explicit "is-final" flag in 06-HOOK-KWARGS.
    - Recommendation: idempotent overwrite keyed by `session_id` (no disambiguation needed); add a once-guard for continuous-mode auto-submit.
 
-3. **`provider` literal gap for Anthropic.**
+3. RESOLVED: **`provider` literal gap for Anthropic.**
    - `ProviderType` lacks `anthropic`. Recommendation: map remote Anthropic to `provider="custom"`, record true backend in free-text `HardwareProfile.inference_backend` (D-03). Planner may optionally extend the literal — flag, don't assume.
 
 ## Environment Availability

@@ -24,7 +24,7 @@ Requirements for Hermes Pipeline Validation milestone. Each maps to roadmap phas
 
 ### Privacy
 
-- [ ] **PRIV-01**: `scrubber_llm.py` stub replaced with GLiNER-based semantic PII detection using `nvidia/gliner-pii` model
+- [ ] **PRIV-01**: `scrubber_llm.py` stub replaced with GLiNER-based semantic PII detection using `nvidia/gliner-PII` model
 - [ ] **PRIV-02**: Auto-redact entities with confidence >= 0.7, flag entities with confidence >= 0.4 for HITL review, ignore below 0.4
 - [ ] **PRIV-03**: GLiNER tested against code content fixtures to calibrate false positive rates on programming identifiers
 - [ ] **PRIV-04**: `gliner` added to `pyproject.toml` as `pip install kajiba[llm-scrub]` optional extra
