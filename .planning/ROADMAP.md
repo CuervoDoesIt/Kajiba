@@ -102,7 +102,7 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
 
 **Wave 2** *(parallel — blocked on Wave 1; disjoint files)*
 
-- [ ] 07-03-PLAN.md — Promote capture: paired-turn + tool buffer (ok→success), ollama metadata + remote degrade, finalize-once session-end, promoted hooks (CAPT-02/03/04)
+- [x] 07-03-PLAN.md — Promote capture: paired-turn + tool buffer (ok→success), ollama metadata + remote degrade, finalize-once session-end, promoted hooks (CAPT-02/03/04)
 - [ ] 07-04-PLAN.md — GLiNER scrubber_semantic: nvidia/gliner-PII detector, D-05 bands, D-07 asymmetric coverage, D-06 calibration gate, retire scrubber_llm stub (PRIV-01/02/03)
 
 **Wave 3** *(blocked on 07-04 — cli.py)*

@@ -18,9 +18,9 @@ Requirements for Hermes Pipeline Validation milestone. Each maps to roadmap phas
 ### Data Capture
 
 - [x] **CAPT-01**: Logging-only plugin stub deployed to empirically confirm hook kwargs against live Hermes v0.6.0
-- [ ] **CAPT-02**: User turns captured from `pre_llm_call` and assistant responses from `post_llm_call`, assembled into `ConversationTurn` objects
-- [ ] **CAPT-03**: Tool calls captured from `post_tool_call` events and attached to the correct assistant turn via pending turn buffer
-- [ ] **CAPT-04**: Full model metadata captured via `ollama.show()` (parameter count, quantization, family, context length) and stored in `ModelMetadata`
+- [x] **CAPT-02**: User turns captured from `pre_llm_call` and assistant responses from `post_llm_call`, assembled into `ConversationTurn` objects
+- [x] **CAPT-03**: Tool calls captured from `post_tool_call` events and attached to the correct assistant turn via pending turn buffer
+- [x] **CAPT-04**: Full model metadata captured via `ollama.show()` (parameter count, quantization, family, context length) and stored in `ModelMetadata`
 
 ### Privacy
 
@@ -119,9 +119,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PLUG-04 | Phase 8 | Pending |
 | PLUG-05 | Phase 8 | Pending |
 | CAPT-01 | Phase 6 | Complete |
-| CAPT-02 | Phase 7 | Pending |
-| CAPT-03 | Phase 7 | Pending |
-| CAPT-04 | Phase 7 | Pending |
+| CAPT-02 | Phase 7 | Complete |
+| CAPT-03 | Phase 7 | Complete |
+| CAPT-04 | Phase 7 | Complete (mocked; live proof 07-06) |
 | PRIV-01 | Phase 7 | Pending |
 | PRIV-02 | Phase 7 | Pending |
 | PRIV-03 | Phase 7 | Pending |

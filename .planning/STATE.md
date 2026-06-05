@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Experiment Logging
 status: executing
-stopped_at: "Phase 7 Plan 01 complete (capture foundation: [llm-scrub] extra + RED scaffolds)"
-last_updated: "2026-06-05T21:26:05.265Z"
-last_activity: "2026-06-05 -- Phase 07 Plan 01 complete (capture foundation: [llm-scrub] extra + RED scaffolds)"
+stopped_at: "Phase 7 Plan 03 complete (turn/tool capture GREEN + promoted hook dispatch)"
+last_updated: "2026-06-05T21:40:00.000Z"
+last_activity: "2026-06-05 -- Phase 07 Plan 03 complete (paired-turn capture, tool buffer, ollama enrichment, finalize-once, hook dispatch)"
 progress:
   total_phases: 10
   completed_phases: 4
   total_plans: 27
-  completed_plans: 22
-  percent: 40
+  completed_plans: 24
+  percent: 44
 ---
 
 # Project State
@@ -28,11 +28,11 @@ See: .planning/PROJECT.md (updated 2026-04-02)
 ## Current Position
 
 Phase: 07 (turn-capture-semantic-pii-scrubbing) — EXECUTING
-Plan: 3 of 6
+Plan: 4 of 6
 Status: Ready to execute
-Last activity: 2026-06-05 -- Phase 07 Plan 01 complete (capture foundation: [llm-scrub] extra + RED scaffolds)
+Last activity: 2026-06-05 -- Phase 07 Plan 03 complete (turn/tool capture GREEN + promoted hook dispatch)
 
-Progress: [██░░░░░░░░] 17% (1/6 plans)
+Progress: [█████░░░░░] 50% (3/6 plans)
 
 ## Performance Metrics
 
@@ -76,6 +76,7 @@ Progress: [██░░░░░░░░] 17% (1/6 plans)
 | Phase 06 P05 | 2m | 2 tasks | 2 files |
 | Phase 07 P01 | 11m | 3 tasks | 3 files |
 | Phase 07 P02 | 14m | 2 tasks | 2 files |
+| Phase 07 P03 | 12m | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -120,6 +121,8 @@ Progress: [██░░░░░░░░] 17% (1/6 plans)
 - 06-05 (live verification, D-15/D-16/D-17/D-18/D-19/D-21, ENV-01/02/03 + PLUG-01/02 + CAPT-01): Live Hermes v0.15.1 native-Windows session (id 20260605_111446_5a978c) on a REMOTE backend (nvidia/nemotron-3-ultra:free via OpenRouter; earlier same-build run used claude-opus-4-8 — no GPU/Ollama) with KAJIBA_DEBUG=1 fired all four hooks; startup line `Kajiba registered hooks: on_session_start, post_llm_call, post_tool_call, on_session_end` confirmed register(ctx) ran. Wrote 06-HOOK-KWARGS.md — per-hook kwarg tables dual-tagged [DOCUMENTED v0.15.x] + [VERIFIED] (undocumented extras [VERIFIED]-only), 8 cross-cutting findings, Phase 7 implications (CAPT-02/03 mapping); synthetic PII placeholders (T-06-11). KEY FINDINGS: telemetry_schema_version="hermes.observer.v1" on ALL four hooks; on_session_end is TURN-SCOPED (per run_conversation, not session-final); post_tool_call.result is a JSON str while args is a dict; rich correlation ids task_id/turn_id ("<session>:<task>:<8hex>")/tool_call_id/api_request_id; D-17 discovery dir = <HERMES_HOME>/plugins/ i.e. %LOCALAPPDATA%\hermes\plugins\ (confirmed via installed source AND `hermes plugins list` source=user); D-19 `hermes plugins enable kajiba` REQUIRED (inert until enabled); ENV-03 native-Windows symlink FAILED (admin required, Dev Mode off) → COPY fallback used; plugin installed editable into the Hermes venv (%LOCALAPPDATA%\hermes\hermes-agent\venv, kajiba 0.2.0) not the repo .venv. Promoted plugin.yaml header [ASSUMED] → [CONFIRMED v0.15.x] (D-18, comment-only). hooks.py [ASSUMED] docstrings left for Phase 7 (out of scope). tests/test_plugin.py 3/3 green. No deviations. Phase 6 all 5 plans complete — ready for /gsd-verify-work. Commits: docs e401885 (06-HOOK-KWARGS.md), docs 3b13724 (plugin.yaml promotion), docs ec27472 (summary).
 - [Phase ?]: 07-02 (Wave 0 semantic-scrub RED): Built D-06 calibration fixture (tests/fixtures/code_content_pii.json — known-safe code identifiers in turn-value AND tool fields + Margaret Chen/Aldebaran Robotics true-positive seed; loads via validate_record) and tests/test_scrubber_semantic.py pinning kajiba.scrubber_semantic's surface (classify_band, scrub_record_semantic, detect_entities, SemanticScrubUnavailable, GLINER_MODEL_ID=nvidia/gliner-PII). LANE A pure-logic RED (bands D-05, asymmetric D-07 tool flag-only, soft_import PRIV-04) imports module INSIDE each test so collection succeeds; LANE B model-gated via importorskip(gliner) (detect true-positive, calibration D-06 HARD GATE asserts score>=0.7 set EMPTY on code + records FP rate). FlaggedItem reused from kajiba.scrubber. Verified LANE A 8 RED, full file 8 failed + 2 LANE-B skips no collection error, 0 regressions (11 fails all in known 07-01 scaffolds). No deviations. Commits test b57e971, test 2c8ded3.
 
+- 07-03 (Wave 2 GREEN, CAPT-02/03/04 + session-end fix): Promoted the Phase 6 debug-only hook stubs into real turn/tool capture and fixed the turn-scoped on_session_end bug — all 9 collector + 2 dispatch 07-01 RED scaffolds now GREEN, the 2 fault tests stayed green. collector.py: on_llm_turn (paired human+gpt ConversationTurn, conversation_history context-only never re-ingested → no double-count, Correction 4); on_tool_call (turn_id-keyed pending buffer attach-or-buffer for both tool orderings, dedup by tool_call_id, json.loads result with try/except fallback truncated [:2000], json.dumps args into tool_input, _map_tool_status maps error fields→error/timeout else status=="ok"→"success" EXACTLY, Correction 2); _enrich_from_ollama (psutil-style soft-import + try/except around ollama.show, dict-or-object A1) + _build_metadata_and_hardware (local Ollama enrich vs remote slug inference, params left None, HardwareProfile.inference_backend set, D-03; Anthropic→provider="custom"+inference_backend="anthropic", Correction 5, NO schema change); on_session_start now accepts provider/**_ and stops mis-mapping platform→provider; finalize-once on_session_end (idempotent overwrite of session_{id}.json → N firings = ONE file, Correction 3; continuous-mode auto-submit gated by _finalized once-flag). plugin/hooks.py: on_post_llm_call/on_post_tool_call promoted from debug-log stubs to real kwargs.get(...) dispatch keeping _log_kwargs + try/except + if _collector is not None; no pre_llm_call registered (Phase 8). DECISION: telemetry_schema_version held as module constant TELEMETRY_SCHEMA_VERSION="hermes.observer.v1" (no ModelMetadata field, schema frozen) for a future schema bump; hooks tolerate the incoming kwarg via **_. DEVIATION (structural): Task 1+2 landed in ONE commit (fad5b8a) — both edit only collector.py and are inseparably coupled through on_session_start; both task selectors pass. test_collector.py + test_plugin.py 35 passed; git diff --quiet src/kajiba/schema.py exit 0; import kajiba.collector/plugin.hooks clean offline. OUT-OF-SCOPE: tests/test_scrubber_semantic.py 8 RED belong to sibling plan 07-04 (logged to deferred-items.md, NOT fixed). Commits: feat fad5b8a, feat cb67f21, docs 326859f.
+
 ### Pending Todos
 
 None.
@@ -132,6 +135,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-06-05T21:25:55.399Z
-Stopped at: Phase 7 Plan 01 complete (capture foundation: [llm-scrub] extra + RED scaffolds)
-Resume file: .planning/phases/07-turn-capture-semantic-pii-scrubbing/07-02-PLAN.md
+Last session: 2026-06-05T21:40:00.000Z
+Stopped at: Phase 7 Plan 03 complete (turn/tool capture GREEN + promoted hook dispatch)
+Resume file: .planning/phases/07-turn-capture-semantic-pii-scrubbing/07-04-PLAN.md
