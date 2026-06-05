@@ -1,0 +1,48 @@
+{
+  "_comment": "D-06 calibration fixture for the semantic-scrub HARD GATE. Conversation turns AND tool fields embed KNOWN-SAFE code identifiers (library/framework names, capitalized class/function names, ordinary variables) that a generalist NER tends to over-fire on. A generalist GLiNER must produce ZERO auto-redacts (score>=0.7) on these. A small number of GENUINE person/company names are seeded in prose (turn 2) so the true-positive test proves GLiNER still fires on real PII. The explicit known-safe denominator for the FP-rate is mirrored as KNOWN_SAFE_TOKENS in tests/test_scrubber_semantic.py.",
+  "schema_version": "0.2.0",
+  "record_type": "task_trajectory",
+  "record_kind": "coding_session",
+  "created_at": "2026-06-05T10:00:00Z",
+  "trajectory": {
+    "format": "sharegpt_extended",
+    "conversations": [
+      {
+        "from": "human",
+        "value": "Refactor this React component to use pandas-style data loading. Here is the current code:\n\nimport pandas as pd\nimport numpy as np\nfrom fastapi import FastAPI\nconst App = () => <React.Fragment><DataGrid rows={numpy} /></React.Fragment>\n\ndef compute_quality_score(record):\n    df = pd.DataFrame(record)\n    return df.mean()\n\nThe Tornado server uses Flask blueprints and a Django ORM model called Customer."
+      },
+      {
+        "from": "gpt",
+        "value": "I'll refactor the App component using numpy for the array math and pandas for the DataFrame. The class names React, App, DataGrid, FastAPI, Flask, Django, Customer, and Tornado are framework or local identifiers, not people. This change was reviewed by Margaret Chen at Aldebaran Robotics before merge.",
+        "tool_calls": [
+          {
+            "tool_name": "edit_file",
+            "tool_input": "import pandas as pd\nimport numpy as np\nfrom fastapi import FastAPI\n\ndef compute_quality_score(record):\n    df = pd.DataFrame(record)\n    return df.mean()\n\nclass Customer:\n    accountManager = None\n    userController = None",
+            "tool_output": "Wrote 12 lines. Modules pandas, numpy, FastAPI imported. Class Customer updated; Express middleware and Kubernetes Deployment unchanged. Django ORM and Tornado worker intact.",
+            "tool_status": "success",
+            "latency_ms": 80
+          }
+        ],
+        "token_count": 120,
+        "generation_latency_ms": 900
+      },
+      {
+        "from": "human",
+        "value": "Also rename the variable userController to accountManager and update the Express middleware. Keep the Kubernetes Deployment manifest as-is."
+      }
+    ],
+    "turn_count": 3,
+    "total_tool_calls": 1,
+    "successful_tool_calls": 1,
+    "failed_tool_calls": 0
+  },
+  "model": {
+    "model_name": "hermes-3-8b",
+    "provider": "ollama"
+  },
+  "submission": {
+    "kajiba_plugin_version": "0.2.0",
+    "consent_level": "full",
+    "pii_scrub_version": "0.2.0"
+  }
+}
