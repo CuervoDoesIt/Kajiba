@@ -253,7 +253,19 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
   1. Running an evaluation inside a live Hermes session produces an `ExperimentRecord` via the shared plugin hooks
   2. A live-captured experiment record carries the same metadata/outcome structure as a deliberately-logged one
 
-**Plans**: TBD
+**Plans**: 3 plans
+
+**Wave 1**
+
+- [ ] 14-01-PLAN.md — Wave 0 test scaffolds: TestExperimentCapture (6 ECAP-01 tests, RED) + extract shared _build_trajectory() helper (ECAP-01)
+
+**Wave 2** *(blocked on 14-01 — collector.py overlap)*
+
+- [ ] 14-02-PLAN.md — experiment-mode env trigger + state attrs in on_session_start + _build_experiment_record (D-03..D-06 field mapping, SC#2 parity) (ECAP-01)
+
+**Wave 3** *(blocked on 14-02 — collector.py overlap)*
+
+- [ ] 14-03-PLAN.md — _finalize_experiment (Design B finalize-once) + on_session_end divergent-tail branch + no-regression/D-08 privacy proof (ECAP-01)
 
 ### Phase 15: Analysis Export & Practice-Project Integration
 
