@@ -404,6 +404,90 @@ hermes plugins enable kajiba
 
 Then verify exactly as in the primary path (`hermes --version` reports v0.15.x; `KAJIBA_DEBUG=1 hermes` shows the `Kajiba registered hooks: ...` line). If you run Hermes under a non-default `HERMES_HOME`, create the symlink under that profile's `plugins/` directory instead — a different profile is a separate data namespace (its own staging / outbox).
 
+### A.5 DGX Spark / native aarch64 Linux (no WSL2)
+
+This path was validated end-to-end during the Phase 7 live-capture proof on an **NVIDIA DGX
+Spark** (GB10 Grace Blackwell, 128GB unified memory, aarch64, DGX OS). See
+`.planning/phases/07-turn-capture-semantic-pii-scrubbing/07-LIVE-CAPTURE.md` for the captured
+evidence. On native Linux there is **no WSL2 layer** — `~/.hermes/kajiba/` paths are literal,
+plugin discovery uses a normal symlink, and none of the MP-8/MP-9 WSL2 pitfalls apply. The
+128GB unified memory means GLiNER (`nvidia/gliner-PII`) and Hermes 3 coexist with no OOM.
+
+**Ollama — user-local install (no sudo):**
+
+```bash
+# arm64 tarball extracted to a user dir; no root needed
+mkdir -p ~/.local/ollama && cd ~/.local/ollama
+# download + extract the official ollama-linux-arm64 tarball here, then:
+ln -sfn ~/.local/ollama/bin/ollama ~/bin/ollama        # ensure ~/bin is on PATH
+nohup ollama serve >~/ollama.log 2>&1 &
+ollama pull hermes3:8b                                   # Q4_0, 8B, 131072 ctx
+ollama show hermes3:8b                                   # confirms parameter_size / quantization / family
+```
+
+**GB10 GPU offload (Blackwell, compute capability 12.1 / sm_121):** the stock arm64 tarball ships
+both `cuda_v12` and `cuda_v13` libraries. The GB10 needs the **`cuda_v13`** path — the DGX OS ships
+CUDA 13. Start the server with debug logging to confirm full offload (no source build required):
+
+```bash
+OLLAMA_DEBUG=1 ollama serve     # then run one generation and inspect ~/ollama.log
+```
+
+Confirm in the log (all three): `verifying if device is supported ... NVIDIA GB10 compute=12.1`,
+`load_tensors: offloaded 33/33 layers to GPU`, and runner `library=CUDA` `vram=21.0 GiB` — **not**
+"skipping CUDA device" / CPU. `nvidia-smi` should show the `llama-server` child process holding
+VRAM during inference; tokens/sec jumps materially (≈51 t/s observed on GB10 vs the CPU fallback).
+If a future Ollama build lacks sm_121 kernels, build from source with
+`CMAKE_CUDA_ARCHITECTURES=121`, or use an NVIDIA NIM/NGC container that exposes the Ollama API on
+`:11434`. **Keep Ollama as the serving backend** — Kajiba's model-metadata capture (CAPT-04)
+depends on `ollama.show()`; switching to vLLM/TGI loses that enrichment.
+
+**Point Hermes at local Ollama (the config that actually works on Linux):** use the **OpenAI-compat
+`/v1` endpoint with `provider: custom`**, not a plain `provider: ollama`:
+
+```yaml
+provider: custom
+base_url: http://localhost:11434/v1     # the /v1 suffix is required
+default: hermes3:8b
+api_key: ""                              # empty; Ollama ignores it
+```
+
+On the validated build, `provider: ollama` (or a `base_url` without `/v1`) returned 404 / fell
+back to a custom-provider error. Even with `provider: custom`, the captured record's
+`model.provider` still comes out as `ollama` — the collector's `_enrich_from_ollama` recognizes the
+local backend and calls `ollama.show()` regardless of the Hermes-side label.
+
+**Plugin (Linux native symlink + editable install in the Hermes venv):**
+
+```bash
+cd ~/Kajiba
+python3.11 -m venv .venv && source .venv/bin/activate
+pip install -e ".[llm-scrub]"                              # dev venv: GLiNER LANE-B + capture
+ln -sfn "$(pwd)/src/kajiba/plugin" ~/.hermes/plugins/kajiba
+hermes plugins enable kajiba                                # REQUIRED — discovered != enabled
+# Hermes runs in its own venv; install Kajiba there too (it may have no pip binary — use uv):
+uv pip install --python ~/.hermes/hermes-agent/venv/bin/python -e "$(pwd)[llm-scrub]"
+```
+
+**Verification checkpoint: DGX live capture** — run one short throwaway session with a tool call,
+then:
+
+```bash
+ls ~/.hermes/kajiba/staging/        # exactly ONE session_<id>.json (finalize-once)
+kajiba preview                       # GLiNER Layer C active; real model metadata in the record
+```
+
+Confirm exactly one staging file, a `model` block with non-null `parameter_count` / `quantization`
+/ `model_family` / `context_window`, and that `kajiba preview` runs the GLiNER path (not degraded).
+
+**Permissions / autonomy (isolated dev box only):** for hands-off agent runs the DGX setup used
+`hermes config set approvals.mode off` and `export HERMES_YOLO_MODE=1` (persisted in `~/.bashrc`).
+This is appropriate **only** for an isolated throwaway playground. **Security caveat:** this box
+captures sessions for a privacy-first dataset — re-enable `hermes config set security.redact_secrets
+true` before any **real** (non-throwaway) capture, and never replicate passwordless-root / yolo /
+`curl | sh` autonomy to a machine that handles real user data. Kajiba's CLI scrubbing is the real
+safety net; this is defense-in-depth.
+
 ### Appendix summary checklist (WSL2 / GPU / Ollama — optional)
 
 | Step | Verification checkpoint | Pass condition |
@@ -412,3 +496,4 @@ Then verify exactly as in the primary path (`hermes --version` reports v0.15.x; 
 | A.2 GPU | `nvidia-smi` (in WSL2) | RTX 4070 + VRAM shown |
 | A.3 Ollama | `ollama run` + `nvidia-smi` | Output produced AND VRAM in use during inference |
 | A.4 Hermes + plugin | `hermes --version` + `KAJIBA_DEBUG=1 hermes` | Reports v0.15.x; `Kajiba registered hooks: ...` in log |
+| A.5 DGX / aarch64 | `OLLAMA_DEBUG=1 ollama serve` + `kajiba preview` | `offloaded 33/33 layers to GPU` (cuda_v13); one staging file with live `ollama.show()` metadata; GLiNER Layer C active |
