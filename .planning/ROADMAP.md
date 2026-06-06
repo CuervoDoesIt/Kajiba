@@ -286,7 +286,7 @@ Two parallel tracks share a foundation. Execute by dependency, not strict numeri
 | 4. Contribution Modes | v1.0 | 3/3 | Complete | 2026-04-01 |
 | 5. Consumer Experience | v1.0 | 2/2 | Complete | 2026-04-02 |
 | 6. Environment + Plugin Foundation | v1.1 | 5/5 | Complete    | 2026-06-05 |
-| 7. Turn Capture + Semantic PII Scrubbing | v1.1 | 6/6 | Complete   | 2026-06-06 |
+| 7. Turn Capture + Semantic PII Scrubbing | v1.1 | 6/6 | Complete    | 2026-06-06 |
 | 8. HITL Validation + Pipeline Integration | v1.1 | 0/0 | Not started | - |
 | 9. Fine-Tune Experiment | v1.1 | 0/0 | Not started | - |
 | 10. Experiment Schema Foundation | v1.2 | 3/3 | Complete    | 2026-06-03 |

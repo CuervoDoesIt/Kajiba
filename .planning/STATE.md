@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Experiment Logging
-status: executing
-stopped_at: "Phase 7 PAUSED at 07-06 checkpoint — live-capture proof relocated to DGX Spark (see 07-DGX-HANDOFF.md)"
-last_updated: "2026-06-05T22:20:00.000Z"
-last_activity: "2026-06-05 -- Phase 07 Waves 1-3 complete (5/6 plans GREEN, 430 passed/16 skipped); 07-06 (autonomous:false) paused at human-action gate and relocated to DGX Spark"
+status: completed
+stopped_at: Phase 7 Waves 1-3 complete (5/6 plans, 430 passed); 07-06 paused at human-action checkpoint and relocated to DGX Spark
+last_updated: "2026-06-06T01:23:57.390Z"
+last_activity: 2026-06-06
 progress:
   total_phases: 10
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 27
   completed_plans: 26
-  percent: 48
+  percent: 50
 ---
 
 # Project State
@@ -21,24 +21,24 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-02)
 
 **Core value:** Real-world AI session data, tagged with full runtime context, flowing into a community dataset that accelerates local model fine-tuning for everyone.
-**Current focus:** Phase 07 — turn-capture-semantic-pii-scrubbing
-**Active milestone:** v1.2 Experiment Logging (Dual-Use), Phases 10-15 — Phases 10-12 complete (audited 2026-06-04, see `.planning/v1.2-MILESTONE-AUDIT.md`); next up Phase 13.
-**Parallel milestone:** v1.1 Hermes Pipeline Validation, Phases 6-9 — Phase 6 complete (verified 2026-06-05); Phase 7 next. Shared foundation Phases 6-7 gate v1.2 Phase 14 live capture (Phase 6 dependency now cleared).
+**Current focus:** Phase 7 COMPLETE (verified 2026-06-06) — next: Phase 8 (v1.1) and/or Phase 14 (v1.2, now unblocked)
+**v1.1 Hermes Pipeline Validation (Phases 6-9):** Phase 6 ✓ (2026-06-05), Phase 7 ✓ (2026-06-06); next up Phase 8 (HITL Validation + Pipeline Integration), then Phase 9.
+**v1.2 Experiment Logging (Phases 10-15):** Phases 10-13 complete; Phase 14 (Live Experiment Capture) was gated on v1.1 Phases 6-7 — that gate is now CLEARED, so Phase 14 is unblocked. Phase 15 follows. (Note: gsd `phase.complete` reported `next_phase: 10`, which is stale — 10-13 are done; the real next phases are 8 and 14.)
 
 ## Current Position
 
-Phase: 07 (turn-capture-semantic-pii-scrubbing) — PAUSED (07-06 checkpoint)
-Plan: 6 of 6 (07-06, autonomous:false — human-action gate)
-Status: Waves 1-3 complete (5/6 plans GREEN, 430 passed / 16 skipped). 07-06 live-capture proof RELOCATED to DGX Spark — awaiting live local-Ollama Hermes run. See 07-DGX-HANDOFF.md.
-Last activity: 2026-06-05 -- 07-01..07-05 complete; 07-06 paused at human-action checkpoint, relocated to DGX
+Phase: 07 — COMPLETE (verified 2026-06-06, 6/6 plans, 5/5 must-haves)
+Plan: 6 of 6 complete
+Status: Phase 7 closed out. D-02 live-capture proven on the DGX Spark (real ollama.show() metadata, GLiNER Layer C active, calibration FP 0.0000, GB10 GPU offload). Next: Phase 8 (v1.1) and/or Phase 14 (v1.2, now unblocked).
+Last activity: 2026-06-06 — Phase 7 verified and marked complete
 
-Progress: [████████░░] 83% (5/6 plans)
+Progress: [██████████] 100% (6/6 plans)
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 33 (v1.0)
+- Total plans completed: 39 (v1.0)
 - Average duration: --
 - Total execution time: --
 
@@ -52,6 +52,7 @@ Progress: [████████░░] 83% (5/6 plans)
 | 12 | 4 | - | - |
 | 13 | 5 | - | - |
 | 06 | 5 | - | - |
+| 07 | 6 | - | - |
 
 **Recent Trend:**
 
@@ -131,6 +132,8 @@ Progress: [████████░░] 83% (5/6 plans)
 
 - 07-06 RELOCATED to DGX Spark (DECIDED 2026-06-05): the live-capture D-02 proof (install Ollama + Hermes 3 8B Q4, real local session capture, GLiNER on real prose) moves from the Windows RTX 4070 (8GB) to the DGX Spark (GB10, 128GB unified, Ubuntu/aarch64). Removes the plan's GLiNER CPU-fallback/OOM hedges, matches the project's `~/.hermes/kajiba/` Unix path conventions, and aligns with the Loop-B (optimize-Hermes' learning/memory) vision the DGX is the lab for. Handoff brief written to 07-DGX-HANDOFF.md; a fresh Hermes agent on the DGX runs Task 1 (install `[llm-scrub]` + LANE-B calibration hard gate) + Task 2 (live capture), then reports evidence back for Claude to write 07-LIVE-CAPTURE.md (Task 3). Phase 7 stays INCOMPLETE until the live proof lands.
 
+- 07-06 COMPLETE (2026-06-06): D-02 live-capture proven on the DGX Spark. Live Hermes 3 8B Q4 (Ollama) session `20260605_192518_ea3f16` captured exactly one staging record with real `ollama.show()` metadata (8.0B / Q4_0 / llama / 131072); `kajiba preview` ran GLiNER Layer C live (1 flag @0.52, no real PII); D-06 calibration green on the real model (FP 0.0000, after assertion fix `ef64e88`); bonus full GB10 GPU offload (33/33 layers via `cuda_v13`). Cross-machine execution: Windows orchestrator + DGX Hermes agent over git (origin/master) as message bus. Artifacts: 07-LIVE-CAPTURE.md, 07-06-SUMMARY.md, docs/hermes-setup.md A.5. CAPT-04 / PRIV-01 / PRIV-03 proven on real data. Verification PASSED 5/5. Phase 7 COMPLETE.
+
 ### Pending Todos
 
 None.
@@ -138,11 +141,11 @@ None.
 ### Blockers/Concerns
 
 - RESOLVED 2026-06-05 (06-05): Hermes hook kwargs verified live on v0.15.1 — all four hooks' payloads recorded dual-tagged in 06-HOOK-KWARGS.md. The "no formal payload schema published" blocker is permanently closed (D-16/D-21).
-- GLiNER false positive rate on code content needs calibration in Phase 7
-- WSL2 CUDA driver stub overwrite risk -- install only cuda-toolkit, not cuda meta-package (WSL2-only; native-Windows is now the primary path)
+- RESOLVED 2026-06-06 (07-06): GLiNER false-positive rate on code content calibrated on the real `nvidia/gliner-PII` model on the DGX — `CALIBRATION_FP_RATE=0.0000` (zero of 16 known-safe code identifiers auto-redacted at ≥0.7). D-06 hard gate green.
+- WSL2 CUDA driver stub overwrite risk -- install only cuda-toolkit, not cuda meta-package (WSL2-only; native-Windows is now the primary path). NOTE: the DGX Spark (aarch64/DGX OS) uses native Linux — none of the WSL2 pitfalls apply there; see docs/hermes-setup.md A.5.
 
 ## Session Continuity
 
-Last session: 2026-06-05
-Stopped at: Phase 7 Waves 1-3 complete (5/6 plans, 430 passed); 07-06 paused at human-action checkpoint and relocated to DGX Spark
-Resume file: .planning/phases/07-turn-capture-semantic-pii-scrubbing/07-DGX-HANDOFF.md (then write 07-LIVE-CAPTURE.md from reported evidence)
+Last session: 2026-06-06
+Stopped at: Phase 7 COMPLETE — all 6 plans done, verification PASSED (5/5 must-haves), D-02 live-capture proven on the DGX Spark. Tracking finalized.
+Resume file: none — pick Phase 8 (v1.1 HITL Validation) or Phase 14 (v1.2 Live Experiment Capture, now unblocked). See ROADMAP.
