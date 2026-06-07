@@ -72,7 +72,7 @@ Requirements for the Experiment Logging (Dual-Use) milestone. Runs **in parallel
 
 ### Experiment Live Capture
 
-- [ ] **ECAP-01**: An eval run performed inside a live Hermes session is captured into an `ExperimentRecord` through the shared plugin hooks *(depends on v1.1 Phase 6–7)*
+- [x] **ECAP-01**: An eval run performed inside a live Hermes session is captured into an `ExperimentRecord` through the shared plugin hooks *(depends on v1.1 Phase 6–7)*
 
 ### Experiment Export & Integration
 
@@ -145,7 +145,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | EREV-01 | Phase 13 | Complete |
 | EREV-02 | Phase 13 | Complete |
 | EREV-03 | Phase 13 | Complete |
-| ECAP-01 | Phase 14 | Pending |
+| ECAP-01 | Phase 14 | Complete |
 | EEXP-01 | Phase 15 | Pending |
 | EEXP-02 | Phase 15 | Pending |
 
