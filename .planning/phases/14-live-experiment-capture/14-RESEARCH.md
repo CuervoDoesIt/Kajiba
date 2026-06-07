@@ -187,7 +187,7 @@ def _finalize_experiment(self, session_id: str) -> None:
     # Remove the prior file from THIS session if the content ID changed across turns.
     if self._last_experiment_path and self._last_experiment_path != new_path:
         self._last_experiment_path.unlink(missing_ok=True)
-    log_experiment(rec, EXPERIMENTS_DIR)   # or update_experiment for overwrite-safety
+    update_experiment(rec, EXPERIMENTS_DIR)   # overwrite-safe write path (NEVER log_experiment: skip-on-exists leaves orphan files as the content ID moves)
     self._last_experiment_path = new_path
 ```
 **Design B is the recommendation.** It needs one new instance attribute `self._last_experiment_path: Optional[Path] = None` (reset in `on_session_start`). It is the experiment analog of the coding ad-hoc path's "rewrite the SAME file" trick (collector.py:631-635), adapted for a content-addressed filename that legitimately moves as the final output accumulates.
