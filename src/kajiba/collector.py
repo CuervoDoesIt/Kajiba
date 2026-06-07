@@ -7,15 +7,20 @@ non-intrusively.
 
 import json
 import logging
+import os
 import platform
 import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Optional
 
+from kajiba import experiment_store
+from kajiba.experiment_store import build_experiment_record
 from kajiba.schema import (
+    EXPERIMENT_TYPES,
     SCHEMA_VERSION,
     ConversationTurn,
+    ExperimentRecord,
     HardwareProfile,
     KajibaRecord,
     ModelMetadata,
@@ -344,6 +349,16 @@ class KajibaCollector:
         # Once-flag guarding continuous-mode auto-submit against per-turn
         # on_session_end firings (Correction 3).
         self._finalized: bool = False
+        # Experiment-capture (v1.2 divergent tail) state. Populated per-session
+        # from the KAJIBA_EXPERIMENT* env vars at on_session_start (call-time,
+        # per-session semantics). When _experiment_mode is False the collector
+        # behaves exactly as today's coding-session capture (D-01).
+        self._experiment_mode: bool = False
+        self._experiment_type: str = "model_evaluation"
+        self._task_category: str = "coding"
+        # Self-cleaning finalize-once anchor consumed by plan 03's
+        # _finalize_experiment; declared here so __init__ is complete.
+        self._last_experiment_path: Optional[Path] = None
 
     def on_session_start(
         self,
@@ -399,6 +414,21 @@ class KajibaCollector:
             self._last_gpt_turn_id = None
             self._seen_tool_call_ids = set()
             self._finalized = False
+            # Experiment-mode opt-in, read at CALL TIME (NOT import time) so the
+            # same loaded plugin handles both coding and experiment sessions
+            # across the Hermes process lifetime (D-01, env-var trigger). An
+            # untrusted KAJIBA_EXPERIMENT_TYPE value is validated against
+            # EXPERIMENT_TYPES and falls back to "model_evaluation" (T-14-input);
+            # KAJIBA_EXPERIMENT_CATEGORY is free-form.
+            self._experiment_mode = os.environ.get("KAJIBA_EXPERIMENT") == "1"
+            _exp_type = os.environ.get("KAJIBA_EXPERIMENT_TYPE", "model_evaluation")
+            self._experiment_type = (
+                _exp_type if _exp_type in EXPERIMENT_TYPES else "model_evaluation"
+            )
+            self._task_category = os.environ.get(
+                "KAJIBA_EXPERIMENT_CATEGORY", "coding"
+            )
+            self._last_experiment_path = None
             self._created_at = datetime.now(UTC)
             self._model_metadata, self._hardware = _build_metadata_and_hardware(
                 model_config
