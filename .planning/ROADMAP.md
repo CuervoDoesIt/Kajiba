@@ -261,7 +261,7 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
 
 **Wave 2** *(blocked on 14-01 — collector.py overlap)*
 
-- [ ] 14-02-PLAN.md — experiment-mode env trigger + state attrs in on_session_start + _build_experiment_record (D-03..D-06 field mapping, SC#2 parity) (ECAP-01)
+- [x] 14-02-PLAN.md — experiment-mode env trigger + state attrs in on_session_start + _build_experiment_record (D-03..D-06 field mapping, SC#2 parity) (ECAP-01) — 2 tasks, feat 47d1d4f + feat 9bbe774, field-mapping + structural-parity tests GREEN, full suite 469 passed/2 skipped/2 RED-by-design (plan 03 finalize)
 
 **Wave 3** *(blocked on 14-02 — collector.py overlap)*
 
@@ -305,5 +305,5 @@ Two parallel tracks share a foundation. Execute by dependency, not strict numeri
 | 11. Experiment Logging & Private Store | v1.2 | 3/3 | Complete    | 2026-06-04 |
 | 12. Eval Scoring & Scrub Tuning | v1.2 | 4/4 | Complete    | 2026-06-04 |
 | 13. Reviewer Critique & Drift | v1.2 | 5/5 | Complete    | 2026-06-04 |
-| 14. Live Experiment Capture | v1.2 | 1/3 | In progress | - |
+| 14. Live Experiment Capture | v1.2 | 2/3 | In progress | - |
 | 15. Analysis Export & Practice-Project Integration | v1.2 | 0/0 | Not started | - |
