@@ -40,7 +40,7 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
 - [x] **Phase 11: Experiment Logging & Private Store** - `kajiba experiment` CLI + programmatic logging into a private local namespace (completed 2026-06-04)
 - [x] **Phase 12: Eval Scoring & Scrub Tuning** - eval-specific scorer and experiment-aware scrubbing (completed 2026-06-04)
 - [x] **Phase 13: Reviewer Critique & Drift** - critique attachment, queryable `lessons_learned`, quality-drift detection (completed 2026-06-04)
-- [ ] **Phase 14: Live Experiment Capture** - capture eval runs from live Hermes sessions via shared hooks (depends on Phase 6–7)
+- [x] **Phase 14: Live Experiment Capture** - capture eval runs from live Hermes sessions via shared hooks (depends on Phase 6–7) (completed 2026-06-07)
 - [ ] **Phase 15: Analysis Export & Practice-Project Integration** - analysis export format + Nemotron/Qwen/Gemma workflow writes directly to experiment records
 
 ## Phase Details
@@ -265,7 +265,7 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
 
 **Wave 3** *(blocked on 14-02 — collector.py overlap)*
 
-- [ ] 14-03-PLAN.md — _finalize_experiment (Design B finalize-once) + on_session_end divergent-tail branch + no-regression/D-08 privacy proof (ECAP-01)
+- [x] 14-03-PLAN.md — _finalize_experiment (Design B finalize-once) + on_session_end divergent-tail branch + no-regression/D-08 privacy proof (ECAP-01) — completed 2026-06-07, feat cac1040, 6 ECAP-01 tests GREEN, full suite 471 passed/2 skipped/0 failed
 
 ### Phase 15: Analysis Export & Practice-Project Integration
 
@@ -305,5 +305,5 @@ Two parallel tracks share a foundation. Execute by dependency, not strict numeri
 | 11. Experiment Logging & Private Store | v1.2 | 3/3 | Complete    | 2026-06-04 |
 | 12. Eval Scoring & Scrub Tuning | v1.2 | 4/4 | Complete    | 2026-06-04 |
 | 13. Reviewer Critique & Drift | v1.2 | 5/5 | Complete    | 2026-06-04 |
-| 14. Live Experiment Capture | v1.2 | 2/3 | In progress | - |
+| 14. Live Experiment Capture | v1.2 | 3/3 | Complete    | 2026-06-07 |
 | 15. Analysis Export & Practice-Project Integration | v1.2 | 0/0 | Not started | - |

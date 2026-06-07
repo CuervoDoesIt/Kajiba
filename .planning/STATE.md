@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Experiment Logging
 status: executing
-stopped_at: Phase 14 plan 02 complete
-last_updated: "2026-06-07T00:45:38.000Z"
-last_activity: 2026-06-07 -- Phase 14 plan 02 complete (Wave 2: experiment-mode trigger + record assembly)
+stopped_at: Phase 14 plan 03 complete (Phase 14 COMPLETE)
+last_updated: "2026-06-07T01:10:00.000Z"
+last_activity: 2026-06-07 -- Phase 14 plan 03 complete (Wave 3 FINAL: finalize-once + D-08 privacy branch; Phase 14 COMPLETE, ECAP-01 satisfied)
 progress:
   total_phases: 10
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 30
-  completed_plans: 28
-  percent: 93
+  completed_plans: 29
+  percent: 97
 ---
 
 # Project State
@@ -27,12 +27,12 @@ See: .planning/PROJECT.md (updated 2026-04-02)
 
 ## Current Position
 
-Phase: 14 (live-experiment-capture) — EXECUTING
-Plan: 3 of 3
-Status: Executing Phase 14 (14-01, 14-02 complete; 14-03 next)
-Last activity: 2026-06-07 -- Phase 14 plan 02 complete (Wave 2: experiment-mode trigger + record assembly)
+Phase: 14 (live-experiment-capture) — COMPLETE
+Plan: 3 of 3 (all complete)
+Status: Phase 14 COMPLETE (14-01, 14-02, 14-03 all done) — ready for /gsd-verify-work
+Last activity: 2026-06-07 -- Phase 14 plan 03 complete (Wave 3 FINAL: finalize-once + D-08 privacy branch)
 
-Progress: [█████████░] 93% (28/30 plans)
+Progress: [██████████] 97% (29/30 plans)
 
 ## Performance Metrics
 
@@ -82,6 +82,7 @@ Progress: [█████████░] 93% (28/30 plans)
 | Phase 07 P05 | 5m | 2 tasks | 2 files |
 | Phase 14 P01 | 3m | 2 tasks | 2 files |
 | Phase 14 P02 | 2m | 2 tasks | 2 files |
+| Phase 14 P03 | 4m | 2 tasks | 1 file |
 
 ## Accumulated Context
 
@@ -136,6 +137,8 @@ Progress: [█████████░] 93% (28/30 plans)
 
 - 07-06 COMPLETE (2026-06-06): D-02 live-capture proven on the DGX Spark. Live Hermes 3 8B Q4 (Ollama) session `20260605_192518_ea3f16` captured exactly one staging record with real `ollama.show()` metadata (8.0B / Q4_0 / llama / 131072); `kajiba preview` ran GLiNER Layer C live (1 flag @0.52, no real PII); D-06 calibration green on the real model (FP 0.0000, after assertion fix `ef64e88`); bonus full GB10 GPU offload (33/33 layers via `cuda_v13`). Cross-machine execution: Windows orchestrator + DGX Hermes agent over git (origin/master) as message bus. Artifacts: 07-LIVE-CAPTURE.md, 07-06-SUMMARY.md, docs/hermes-setup.md A.5. CAPT-04 / PRIV-01 / PRIV-03 proven on real data. Verification PASSED 5/5. Phase 7 COMPLETE.
 
+- 14-03 (Wave 3 FINAL, ECAP-01 COMPLETE): Added `_finalize_experiment(session_id)` (RESEARCH Pattern 2 Design B self-cleaning finalize-once) + the `on_session_end` experiment branch. Branch (`if self._experiment_mode: self._finalize_experiment(session_id); return`) sits at the TOP of the try block BEFORE the `contribution_mode` read (D-08 structural privacy guard, T-14-priv) — coding path below is byte-for-byte unchanged. `_finalize_experiment`: `if not self._conversations: return` (Pitfall 3 zero-turn guard); `rec = self._build_experiment_record(session_id)`; **`rec.compute_record_id()` BEFORE computing `new_path`** (the key fix — `record_id` is None on a fresh record and the experiment identity includes `local_model_output` which moves the id each turn; without the pre-compute the self-cleaning unlink targeted `exp_None.json` → 3 orphan files instead of 1); `new_path = experiment_store.EXPERIMENTS_DIR / f"exp_{rec.record_id}.json"` (LIVE module attr, never bound); unlink stale `_last_experiment_path` when the id moves; write via `experiment_store.update_experiment(rec, experiment_store.EXPERIMENTS_DIR)` (overwrite-safe, NEVER `log_experiment`; same live attr as store_dir resolves EQUAL to the call-time D-13 expected_base → no ValueError, monkeypatch-isolated); `self._last_experiment_path = new_path`. All inside the existing `try/except → logger.exception` (T-14-dos). Stored RAW — scrub/score/review/drift are later CLI steps (D-09). Task 2 needed NO code change (the plan-01 scaffold already carried the final privacy/regression assertions; Task 1 turned both GREEN). No deviations. TestExperimentCapture 6/6 GREEN; full suite 471 passed / 2 skipped (pre-existing yaml) / 0 failed (was 469/2 failed). ECAP-01 satisfied; SC#1 + SC#2 TRUE. Phase 14 COMPLETE. Commit: feat cac1040.
+
 - 14-02 (Wave 2, ECAP-01 partial GREEN): Wired the experiment-mode opt-in trigger + record assembly into `KajibaCollector`. Added `import os` + `from kajiba import experiment_store` (MODULE import — store dir referenced ONLY as `experiment_store.EXPERIMENTS_DIR` at call time, never bound, so a monkeypatch reaches it and the D-13 guard resolves to the same dir) + `build_experiment_record`/`EXPERIMENT_TYPES`/`ExperimentRecord` imports. Declared four `__init__` attrs (`_experiment_mode`/`_experiment_type`/`_task_category`/`_last_experiment_path`) mirroring `self._finalized`. `on_session_start` reads `KAJIBA_EXPERIMENT`/`_TYPE`/`_CATEGORY` at CALL TIME (per-session, intentional deviation from the import-time `KAJIBA_DEBUG` idiom); type validated vs `EXPERIMENT_TYPES`, fallback `model_evaluation` (T-14-input); coding-path resets untouched. Added `_build_experiment_record(session_id)`: first `human`->`task_description`, last `gpt`->`local_model_output` (defensive `next(...)`, no indexing, Pitfall 3), `eval_score=0.0` (D-05 placeholder), `started_at=self._created_at`, `experiment_id=f"live_{session_id}"`, `model`/`hardware`/`trajectory` via `build_experiment_record(**extra)` (SC#2 parity by construction), then promotes `self._model_metadata` into `rec.experiment.local_model` before any write (Pattern 3/Pitfall 4). Rewrote `test_field_mapping` + `test_structural_parity_with_deliberate_log` to exercise the assembly helper DIRECTLY (added a local `_drive_session` that drives start + N x `on_llm_turn` WITHOUT `on_session_end`) — disk persistence is plan 03, so the two finalize/no-staging tests stay RED by design. No deviations. Full suite 469 passed / 2 skipped (pre-existing yaml) / 2 failed (exactly the plan-03 finalize tests), 0 regressions. Commits: feat 47d1d4f, feat 9bbe774.
 
 - 14-01 (Wave 0 foundation, ECAP-01 RED): Extracted `_build_trajectory()` verbatim from `_build_record` (collector.py) as a non-breaking refactor — byte-identical Trajectory, `_build_record` now delegates to it — so the upcoming experiment finalize (plans 02-03) reuses the EXACT coding trajectory shape (SC#2 structural parity by construction). Added `TestExperimentCapture` to test_collector.py with the six exactly-named ECAP-01 methods + a module-level `_drive_turns(collector, session_id, turns)` helper that drives `on_session_start` -> N x (`on_llm_turn` + `on_session_end`) (the v0.15.x turn entry point, NOT `on_turn_complete`) to reproduce the turn-scoped finalize-once scenario. Isolation uses a SINGLE store-dir monkeypatch target (`experiment_store.EXPERIMENTS_DIR`) so the call-time D-13 guard inside `update_experiment` resolves to the same tmp dir the collector writes — `STAGING_DIR`/`OUTBOX_DIR` patched on the collector module (collector-owned constants). Parity helper compares live `model_dump(by_alias=True)` top-level + nested experiment/outcome keys vs a direct `build_experiment_record` (permits populated trajectory + eval_score==0.0). `--collect-only` lists six tests (plan's authoritative verify); Task 1 verify `pytest tests/test_collector.py -x -q` 28 passed + full suite 465 passed/2 skipped (refactor non-breaking). RED baseline in this env: 4 failed / 2 passed (the 2 passing are no-op safety cases test_flag_absent + test_zero_turn; the 4 failing need plan 02-03). No deviations. Commits: refactor 40d6ab6, test 97021a1.
@@ -152,6 +155,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-06-07T00:45:38.000Z
-Stopped at: Phase 14 plan 02 complete (Wave 2: experiment-mode trigger + record assembly)
-Resume file: .planning/phases/14-live-experiment-capture/14-03-PLAN.md
+Last session: 2026-06-07T01:10:00.000Z
+Stopped at: Phase 14 plan 03 complete (Wave 3 FINAL) — Phase 14 COMPLETE, ECAP-01 satisfied
+Resume file: None — Phase 14 ready for /gsd-verify-work; next phases are 8 (v1.1 HITL) or 15 (v1.2 analysis export)
