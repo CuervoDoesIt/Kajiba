@@ -658,6 +658,21 @@ class KajibaCollector:
         # nothing rather than a malformed record.
         if not self._conversations:
             return
+        # WR-03: a session with turns but no gpt turn (human-only or a malformed
+        # paired-turn path) would otherwise persist a record whose
+        # local_model_output is "" — captured-but-junk data that collides in
+        # content-addressed identity with any other empty-output session for the
+        # same experiment_id/started_at and is indistinguishable from a genuine
+        # empty generation. Require a non-empty model output before writing.
+        last_gpt = next(
+            (t.value for t in reversed(self._conversations) if t.from_ == "gpt"), ""
+        )
+        if not last_gpt:
+            logger.debug(
+                "Experiment finalize skipped for session %s: no gpt turn captured",
+                session_id,
+            )
+            return
         rec = self._build_experiment_record(session_id)
         # Overwrite-safe write path FIRST (NEVER log_experiment, whose
         # skip-on-exists would orphan files as the content id moves). Pass the
