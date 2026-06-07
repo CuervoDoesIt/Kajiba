@@ -659,25 +659,26 @@ class KajibaCollector:
         if not self._conversations:
             return
         rec = self._build_experiment_record(session_id)
-        # Compute the content-addressed id NOW so new_path matches the file
-        # update_experiment will actually write (the experiment identity includes
-        # local_model_output, which moves the id every turn — Design B). Without
-        # this, rec.record_id is None and the self-cleaning unlink would miss the
-        # real prior-turn files, orphaning one per turn.
-        rec.compute_record_id()
-        # Reference the store dir as the LIVE module attribute (never a bound
-        # name) so a test monkeypatch reaches it and the D-13 guard resolves
-        # equal to this same dir.
-        new_path = experiment_store.EXPERIMENTS_DIR / f"exp_{rec.record_id}.json"
+        # Overwrite-safe write path FIRST (NEVER log_experiment, whose
+        # skip-on-exists would orphan files as the content id moves). Pass the
+        # store dir as the LIVE module attribute (never a bound name) so a test
+        # monkeypatch reaches it and it resolves EQUAL to the call-time
+        # expected_base (= experiment_store.EXPERIMENTS_DIR) → no D-13 ValueError.
+        # update_experiment re-validates, recomputes the content-addressed id,
+        # and atomically writes via temp-file + os.replace, then RETURNS the path
+        # it actually wrote. Writing before unlinking closes the WR-01 data-loss
+        # window (a raised write leaves the prior-turn record intact), and using
+        # the returned path as the authoritative anchor removes the WR-02 dual
+        # record_id compute that could silently diverge from the on-disk file.
+        new_path = experiment_store.update_experiment(
+            rec, experiment_store.EXPERIMENTS_DIR
+        )
         # Self-cleaning: drop the stale prior-turn file when the content id moved
         # (local_model_output changes each turn, so the record_id moves too).
+        # Only reached after a successful write above, so the session always
+        # retains at least one persisted record.
         if self._last_experiment_path and self._last_experiment_path != new_path:
             self._last_experiment_path.unlink(missing_ok=True)
-        # Overwrite-safe write path (NEVER log_experiment, whose skip-on-exists
-        # would orphan files as the content id moves). Pass the same live module
-        # attribute as store_dir so it resolves EQUAL to the call-time
-        # expected_base (= experiment_store.EXPERIMENTS_DIR) → no D-13 ValueError.
-        experiment_store.update_experiment(rec, experiment_store.EXPERIMENTS_DIR)
         self._last_experiment_path = new_path
 
     def on_session_end(self, session_id: str) -> None:
