@@ -630,6 +630,56 @@ class KajibaCollector:
         # Unknown/absent status with no error signal — treat as success.
         return "success"
 
+    def _finalize_experiment(self, session_id: str) -> None:
+        """Persist exactly one experiment record for an opted-in session (D-07/D-08).
+
+        This is the v1.2 divergent tail of ``on_session_end``. Because Hermes
+        fires ``on_session_end`` after every run (turn-scoped, finding 2) and the
+        experiment filename is content-addressed on ``local_model_output`` (the
+        last gpt turn, D-03) — which changes each turn — a naive write would leave
+        one stale ``exp_*.json`` per turn. This implements RESEARCH Pattern 2
+        Design B (self-cleaning overwrite-latest): track the last-written path,
+        unlink it when the content id moves, then write the latest via the
+        overwrite-safe ``experiment_store.update_experiment`` so a session
+        finalizes to exactly ONE record (finalize-once).
+
+        The store dir is referenced as the live module attribute
+        ``experiment_store.EXPERIMENTS_DIR`` (never a bound name) and passed as
+        ``store_dir`` so it resolves EQUAL to the call-time D-13 ``expected_base``
+        (no ValueError) and a test ``monkeypatch.setattr`` stays isolated. The
+        record is stored RAW — scrub/score/review/drift run later as
+        ``kajiba experiment ...`` CLI steps, never in this hook (D-09). This
+        method NEVER touches STAGING_DIR/OUTBOX_DIR (D-08).
+
+        Args:
+            session_id: The session identifier (for record assembly).
+        """
+        # Pitfall 3: a zero-turn / interrupted end has nothing to persist; write
+        # nothing rather than a malformed record.
+        if not self._conversations:
+            return
+        rec = self._build_experiment_record(session_id)
+        # Compute the content-addressed id NOW so new_path matches the file
+        # update_experiment will actually write (the experiment identity includes
+        # local_model_output, which moves the id every turn — Design B). Without
+        # this, rec.record_id is None and the self-cleaning unlink would miss the
+        # real prior-turn files, orphaning one per turn.
+        rec.compute_record_id()
+        # Reference the store dir as the LIVE module attribute (never a bound
+        # name) so a test monkeypatch reaches it and the D-13 guard resolves
+        # equal to this same dir.
+        new_path = experiment_store.EXPERIMENTS_DIR / f"exp_{rec.record_id}.json"
+        # Self-cleaning: drop the stale prior-turn file when the content id moved
+        # (local_model_output changes each turn, so the record_id moves too).
+        if self._last_experiment_path and self._last_experiment_path != new_path:
+            self._last_experiment_path.unlink(missing_ok=True)
+        # Overwrite-safe write path (NEVER log_experiment, whose skip-on-exists
+        # would orphan files as the content id moves). Pass the same live module
+        # attribute as store_dir so it resolves EQUAL to the call-time
+        # expected_base (= experiment_store.EXPERIMENTS_DIR) → no D-13 ValueError.
+        experiment_store.update_experiment(rec, experiment_store.EXPERIMENTS_DIR)
+        self._last_experiment_path = new_path
+
     def on_session_end(self, session_id: str) -> None:
         """Finalize record and optionally auto-submit in continuous mode.
 
@@ -654,6 +704,14 @@ class KajibaCollector:
                 "Kajiba collector ended for session %s (%d turns)",
                 session_id, len(self._conversations),
             )
+
+            # Experiment-mode divergent tail (D-07/D-08): finalize to the
+            # experiment store and return BEFORE the contribution_mode read, so
+            # the coding path below (staging / continuous auto-submit) is never
+            # reached. This is the structural privacy guard for T-14-priv.
+            if self._experiment_mode:
+                self._finalize_experiment(session_id)
+                return
 
             # Check contribution mode (per D-04, D-07)
             contribution_mode = _load_config_value("contribution_mode", "ad-hoc")
