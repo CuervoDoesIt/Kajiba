@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Experiment Logging
-status: completed
-stopped_at: Phase 7 Waves 1-3 complete (5/6 plans, 430 passed); 07-06 paused at human-action checkpoint and relocated to DGX Spark
-last_updated: "2026-06-06T01:23:57.390Z"
-last_activity: 2026-06-06
+status: "Phase 7 closed out. D-02 live-capture proven on the DGX Spark (real ollama.show() metadata, GLiNER Layer C active, calibration FP 0.0000, GB10 GPU offload). Next: Phase 8 (v1.1) and/or Phase 14 (v1.2, now unblocked)."
+stopped_at: Phase 14 context gathered
+last_updated: "2026-06-06T21:04:18.289Z"
+last_activity: 2026-06-06 — Phase 7 verified and marked complete
 progress:
   total_phases: 10
   completed_phases: 5
@@ -146,6 +146,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-06-06
-Stopped at: Phase 7 COMPLETE — all 6 plans done, verification PASSED (5/5 must-haves), D-02 live-capture proven on the DGX Spark. Tracking finalized.
-Resume file: none — pick Phase 8 (v1.1 HITL Validation) or Phase 14 (v1.2 Live Experiment Capture, now unblocked). See ROADMAP.
+Last session: 2026-06-06T21:04:18.271Z
+Stopped at: Phase 14 context gathered
+Resume file: .planning/phases/14-live-experiment-capture/14-CONTEXT.md
