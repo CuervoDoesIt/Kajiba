@@ -1016,21 +1016,45 @@ class TestExperimentCapture:
         assert list(staging_dir.glob("session_*.json")), "coding path must write staging"
         assert not list(exp_dir.glob("exp_*.json")), "experiment store must be untouched"
 
+    def _drive_session(self, collector, session_id, turns):
+        """Drive on_session_start + N x on_llm_turn WITHOUT on_session_end.
+
+        Plan 02 wires the experiment-mode trigger and the
+        ``_build_experiment_record`` assembly, but NOT the finalize branch that
+        persists the record (that is plan 03). These two parity/mapping tests
+        therefore exercise the assembly helper directly on the buffered state
+        rather than reading from disk; ``on_session_end`` is intentionally not
+        called here so the still-RED finalize tests retain their own coverage.
+        """
+        collector.on_session_start(
+            session_id=session_id,
+            model_config={
+                "model_name": "Hermes-3-Llama-3.1-8B",
+                "provider": "ollama",
+                "is_local": True,
+            },
+        )
+        for i, (user_message, assistant_response) in enumerate(turns):
+            collector.on_llm_turn(
+                user_message=user_message,
+                assistant_response=assistant_response,
+                turn_id=f"{session_id}:turn:{i}",
+            )
+
     def test_structural_parity_with_deliberate_log(self, monkeypatch, tmp_path):
         """Live record's model_dump(by_alias=True) shape matches a deliberate log."""
-        exp_dir, _staging, _outbox = self._isolate(monkeypatch, tmp_path)
+        self._isolate(monkeypatch, tmp_path)
         monkeypatch.setenv("KAJIBA_EXPERIMENT", "1")
 
         collector = KajibaCollector()
-        _drive_turns(
+        self._drive_session(
             collector,
             "parity-session-001",
             [("Write a binary search.", "def bsearch(a, x): ...")],
         )
 
-        records = list(exp_dir.glob("exp_*.json"))
-        assert len(records) == 1
-        live = json.loads(records[0].read_text(encoding="utf-8"))
+        rec = collector._build_experiment_record("parity-session-001")
+        live = rec.model_dump(by_alias=True)
 
         deliberate = build_experiment_record(
             experiment_id="deliberate",
@@ -1055,11 +1079,11 @@ class TestExperimentCapture:
 
     def test_field_mapping(self, monkeypatch, tmp_path):
         """task_description==first human, local_model_output==last gpt, eval_score==0.0."""
-        exp_dir, _staging, _outbox = self._isolate(monkeypatch, tmp_path)
+        self._isolate(monkeypatch, tmp_path)
         monkeypatch.setenv("KAJIBA_EXPERIMENT", "1")
 
         collector = KajibaCollector()
-        _drive_turns(
+        self._drive_session(
             collector,
             "mapping-session-001",
             [
@@ -1068,10 +1092,10 @@ class TestExperimentCapture:
             ],
         )
 
-        records = list(exp_dir.glob("exp_*.json"))
-        assert len(records) == 1
-        live = json.loads(records[0].read_text(encoding="utf-8"))
+        rec = collector._build_experiment_record("mapping-session-001")
+        live = rec.model_dump(by_alias=True)
 
+        assert rec.experiment.experiment_id == "live_mapping-session-001"
         assert live["experiment"]["task_description"] == "First user prompt."
         assert live["outcome"]["local_model_output"] == "Final assistant reply."
         assert live["outcome"]["eval_score"] == 0.0
