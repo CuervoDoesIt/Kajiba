@@ -688,11 +688,21 @@ class KajibaCollector:
         new_path = experiment_store.update_experiment(
             rec, experiment_store.EXPERIMENTS_DIR
         )
+        # WR-04: lifecycle audit trail consistent with the module's other
+        # persistence paths (_save_to_staging, continuous auto-submit) so the
+        # logs confirm whether — and where — an experiment record was written.
+        logger.info(
+            "Experiment finalized for session %s -> %s", session_id, new_path
+        )
         # Self-cleaning: drop the stale prior-turn file when the content id moved
         # (local_model_output changes each turn, so the record_id moves too).
         # Only reached after a successful write above, so the session always
         # retains at least one persisted record.
         if self._last_experiment_path and self._last_experiment_path != new_path:
+            logger.debug(
+                "Reaped stale prior-turn experiment record: %s",
+                self._last_experiment_path,
+            )
             self._last_experiment_path.unlink(missing_ok=True)
         self._last_experiment_path = new_path
 
