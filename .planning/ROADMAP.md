@@ -257,7 +257,7 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
 
 **Wave 1**
 
-- [ ] 14-01-PLAN.md — Wave 0 test scaffolds: TestExperimentCapture (6 ECAP-01 tests, RED) + extract shared _build_trajectory() helper (ECAP-01)
+- [x] 14-01-PLAN.md — Wave 0 test scaffolds: TestExperimentCapture (6 ECAP-01 tests, RED) + extract shared _build_trajectory() helper (ECAP-01) — 2 tasks, refactor 40d6ab6 + test 97021a1, six tests collect, full suite 465 passed/2 skipped
 
 **Wave 2** *(blocked on 14-01 — collector.py overlap)*
 
@@ -305,5 +305,5 @@ Two parallel tracks share a foundation. Execute by dependency, not strict numeri
 | 11. Experiment Logging & Private Store | v1.2 | 3/3 | Complete    | 2026-06-04 |
 | 12. Eval Scoring & Scrub Tuning | v1.2 | 4/4 | Complete    | 2026-06-04 |
 | 13. Reviewer Critique & Drift | v1.2 | 5/5 | Complete    | 2026-06-04 |
-| 14. Live Experiment Capture | v1.2 | 0/0 | Not started | - |
+| 14. Live Experiment Capture | v1.2 | 1/3 | In progress | - |
 | 15. Analysis Export & Practice-Project Integration | v1.2 | 0/0 | Not started | - |

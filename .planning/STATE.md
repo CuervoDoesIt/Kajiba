@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Experiment Logging
-status: "Phase 7 closed out. D-02 live-capture proven on the DGX Spark (real ollama.show() metadata, GLiNER Layer C active, calibration FP 0.0000, GB10 GPU offload). Next: Phase 8 (v1.1) and/or Phase 14 (v1.2, now unblocked)."
-stopped_at: Phase 14 context gathered
-last_updated: "2026-06-06T23:57:06.962Z"
-last_activity: 2026-06-06 — Phase 7 verified and marked complete
+status: executing
+stopped_at: Phase 14 plan 01 complete
+last_updated: "2026-06-07T00:38:13.000Z"
+last_activity: 2026-06-07 -- Phase 14 plan 01 complete (Wave 0 foundation)
 progress:
   total_phases: 10
   completed_phases: 5
-  total_plans: 27
-  completed_plans: 26
-  percent: 50
+  total_plans: 30
+  completed_plans: 27
+  percent: 90
 ---
 
 # Project State
@@ -21,18 +21,18 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-02)
 
 **Core value:** Real-world AI session data, tagged with full runtime context, flowing into a community dataset that accelerates local model fine-tuning for everyone.
-**Current focus:** Phase 7 COMPLETE (verified 2026-06-06) — next: Phase 8 (v1.1) and/or Phase 14 (v1.2, now unblocked)
+**Current focus:** Phase 14 — live-experiment-capture
 **v1.1 Hermes Pipeline Validation (Phases 6-9):** Phase 6 ✓ (2026-06-05), Phase 7 ✓ (2026-06-06); next up Phase 8 (HITL Validation + Pipeline Integration), then Phase 9.
 **v1.2 Experiment Logging (Phases 10-15):** Phases 10-13 complete; Phase 14 (Live Experiment Capture) was gated on v1.1 Phases 6-7 — that gate is now CLEARED, so Phase 14 is unblocked. Phase 15 follows. (Note: gsd `phase.complete` reported `next_phase: 10`, which is stale — 10-13 are done; the real next phases are 8 and 14.)
 
 ## Current Position
 
-Phase: 07 — COMPLETE (verified 2026-06-06, 6/6 plans, 5/5 must-haves)
-Plan: 6 of 6 complete
-Status: Phase 7 closed out. D-02 live-capture proven on the DGX Spark (real ollama.show() metadata, GLiNER Layer C active, calibration FP 0.0000, GB10 GPU offload). Next: Phase 8 (v1.1) and/or Phase 14 (v1.2, now unblocked).
-Last activity: 2026-06-06 — Phase 7 verified and marked complete
+Phase: 14 (live-experiment-capture) — EXECUTING
+Plan: 2 of 3
+Status: Executing Phase 14 (14-01 complete; 14-02 next)
+Last activity: 2026-06-07 -- Phase 14 plan 01 complete (Wave 0 foundation)
 
-Progress: [██████████] 100% (6/6 plans)
+Progress: [█████████░] 90% (27/30 plans)
 
 ## Performance Metrics
 
@@ -80,6 +80,7 @@ Progress: [██████████] 100% (6/6 plans)
 | Phase 07 P03 | 12m | 3 tasks | 2 files |
 | Phase 07 P04 | 3m | 2 tasks | 3 files |
 | Phase 07 P05 | 5m | 2 tasks | 2 files |
+| Phase 14 P01 | 3m | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -134,6 +135,8 @@ Progress: [██████████] 100% (6/6 plans)
 
 - 07-06 COMPLETE (2026-06-06): D-02 live-capture proven on the DGX Spark. Live Hermes 3 8B Q4 (Ollama) session `20260605_192518_ea3f16` captured exactly one staging record with real `ollama.show()` metadata (8.0B / Q4_0 / llama / 131072); `kajiba preview` ran GLiNER Layer C live (1 flag @0.52, no real PII); D-06 calibration green on the real model (FP 0.0000, after assertion fix `ef64e88`); bonus full GB10 GPU offload (33/33 layers via `cuda_v13`). Cross-machine execution: Windows orchestrator + DGX Hermes agent over git (origin/master) as message bus. Artifacts: 07-LIVE-CAPTURE.md, 07-06-SUMMARY.md, docs/hermes-setup.md A.5. CAPT-04 / PRIV-01 / PRIV-03 proven on real data. Verification PASSED 5/5. Phase 7 COMPLETE.
 
+- 14-01 (Wave 0 foundation, ECAP-01 RED): Extracted `_build_trajectory()` verbatim from `_build_record` (collector.py) as a non-breaking refactor — byte-identical Trajectory, `_build_record` now delegates to it — so the upcoming experiment finalize (plans 02-03) reuses the EXACT coding trajectory shape (SC#2 structural parity by construction). Added `TestExperimentCapture` to test_collector.py with the six exactly-named ECAP-01 methods + a module-level `_drive_turns(collector, session_id, turns)` helper that drives `on_session_start` -> N x (`on_llm_turn` + `on_session_end`) (the v0.15.x turn entry point, NOT `on_turn_complete`) to reproduce the turn-scoped finalize-once scenario. Isolation uses a SINGLE store-dir monkeypatch target (`experiment_store.EXPERIMENTS_DIR`) so the call-time D-13 guard inside `update_experiment` resolves to the same tmp dir the collector writes — `STAGING_DIR`/`OUTBOX_DIR` patched on the collector module (collector-owned constants). Parity helper compares live `model_dump(by_alias=True)` top-level + nested experiment/outcome keys vs a direct `build_experiment_record` (permits populated trajectory + eval_score==0.0). `--collect-only` lists six tests (plan's authoritative verify); Task 1 verify `pytest tests/test_collector.py -x -q` 28 passed + full suite 465 passed/2 skipped (refactor non-breaking). RED baseline in this env: 4 failed / 2 passed (the 2 passing are no-op safety cases test_flag_absent + test_zero_turn; the 4 failing need plan 02-03). No deviations. Commits: refactor 40d6ab6, test 97021a1.
+
 ### Pending Todos
 
 None.
@@ -146,6 +149,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-06-06T21:04:18.271Z
-Stopped at: Phase 14 context gathered
-Resume file: .planning/phases/14-live-experiment-capture/14-CONTEXT.md
+Last session: 2026-06-07T00:38:13.000Z
+Stopped at: Phase 14 plan 01 complete (Wave 0 foundation)
+Resume file: .planning/phases/14-live-experiment-capture/14-02-PLAN.md
