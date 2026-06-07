@@ -6,7 +6,10 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from kajiba import collector as collector_mod
+from kajiba import experiment_store
 from kajiba.collector import KajibaCollector, _detect_hardware
+from kajiba.experiment_store import build_experiment_record
 from kajiba.schema import SCHEMA_VERSION, validate_record
 
 
@@ -919,3 +922,198 @@ class TestRemoteDegrade:
         # Hardware inference_backend recorded (D-03).
         assert collector._hardware is not None
         assert collector._hardware.inference_backend is not None
+
+
+def _drive_turns(collector, session_id, turns):
+    """Drive a collector through the turn-scoped finalize lifecycle.
+
+    Calls ``on_session_start`` once, then for each ``(user, assistant)`` pair in
+    ``turns`` calls ``on_llm_turn`` (the v0.15.x plugin turn entry point —
+    keyword-only) followed immediately by ``on_session_end``. This reproduces the
+    Hermes turn-scoped firing where ``on_session_end`` fires after every run, so
+    a correct finalize must collapse N firings into exactly ONE record.
+
+    Args:
+        collector: The KajibaCollector under test.
+        session_id: The session identifier passed to start/end.
+        turns: An iterable of ``(user_message, assistant_response)`` pairs.
+    """
+    collector.on_session_start(
+        session_id=session_id,
+        model_config={
+            "model_name": "Hermes-3-Llama-3.1-8B",
+            "provider": "ollama",
+            "is_local": True,
+        },
+    )
+    for i, (user_message, assistant_response) in enumerate(turns):
+        collector.on_llm_turn(
+            user_message=user_message,
+            assistant_response=assistant_response,
+            turn_id=f"{session_id}:turn:{i}",
+        )
+        collector.on_session_end(session_id)
+
+
+class TestExperimentCapture:
+    """Live experiment-capture behaviors (ECAP-01).
+
+    These are the RED baseline written ahead of the plan 02-03 implementation.
+    Store isolation uses tmp_path with a SINGLE monkeypatch target,
+    ``experiment_store.EXPERIMENTS_DIR``, so the call-time D-13 guard inside
+    ``update_experiment`` resolves to the same tmp dir the collector writes to.
+    STAGING_DIR/OUTBOX_DIR are patched on the collector module (collector-owned
+    constants). The opt-in flag is set with
+    ``monkeypatch.setenv("KAJIBA_EXPERIMENT", "1")``.
+    """
+
+    def _isolate(self, monkeypatch, tmp_path):
+        """Point the experiment store + collector dirs at tmp_path subdirs."""
+        exp_dir = tmp_path / "experiments"
+        staging_dir = tmp_path / "staging"
+        outbox_dir = tmp_path / "outbox"
+        exp_dir.mkdir(parents=True, exist_ok=True)
+        # SINGLE store-dir target: the collector references the store dir by
+        # MODULE attribute (experiment_store.EXPERIMENTS_DIR), and the call-time
+        # D-13 guard reads the same attribute — patching it alone is sufficient.
+        monkeypatch.setattr(experiment_store, "EXPERIMENTS_DIR", exp_dir)
+        # STAGING_DIR / OUTBOX_DIR remain collector-owned constants.
+        monkeypatch.setattr(collector_mod, "STAGING_DIR", staging_dir)
+        monkeypatch.setattr(collector_mod, "OUTBOX_DIR", outbox_dir)
+        return exp_dir, staging_dir, outbox_dir
+
+    def test_opted_in_session_writes_one_record(self, monkeypatch, tmp_path):
+        """N turn-scoped on_session_end firings → exactly ONE exp_*.json."""
+        exp_dir, _staging, _outbox = self._isolate(monkeypatch, tmp_path)
+        monkeypatch.setenv("KAJIBA_EXPERIMENT", "1")
+
+        collector = KajibaCollector()
+        _drive_turns(
+            collector,
+            "exp-session-001",
+            [
+                ("Write a binary search.", "def bsearch(a, x): ..."),
+                ("Now handle empty input.", "def bsearch(a, x): return -1 ..."),
+                ("Add a docstring.", "def bsearch(a, x):\n    '''...'''"),
+            ],
+        )
+
+        records = list(exp_dir.glob("exp_*.json"))
+        assert len(records) == 1, f"expected exactly one record, got {records}"
+
+    def test_flag_absent_unchanged_coding_path(self, monkeypatch, tmp_path):
+        """Flag unset → session_*.json in STAGING_DIR, EXPERIMENTS_DIR untouched."""
+        exp_dir, staging_dir, _outbox = self._isolate(monkeypatch, tmp_path)
+        monkeypatch.delenv("KAJIBA_EXPERIMENT", raising=False)
+
+        collector = KajibaCollector()
+        _drive_turns(
+            collector,
+            "coding-session-001",
+            [("Deploy the service.", "Deploying now.")],
+        )
+
+        assert list(staging_dir.glob("session_*.json")), "coding path must write staging"
+        assert not list(exp_dir.glob("exp_*.json")), "experiment store must be untouched"
+
+    def test_structural_parity_with_deliberate_log(self, monkeypatch, tmp_path):
+        """Live record's model_dump(by_alias=True) shape matches a deliberate log."""
+        exp_dir, _staging, _outbox = self._isolate(monkeypatch, tmp_path)
+        monkeypatch.setenv("KAJIBA_EXPERIMENT", "1")
+
+        collector = KajibaCollector()
+        _drive_turns(
+            collector,
+            "parity-session-001",
+            [("Write a binary search.", "def bsearch(a, x): ...")],
+        )
+
+        records = list(exp_dir.glob("exp_*.json"))
+        assert len(records) == 1
+        live = json.loads(records[0].read_text(encoding="utf-8"))
+
+        deliberate = build_experiment_record(
+            experiment_id="deliberate",
+            experiment_type="model_evaluation",
+            task_category="coding",
+            task_description="Write a binary search.",
+            local_model_name="Hermes-3-Llama-3.1-8B",
+            local_model_output="def bsearch(a, x): ...",
+            eval_score=0.0,
+        )
+        target = deliberate.model_dump(by_alias=True)
+
+        # Top-level structural parity (live may additionally populate trajectory).
+        assert set(live.keys()) >= set(target.keys()), (
+            f"missing top-level keys: {set(target.keys()) - set(live.keys())}"
+        )
+        assert set(live["experiment"].keys()) == set(target["experiment"].keys())
+        assert set(live["outcome"].keys()) == set(target["outcome"].keys())
+        assert live["record_kind"] == "model_experiment"
+        assert live["outcome"]["eval_score"] == 0.0
+        assert live.get("trajectory") is not None
+
+    def test_field_mapping(self, monkeypatch, tmp_path):
+        """task_description==first human, local_model_output==last gpt, eval_score==0.0."""
+        exp_dir, _staging, _outbox = self._isolate(monkeypatch, tmp_path)
+        monkeypatch.setenv("KAJIBA_EXPERIMENT", "1")
+
+        collector = KajibaCollector()
+        _drive_turns(
+            collector,
+            "mapping-session-001",
+            [
+                ("First user prompt.", "First assistant reply."),
+                ("Second user prompt.", "Final assistant reply."),
+            ],
+        )
+
+        records = list(exp_dir.glob("exp_*.json"))
+        assert len(records) == 1
+        live = json.loads(records[0].read_text(encoding="utf-8"))
+
+        assert live["experiment"]["task_description"] == "First user prompt."
+        assert live["outcome"]["local_model_output"] == "Final assistant reply."
+        assert live["outcome"]["eval_score"] == 0.0
+        assert live["experiment"]["local_model"]["model_name"] == "Hermes-3-Llama-3.1-8B"
+        assert live.get("trajectory") is not None
+        assert live["trajectory"]["turn_count"] >= 1
+
+    def test_no_staging_or_outbox_in_experiment_mode(self, monkeypatch, tmp_path):
+        """Even with contribution_mode==continuous, never writes STAGING/OUTBOX (D-08)."""
+        exp_dir, staging_dir, outbox_dir = self._isolate(monkeypatch, tmp_path)
+        monkeypatch.setenv("KAJIBA_EXPERIMENT", "1")
+        # Force continuous mode so the coding path would auto-submit if reached.
+        monkeypatch.setattr(
+            collector_mod,
+            "_load_config_value",
+            lambda key, default=None: (
+                "continuous" if key == "contribution_mode" else default
+            ),
+        )
+
+        collector = KajibaCollector()
+        _drive_turns(
+            collector,
+            "exp-private-001",
+            [("Evaluate this output.", "Here is the evaluation.")],
+        )
+
+        assert not list(staging_dir.glob("*.json")), "experiment mode must not stage"
+        assert not list(outbox_dir.glob("*")), "experiment mode must not reach outbox"
+        assert len(list(exp_dir.glob("exp_*.json"))) == 1
+
+    def test_zero_turn_session_writes_nothing(self, monkeypatch, tmp_path):
+        """Zero-turn / interrupted on_session_end → no exp_*.json, no IndexError."""
+        exp_dir, _staging, _outbox = self._isolate(monkeypatch, tmp_path)
+        monkeypatch.setenv("KAJIBA_EXPERIMENT", "1")
+
+        collector = KajibaCollector()
+        collector.on_session_start(
+            session_id="empty-session-001",
+            model_config={"model_name": "Hermes-3-Llama-3.1-8B", "is_local": True},
+        )
+        # No turns captured, then the session ends (interrupted).
+        collector.on_session_end("empty-session-001")
+
+        assert not list(exp_dir.glob("exp_*.json")), "zero-turn session must write nothing"
