@@ -795,6 +795,65 @@ class KajibaCollector:
             failed_tool_calls=failed_tool_calls,
         )
 
+    def _build_experiment_record(self, session_id: str) -> ExperimentRecord:
+        """Assemble an ExperimentRecord from the buffered conversation turns.
+
+        Maps the captured session into an experiment record per the divergent-tail
+        field rules:
+
+        - D-03: ``outcome.local_model_output`` is the last ``gpt`` turn.
+        - D-04: ``experiment.task_description`` is the first ``human`` turn.
+        - D-05: ``eval_score`` is the documented ``0.0`` placeholder — the record
+          is captured-but-unscored (NOT "scored zero"); scoring happens later via
+          ``kajiba experiment score``.
+        - D-06: ``trajectory`` is populated from the shared ``_build_trajectory``
+          assembly so the record has the same trajectory shape as the coding path.
+
+        Routing through ``build_experiment_record`` (the deliberate
+        ``kajiba experiment log`` write-path constructor) gives SC#2 structural
+        parity by construction. Turns are searched defensively (``next(...)`` with
+        an empty-string fallback) rather than indexed, so a session missing a
+        human or gpt turn assembles cleanly. The record is NOT written to disk
+        here — persistence is the plan 03 finalize branch.
+
+        Args:
+            session_id: The session identifier; used for the session-stable
+                ``experiment_id`` (``f"live_{session_id}"``).
+
+        Returns:
+            A validated ExperimentRecord with the captured runtime metadata
+            promoted into ``experiment.local_model`` for analysis.
+        """
+        first_user = next(
+            (t.value for t in self._conversations if t.from_ == "human"), ""
+        )
+        last_gpt = next(
+            (t.value for t in reversed(self._conversations) if t.from_ == "gpt"), ""
+        )
+        rec = build_experiment_record(
+            experiment_id=f"live_{session_id}",
+            experiment_type=self._experiment_type,
+            task_category=self._task_category,
+            task_description=first_user,
+            local_model_name=(
+                self._model_metadata.model_name
+                if self._model_metadata
+                else "unknown"
+            ),
+            local_model_output=last_gpt,
+            eval_score=0.0,
+            started_at=self._created_at,
+            model=self._model_metadata,
+            hardware=self._hardware,
+            trajectory=self._build_trajectory(),
+        )
+        # Promote the captured runtime metadata for analysis (Pattern 3). This
+        # mutation happens BEFORE any write; the write path re-validates and
+        # recomputes IDs, so the on-disk content stays consistent (Pitfall 4).
+        if self._model_metadata:
+            rec.experiment.local_model = self._model_metadata
+        return rec
+
     def _build_record(self) -> KajibaRecord:
         """Build a KajibaRecord from collected data.
 
