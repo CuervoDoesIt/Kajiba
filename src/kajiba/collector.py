@@ -732,11 +732,16 @@ class KajibaCollector:
         except Exception:
             logger.exception("Error in on_report")
 
-    def _build_record(self) -> KajibaRecord:
-        """Build a KajibaRecord from collected data.
+    def _build_trajectory(self) -> Trajectory:
+        """Assemble a Trajectory from the buffered conversation turns.
+
+        Shared sub-assembly for both the coding finalize path (``_build_record``)
+        and the experiment finalize path. Tallies tool-call counts from the
+        per-turn ``tool_calls`` and constructs the ``sharegpt_extended``
+        Trajectory over ``self._conversations``.
 
         Returns:
-            The assembled KajibaRecord (not yet scrubbed or scored).
+            The assembled Trajectory over the current conversation turns.
         """
         all_tool_calls = [
             tc
@@ -751,7 +756,7 @@ class KajibaCollector:
         )
         failed_tool_calls = total_tool_calls - successful_tool_calls
 
-        trajectory = Trajectory(
+        return Trajectory(
             format="sharegpt_extended",
             conversations=self._conversations,
             turn_count=turn_count,
@@ -759,6 +764,14 @@ class KajibaCollector:
             successful_tool_calls=successful_tool_calls,
             failed_tool_calls=failed_tool_calls,
         )
+
+    def _build_record(self) -> KajibaRecord:
+        """Build a KajibaRecord from collected data.
+
+        Returns:
+            The assembled KajibaRecord (not yet scrubbed or scored).
+        """
+        trajectory = self._build_trajectory()
 
         return KajibaRecord(
             schema_version=SCHEMA_VERSION,
