@@ -4,7 +4,7 @@ milestone: v1.2
 milestone_name: Experiment Logging
 status: "Phase 7 closed out. D-02 live-capture proven on the DGX Spark (real ollama.show() metadata, GLiNER Layer C active, calibration FP 0.0000, GB10 GPU offload). Next: Phase 8 (v1.1) and/or Phase 14 (v1.2, now unblocked)."
 stopped_at: Phase 14 context gathered
-last_updated: "2026-06-06T21:04:18.289Z"
+last_updated: "2026-06-06T23:57:06.962Z"
 last_activity: 2026-06-06 — Phase 7 verified and marked complete
 progress:
   total_phases: 10
